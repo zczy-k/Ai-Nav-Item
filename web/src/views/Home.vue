@@ -1152,17 +1152,17 @@ onUnmounted(() => {
   document.removeEventListener('click', closeEngineDropdown);
 });
 
-// 获取友情链接 logo（与首页卡片保持一致）
+// 获取友情链接 logo（与首页卡片完全一致）
 function getFriendLogo(friend) {
-  // 1. 优先使用数据库中的 logo
-  if (friend.logo) {
-    return friend.logo;
-  }
-  
-  // 2. 如果没有 logo，使用 CDN 自动生成
+  // 1. 默认使用 CDN 自动生成（与卡片逻辑一致）
   const originUrl = getOriginUrl(friend.url);
   if (originUrl) {
     return `https://api.xinac.net/icon/?url=${originUrl}&sz=128`;
+  }
+  
+  // 2. 如果 URL 解析失败，尝试使用数据库中的 logo
+  if (friend.logo) {
+    return friend.logo;
   }
   
   // 3. 默认图标
