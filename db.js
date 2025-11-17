@@ -311,7 +311,7 @@ async function seedDefaultData() {
     const friendCount = await dbGet('SELECT COUNT(*) as count FROM friends');
     if (friendCount && friendCount.count === 0) {
       const defaultFriends = [
-        ['Noodseek图床', 'https://www.nodeimage.com', 'https://www.nodeseek.com/static/image/favicon/favicon-32x32.png'],
+        ['Nodeseek图床', 'https://www.nodeimage.com', 'https://www.nodeseek.com/static/image/favicon/favicon-32x32.png'],
         ['Font Awesome', 'https://fontawesome.com', 'https://fontawesome.com/favicon.ico']
       ];
       for (const [title, url, logo] of defaultFriends) {
