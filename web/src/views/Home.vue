@@ -1047,37 +1047,50 @@ onBeforeMount(() => {
 });
 
 onMounted(async () => {
-  const res = await getMenus();
-  menus.value = res.data; // 直接使用后端返回的数据，不需要再次构建
-  if (menus.value.length) {
-    activeMenu.value = menus.value[0];
-    loadCards();
-    // 加载所有卡片用于搜索
-    loadAllCardsForSearch();
-  }
-  // 加载广告
-  const adRes = await getAds();
-  leftAds.value = adRes.data.filter(ad => ad.position === 'left');
-  rightAds.value = adRes.data.filter(ad => ad.position === 'right');
+  // 并行加载所有独立数据：菜单、广告、友链、标签、自定义搜索引擎
+  const [menusRes, adsRes, friendsRes, tagsRes, enginesRes] = await Promise.allSettled([
+    getMenus(),
+    getAds(),
+    getFriends(),
+    getTags(),
+    getSearchEngines()
+  ]);
   
-  const friendRes = await getFriends();
-  friendLinks.value = friendRes.data;
-  
-  // 加载标签
-  try {
-    const tagsRes = await getTags();
-    allTags.value = tagsRes.data;
-  } catch (error) {
-    console.error('加载标签失败:', error);
+  // 处理菜单数据（优先级最高）
+  if (menusRes.status === 'fulfilled') {
+    menus.value = menusRes.value.data;
+    if (menus.value.length) {
+      activeMenu.value = menus.value[0];
+      loadCards();
+      // 异步加载所有卡片用于搜索（不阻塞主流程）
+      loadAllCardsForSearch();
+    }
   }
   
-  // 加载自定义搜索引擎
-  try {
-    const enginesRes = await getSearchEngines();
-    const customEngines = enginesRes.data.map(engine => ({
+  // 处理广告数据
+  if (adsRes.status === 'fulfilled') {
+    leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
+    rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
+  }
+  
+  // 处理友链数据
+  if (friendsRes.status === 'fulfilled') {
+    friendLinks.value = friendsRes.value.data;
+  }
+  
+  // 处理标签数据
+  if (tagsRes.status === 'fulfilled') {
+    allTags.value = tagsRes.value.data;
+  } else {
+    console.error('加载标签失败:', tagsRes.reason);
+  }
+  
+  // 处理自定义搜索引擎
+  if (enginesRes.status === 'fulfilled') {
+    const customEngines = enginesRes.value.data.map(engine => ({
       name: 'custom_' + engine.id,
       label: engine.name,
-      iconUrl: null, // 自定义搜索引擎暂时不支持图标
+      iconUrl: null,
       iconFallback: '🔎',
       placeholder: `${engine.name} 搜索...`,
       url: q => engine.search_url.replace('{searchTerms}', encodeURIComponent(q)),
@@ -1086,9 +1099,9 @@ onMounted(async () => {
       keyword: engine.keyword
     }));
     searchEngines.value = [...defaultEngines, ...customEngines];
-  } catch (error) {
-    console.error('加载自定义搜索引擎失败:', error);
-    searchEngines.value = [...defaultEngines]; // Fallback to defaults
+  } else {
+    console.error('加载自定义搜索引擎失败:', enginesRes.reason);
+    searchEngines.value = [...defaultEngines];
   }
 
   // 从 localStorage 初始化默认搜索引擎
@@ -1173,46 +1186,74 @@ async function loadCards() {
   cards.value = res.data;
 }
 
-// 加载所有卡片用于搜索
+// 加载所有卡片用于搜索（优化版：并行加载）
 async function loadAllCardsForSearch() {
-  const tempCards = [];
+  const promises = [];
+  
   for (const menu of menus.value) {
-    try {
-      // 加载主菜单的卡片
-      const res = await getCards(menu.id, null);
-      tempCards.push(...res.data);
-      
-      // 加载子菜单的卡片
-      if (menu.subMenus && menu.subMenus.length) {
-        for (const subMenu of menu.subMenus) {
-          const subRes = await getCards(menu.id, subMenu.id);
-          tempCards.push(...subRes.data);
-        }
-      }
-    } catch (error) {
-      console.error(`加载菜单 ${menu.name} 的卡片失败:`, error);
-    }
-  }
-  allCards.value = tempCards;
-}
-
-// 加载所有分类的卡片
-async function loadAllCards() {
-  const tempCards = {};
-  for (const menu of menus.value) {
-    const res = await getCards(menu.id, null);
-    const key = `${menu.id}_null`;
-    tempCards[key] = res.data;
+    // 并行加载主菜单的卡片
+    promises.push(
+      getCards(menu.id, null)
+        .then(res => res.data)
+        .catch(error => {
+          console.error(`加载菜单 ${menu.name} 的卡片失败:`, error);
+          return [];
+        })
+    );
     
-    // 加载子分类
+    // 并行加载子菜单的卡片
     if (menu.subMenus && menu.subMenus.length) {
       for (const subMenu of menu.subMenus) {
-        const subRes = await getCards(menu.id, subMenu.id);
-        const subKey = `${menu.id}_${subMenu.id}`;
-        tempCards[subKey] = subRes.data;
+        promises.push(
+          getCards(menu.id, subMenu.id)
+            .then(res => res.data)
+            .catch(error => {
+              console.error(`加载子菜单 ${subMenu.name} 的卡片失败:`, error);
+              return [];
+            })
+        );
       }
     }
   }
+  
+  // 等待所有请求完成，合并结果
+  const results = await Promise.all(promises);
+  allCards.value = results.flat();
+}
+
+// 加载所有分类的卡片（优化版：并行加载）
+async function loadAllCards() {
+  const promises = [];
+  const keys = [];
+  
+  for (const menu of menus.value) {
+    const key = `${menu.id}_null`;
+    keys.push(key);
+    promises.push(
+      getCards(menu.id, null)
+        .then(res => res.data)
+        .catch(() => [])
+    );
+    
+    // 并行加载子分类
+    if (menu.subMenus && menu.subMenus.length) {
+      for (const subMenu of menu.subMenus) {
+        const subKey = `${menu.id}_${subMenu.id}`;
+        keys.push(subKey);
+        promises.push(
+          getCards(menu.id, subMenu.id)
+            .then(res => res.data)
+            .catch(() => [])
+        );
+      }
+    }
+  }
+  
+  const results = await Promise.all(promises);
+  const tempCards = {};
+  results.forEach((cards, index) => {
+    tempCards[keys[index]] = cards;
+  });
   allCategoryCards.value = tempCards;
 }
 
