@@ -172,8 +172,17 @@
       </div>
     </div>
     
+    <!-- 加载骨架屏 -->
+    <div v-if="cardsLoading" class="cards-skeleton">
+      <div v-for="i in 12" :key="i" class="skeleton-card">
+        <div class="skeleton-icon"></div>
+        <div class="skeleton-text"></div>
+      </div>
+    </div>
+    
     <!-- 始终显示当前选中的分类 -->
     <CardGrid 
+      v-else
       :cards="filteredCards" 
       :editMode="editMode"
       :selectedCards="selectedCards"
@@ -669,6 +678,7 @@ const menus = ref([]);
 const activeMenu = ref(null);
 const activeSubMenu = ref(null);
 const cards = ref([]);
+const cardsLoading = ref(true); // 卡片加载状态
 const allCards = ref([]); // 存储所有菜单的卡片，用于搜索
 const searchQuery = ref('');
 const leftAds = ref([]);
@@ -1058,8 +1068,10 @@ onMounted(async () => {
     if (menus.value.length) {
       activeMenu.value = menus.value[0];
       loadCards();
-      // 异步加载所有卡片用于搜索（不阻塞主流程）
-      loadAllCardsForSearch();
+      // 延迟 1 秒后加载搜索卡片，让首屏更快
+      setTimeout(() => {
+        loadAllCardsForSearch();
+      }, 1000);
     }
   }
   
@@ -1246,8 +1258,20 @@ const allCategoryCards = ref({});
 
 async function loadCards() {
   if (!activeMenu.value) return;
-  const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
-  cards.value = res.data;
+  
+  cardsLoading.value = true; // 显示加载状态
+  try {
+    const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
+    cards.value = res.data;
+  } catch (error) {
+    console.error('加载卡片失败:', error);
+    cards.value = [];
+  } finally {
+    // 延迟 150ms 隐藏骨架屏，让过渡更平滑
+    setTimeout(() => {
+      cardsLoading.value = false;
+    }, 150);
+  }
 }
 
 // 加载所有卡片用于搜索（优化版：并行加载）
@@ -3799,6 +3823,74 @@ async function saveCardEdit() {
   
   .sub-category-title {
     font-size: 16px;
+  }
+}
+
+/* 骨架屏样式 */
+.cards-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 20px;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.skeleton-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  margin-bottom: 10px;
+}
+
+.skeleton-text {
+  width: 60px;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  animation-delay: 0.2s;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 </style>

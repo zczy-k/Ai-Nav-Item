@@ -125,8 +125,23 @@ watch(() => props.cards, (newCards, oldCards) => {
 }, { deep: true, immediate: false });
 
 // 触发动画
+let isFirstLoad = true; // 首次加载标记
+
 function triggerAnimation() {
-  // 随机选择动画类型，替换bounceIn为convergeIn
+  // 首次加载使用快速淡入，提升性能
+  if (isFirstLoad) {
+    animationType.value = 'fadeIn';
+    animationClass.value = 'animate-fadeIn-fast';
+    isFirstLoad = false;
+    
+    // 动画结束后清除类名
+    setTimeout(() => {
+      animationClass.value = '';
+    }, 400); // 首次加载动画更短
+    return;
+  }
+  
+  // 后续切换使用随机动画
   const animations = ['slideUp', 'radial', 'fadeIn', 'slideLeft', 'slideRight', 'convergeIn', 'flipIn'];
   const randomIndex = Math.floor(Math.random() * animations.length);
   animationType.value = animations[randomIndex];
@@ -772,5 +787,19 @@ const gradients = [
 
 .del-btn:hover {
   background: rgba(239, 68, 68, 0.9);
+}
+
+/* 快速淡入动画（首次加载优化） */
+.animate-fadeIn-fast .link-item {
+  animation: fastFadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fastFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 </style>
