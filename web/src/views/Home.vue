@@ -470,15 +470,11 @@
             >
               <div class="friend-link-logo">
                 <img 
-                  v-if="friend.logo" 
-                  :src="friend.logo" 
+                  :src="getFriendLogo(friend)" 
                   :alt="friend.title"
                   loading="lazy"
-                  @error="handleLogoError"
+                  @error="handleFriendLogoError($event, friend)"
                 />
-                <div v-else class="friend-link-placeholder">
-                  {{ friend.title.charAt(0) }}
-                </div>
               </div>
               <div class="friend-link-info">
                 <h4>{{ friend.title }}</h4>
@@ -1155,6 +1151,75 @@ onUnmounted(() => {
   document.removeEventListener('click', closeFabMenu);
   document.removeEventListener('click', closeEngineDropdown);
 });
+
+// 获取友情链接 logo（与首页卡片保持一致）
+function getFriendLogo(friend) {
+  // 1. 优先使用数据库中的 logo
+  if (friend.logo) {
+    return friend.logo;
+  }
+  
+  // 2. 如果没有 logo，使用 CDN 自动生成
+  const originUrl = getOriginUrl(friend.url);
+  if (originUrl) {
+    return `https://api.xinac.net/icon/?url=${originUrl}&sz=128`;
+  }
+  
+  // 3. 默认图标
+  return '/default-favicon.png';
+}
+
+// 获取网站源地址（用于友情链接 logo）
+function getOriginUrl(url) {
+  if (!url) return '';
+  try {
+    const urlObj = new URL(url);
+    return urlObj.origin;
+  } catch {
+    return '';
+  }
+}
+
+// CDN 备用源列表（用于友情链接 logo 降级）
+const FRIEND_CDN_PROVIDERS = [
+  (url) => `https://api.xinac.net/icon/?url=${url}&sz=128`,           // CDN 1: xinac (国内)
+  (url) => `https://api.afmax.cn/so/ico/index.php?r=${url}&sz=128`,  // CDN 2: afmax (国内)
+  (url) => `https://icon.horse/icon/${url}`,                          // CDN 3: icon.horse
+  (url) => `https://www.google.com/s2/favicons?domain=${url}&sz=128`, // CDN 4: Google
+  (url) => `https://favicon.im/${url}?larger=true`,                   // CDN 5: favicon.im
+];
+
+// 处理友情链接 logo 加载错误（CDN 降级）
+function handleFriendLogoError(e, friend) {
+  const currentSrc = e.target.src;
+  const originUrl = getOriginUrl(friend.url);
+  
+  if (!originUrl) {
+    e.target.src = '/default-favicon.png';
+    return;
+  }
+  
+  // 尝试切换到下一个 CDN
+  for (let i = 0; i < FRIEND_CDN_PROVIDERS.length; i++) {
+    const cdnUrl = FRIEND_CDN_PROVIDERS[i](originUrl);
+    
+    if (currentSrc.includes('api.xinac.net') && i === 0 ||
+        currentSrc.includes('api.afmax.cn') && i === 1 ||
+        currentSrc.includes('icon.horse') && i === 2 ||
+        currentSrc.includes('www.google.com/s2/favicons') && i === 3 ||
+        currentSrc.includes('favicon.im') && i === 4) {
+      // 当前 CDN 失败，尝试下一个
+      if (i + 1 < FRIEND_CDN_PROVIDERS.length) {
+        e.target.src = FRIEND_CDN_PROVIDERS[i + 1](originUrl);
+        return;
+      }
+      break;
+    }
+  }
+  
+  // 最后降级到默认图标
+  e.target.src = '/default-favicon.png';
+}
 
 // 关闭搜索引擎下拉菜单
 function closeEngineDropdown() {
