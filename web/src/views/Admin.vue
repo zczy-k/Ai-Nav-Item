@@ -39,6 +39,7 @@
       <ul class="menu-list">
         <li :class="{active: page==='menu'}" @click="page='menu'; closeSider()">栏目管理</li>
         <li :class="{active: page==='card'}" @click="page='card'; closeSider()">卡片管理</li>
+        <li :class="{active: page==='duplicate'}" @click="page='duplicate'; closeSider()">去重管理</li>
         <li :class="{active: page==='tag'}" @click="page='tag'; closeSider()">标签管理</li>
         <li :class="{active: page==='ad'}" @click="page='ad'; closeSider()">广告管理</li>
         <li :class="{active: page==='friend'}" @click="page='friend'; closeSider()">友链管理</li>
@@ -81,6 +82,7 @@
         </div>
         <MenuManage v-if="page==='menu'" />
         <CardManage v-if="page==='card'" />
+        <DuplicateManage v-if="page==='duplicate'" />
         <TagManage v-if="page==='tag'" />
         <AdManage v-if="page==='ad'" />
         <FriendLinkManage v-if="page==='friend'" />
@@ -99,6 +101,7 @@ import { ref, computed, onMounted } from 'vue';
 import { login } from '../api';
 import MenuManage from './admin/MenuManage.vue';
 import CardManage from './admin/CardManage.vue';
+import DuplicateManage from './admin/DuplicateManage.vue';
 import TagManage from './admin/TagManage.vue';
 import AdManage from './admin/AdManage.vue';
 import FriendLinkManage from './admin/FriendLinkManage.vue';
@@ -120,6 +123,7 @@ const pageTitle = computed(() => {
   switch (page.value) {
     case 'menu': return '栏目管理';
     case 'card': return '卡片管理';
+    case 'duplicate': return '去重管理';
     case 'tag': return '标签管理';
     case 'ad': return '广告管理';
     case 'friend': return '友链管理';
