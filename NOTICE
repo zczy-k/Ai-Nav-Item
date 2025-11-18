@@ -1,0 +1,47 @@
+Con-Nav-Item
+Copyright 2025 zczy-k
+
+This project is based on and derived from nav-item:
+https://github.com/eooce/nav-item
+Copyright 2024 eooce
+
+================================================================================
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+================================================================================
+
+MODIFICATIONS AND ENHANCEMENTS BY zczy-k:
+
+This derivative work includes significant enhancements and modifications:
+
+- Complete duplicate detection system
+- Intelligent pinyin search functionality  
+- Browser extension quick-add features
+- Tag management system
+- Enhanced backup and recovery system
+- PWA support
+- Multi-platform deployment scripts
+- WebDAV cloud backup support
+- Custom search engine configuration
+- And many other improvements
+
+For a complete list of changes, see the project's commit history.
+
+================================================================================
+
+THIRD-PARTY DEPENDENCIES:
+
+This project uses various open-source libraries and dependencies.
+See package.json files for complete dependency information.
+Each dependency maintains its own license and copyright.
