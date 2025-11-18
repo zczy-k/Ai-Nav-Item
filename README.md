@@ -10,8 +10,6 @@
 
 </div>
 
-> Fork 自 [eooce/nav-item](https://github.com/eooce/nav-item) 并进行了大量增强和优化
-
 ## ✨ 特色功能
 
 ### 前端特性
@@ -573,6 +571,7 @@ https://github.com     ↔️  https://github.com/home    ❌ 不是重复
 ---
 
 ⭐ 如果这个项目对你有帮助，请给它一个星标！
+
 
 
 
