@@ -49,7 +49,7 @@
   <img width="1900" height="891" alt="image" src="https://github.com/user-attachments/assets/7c909f50-8d9b-4287-a3be-98c9c0061b86" />
   <p><i>后台管理界面</i></p>
   <img width="1909" height="842" alt="image" src="https://github.com/user-attachments/assets/71067bec-66c0-46b0-a54c-27d59c121d5d" />
-  <p><i>后台管理界面</i></p>
+  <p><i>后台备份功能</i></p>
   <img width="1830" height="878" alt="image" src="https://github.com/user-attachments/assets/c2d01a7a-b2ef-4ce6-b3a5-838f2df64dae" />
   <p><i>前端编辑界面</i></p>
 
@@ -576,6 +576,7 @@ https://github.com     ↔️  https://github.com/home    ❌ 不是重复
 ---
 
 ⭐ 如果这个项目对你有帮助，请给它一个星标！
+
 
 
 
