@@ -3,6 +3,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const db = require('../db');
 const auth = require('./authMiddleware');
+const { isDuplicateCard } = require('../utils/urlNormalizer');
 const router = express.Router();
 
 // 批量解析网址信息
@@ -112,27 +113,77 @@ router.post('/add', auth, (req, res) => {
     return res.status(400).json({ error: '请提供有效的菜单ID和卡片列表' });
   }
 
-  // 获取当前最大的 order 值
-  const orderQuery = sub_menu_id 
-    ? 'SELECT MAX("order") as max_order FROM cards WHERE sub_menu_id = ?'
-    : 'SELECT MAX("order") as max_order FROM cards WHERE menu_id = ? AND sub_menu_id IS NULL';
-  
-  const orderParams = sub_menu_id ? [sub_menu_id] : [menu_id];
-
-  db.get(orderQuery, orderParams, (err, row) => {
+  // 先获取所有现有卡片，用于去重检测
+  db.all('SELECT * FROM cards', [], (err, existingCards) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
 
-    let nextOrder = (row && row.max_order !== null) ? row.max_order + 1 : 0;
-    const insertedIds = [];
-    let completed = 0;
-    let hasError = false;
+    // 过滤掉重复的卡片
+    const uniqueCards = [];
+    const skippedCards = [];
+    
+    cards.forEach(card => {
+      const isDuplicate = existingCards.some(existing => 
+        isDuplicateCard({ title: card.title, url: card.url }, existing)
+      );
+      
+      if (isDuplicate) {
+        skippedCards.push({
+          title: card.title,
+          url: card.url,
+          reason: '与现有卡片重复'
+        });
+      } else {
+        // 检查是否与当前批次中的其他卡片重复
+        const isDuplicateInBatch = uniqueCards.some(unique => 
+          isDuplicateCard({ title: card.title, url: card.url }, { title: unique.title, url: unique.url })
+        );
+        
+        if (!isDuplicateInBatch) {
+          uniqueCards.push(card);
+        } else {
+          skippedCards.push({
+            title: card.title,
+            url: card.url,
+            reason: '在当前批次中重复'
+          });
+        }
+      }
+    });
 
-    // 逐个插入卡片
-    cards.forEach((card, index) => {
-      const { title, url, logo, description, tagIds } = card;
-      const order = nextOrder + index;
+    // 如果所有卡片都被跳过
+    if (uniqueCards.length === 0) {
+      return res.json({
+        success: true,
+        added: 0,
+        skipped: skippedCards.length,
+        skippedCards: skippedCards,
+        ids: []
+      });
+    }
+
+    // 获取当前最大的 order 值
+    const orderQuery = sub_menu_id 
+      ? 'SELECT MAX("order") as max_order FROM cards WHERE sub_menu_id = ?'
+      : 'SELECT MAX("order") as max_order FROM cards WHERE menu_id = ? AND sub_menu_id IS NULL';
+    
+    const orderParams = sub_menu_id ? [sub_menu_id] : [menu_id];
+
+    db.get(orderQuery, orderParams, (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      let nextOrder = (row && row.max_order !== null) ? row.max_order + 1 : 0;
+      const insertedIds = [];
+      let completed = 0;
+      let hasError = false;
+
+      // 逐个插入非重复卡片
+      uniqueCards.forEach((card, index) => {
+        const { title, url, logo, description, tagIds } = card;
+        const order = nextOrder + index;
 
       db.run(
         'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, desc, "order") VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -155,20 +206,24 @@ router.post('/add', auth, (req, res) => {
                   console.error('标签关联失败:', tagErr);
                 }
                 completed++;
-                if (completed === cards.length) {
+                if (completed === uniqueCards.length) {
                   res.json({ 
                     success: true, 
-                    count: insertedIds.length,
+                    added: insertedIds.length,
+                    skipped: skippedCards.length,
+                    skippedCards: skippedCards,
                     ids: insertedIds 
                   });
                 }
               });
             } else {
               completed++;
-              if (completed === cards.length) {
+              if (completed === uniqueCards.length) {
                 res.json({ 
                   success: true, 
-                  count: insertedIds.length,
+                  added: insertedIds.length,
+                  skipped: skippedCards.length,
+                  skippedCards: skippedCards,
                   ids: insertedIds 
                 });
               }
@@ -176,6 +231,7 @@ router.post('/add', auth, (req, res) => {
           }
         }
       );
+      });
     });
   });
 });
