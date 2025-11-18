@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue.js-3-brightgreen.svg)](https://vuejs.org/)
 
-[在线演示](https://navitem.vvvv.ee) · [问题反馈](https://github.com/zczy-k/Con-Nav-Item/issues)
+[问题反馈](https://github.com/zczy-k/Con-Nav-Item/issues)
 
 </div>
 
@@ -576,6 +576,7 @@ https://github.com     ↔️  https://github.com/home    ❌ 不是重复
 ---
 
 ⭐ 如果这个项目对你有帮助，请给它一个星标！
+
 
 
 
