@@ -61,33 +61,11 @@
         </div>
       </div>
       <div class="admin-content">
-        <div v-if="page==='welcome'" class="welcome-page">
-          <h2 class="welcome-title">欢迎您进入 Con-Nav-Item 后台管理系统</h2>
-          <div class="welcome-cards">
-            <div class="welcome-card">
-              <div class="welcome-icon time-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#1abc9c" stroke-width="2"/><path d="M12 6v6l4 2" stroke="#1abc9c" stroke-width="2" stroke-linecap="round"/></svg>
-              </div>
-              <div class="welcome-label">上次登录时间</div>
-              <div class="welcome-value">{{ lastLoginTime || '--' }}</div>
-            </div>
-            <div class="welcome-card">
-              <div class="welcome-icon ip-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#1abc9c" stroke-width="2"/><path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" stroke="#1abc9c" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1abc9c"/></svg>
-              </div>
-              <div class="welcome-label">上次登录IP</div>
-              <div class="welcome-value">{{ lastLoginIp || '--' }}</div>
-            </div>
-          </div>
-        </div>
-        <MenuManage v-if="page==='menu'" />
-        <CardManage v-if="page==='card'" />
-        <DuplicateManage v-if="page==='duplicate'" />
-        <TagManage v-if="page==='tag'" />
-        <AdManage v-if="page==='ad'" />
-        <FriendLinkManage v-if="page==='friend'" />
-        <UserManage v-if="page==='user'" />
-        <BackupManage v-if="page==='backup'" />
+        <transition name="fade" mode="out-in">
+          <keep-alive>
+            <component :is="currentComponent" :key="page" />
+          </keep-alive>
+        </transition>
       </div>
       <footer class="admin-footer">
         <p class="admin-copyright">Copyright © 2025 Con-Nav-Item | <a href="https://github.com/zczy-k/Con-Nav-Item" target="_blank" class="footer-link">Powered by zczy-k</a></p>
@@ -107,8 +85,60 @@ import AdManage from './admin/AdManage.vue';
 import FriendLinkManage from './admin/FriendLinkManage.vue';
 import UserManage from './admin/UserManage.vue';
 import BackupManage from './admin/BackupManage.vue';
+import { defineAsyncComponent, h } from 'vue';
+
+// 欢迎页面组件
+const WelcomePage = {
+  name: 'WelcomePage',
+  props: ['lastLoginTime', 'lastLoginIp'],
+  setup(props) {
+    return () => h('div', { class: 'welcome-page' }, [
+      h('h2', { class: 'welcome-title' }, '欢迎您进入 Con-Nav-Item 后台管理系统'),
+      h('div', { class: 'welcome-cards' }, [
+        h('div', { class: 'welcome-card' }, [
+          h('div', { class: 'welcome-icon time-icon', innerHTML: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#1abc9c" stroke-width="2"/><path d="M12 6v6l4 2" stroke="#1abc9c" stroke-width="2" stroke-linecap="round"/></svg>' }),
+          h('div', { class: 'welcome-label' }, '上次登录时间'),
+          h('div', { class: 'welcome-value' }, props.lastLoginTime || '--')
+        ]),
+        h('div', { class: 'welcome-card' }, [
+          h('div', { class: 'welcome-icon ip-icon', innerHTML: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#1abc9c" stroke-width="2"/><path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" stroke="#1abc9c" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#1abc9c"/></svg>' }),
+          h('div', { class: 'welcome-label' }, '上次登录IP'),
+          h('div', { class: 'welcome-value' }, props.lastLoginIp || '--')
+        ])
+      ])
+    ]);
+  }
+};
 
 const page = ref('welcome');
+
+// 组件映射
+const componentMap = {
+  welcome: WelcomePage,
+  menu: MenuManage,
+  card: CardManage,
+  duplicate: DuplicateManage,
+  tag: TagManage,
+  ad: AdManage,
+  friend: FriendLinkManage,
+  user: UserManage,
+  backup: BackupManage
+};
+
+// 当前组件
+const currentComponent = computed(() => {
+  const component = componentMap[page.value];
+  if (page.value === 'welcome') {
+    return {
+      ...component,
+      props: {
+        lastLoginTime: lastLoginTime.value,
+        lastLoginIp: lastLoginIp.value
+      }
+    };
+  }
+  return component;
+});
 const lastLoginTime = ref('');
 const lastLoginIp = ref('');
 const isLoggedIn = ref(false);
@@ -628,3 +658,34 @@ function closeSider() {
   display: none;
 }
 </style> 
+
+<styl
+e scoped>
+/* 页面切换过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 优化内容区域性能 */
+.admin-content {
+  will-change: contents;
+  contain: layout style paint;
+}
+</style>
