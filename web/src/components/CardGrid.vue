@@ -44,7 +44,6 @@ let sortableInstance = null;
 
 // 动画状态
 const animationClass = ref('');
-const animationType = ref('slideUp'); // 'slideUp' 或 'radial'
 
 // 初始化拖拽功能
 function initSortable() {
@@ -130,7 +129,6 @@ let isFirstLoad = true;
 function triggerAnimation() {
   // 首次加载：极快淡入（100ms）
   if (isFirstLoad) {
-    animationType.value = 'instant';
     animationClass.value = 'animate-instant';
     isFirstLoad = false;
     
@@ -144,64 +142,12 @@ function triggerAnimation() {
   animationClass.value = '';
 }
 
-// 获取卡片样式（用于延迟动画 + 随机渐变色）
+// 获取卡片样式（只有渐变色，无动画延迟）
 function getCardStyle(index) {
   const gradient = gradients[index % gradients.length];
-  const style = {
+  return {
     background: gradient
   };
-  
-  if (!animationClass.value) return style;
-  
-  // 在移动设备上不使用延迟动画
-  const isMobile = window.innerWidth <= 480;
-  if (isMobile) {
-    style.animationDelay = '0s';
-    return style;
-  }
-  
-  if (animationType.value === 'slideUp') {
-    // 从下往上：按索引顺序延迟
-    style.animationDelay = `${index * 0.02}s`;
-  } else if (animationType.value === 'radial') {
-    // 从中心扩散：根据距离中心的位置计算延迟
-    const cols = window.innerWidth <= 768 ? 3 : (window.innerWidth <= 1200 ? 4 : 8);
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-    const centerCol = Math.floor(cols / 2);
-    const distance = Math.abs(col - centerCol) + row;
-    style.animationDelay = `${distance * 0.03}s`;
-  } else if (animationType.value === 'fadeIn') {
-    // 淡入动画：随机延迟
-    style.animationDelay = `${Math.random() * 0.2}s`;
-  } else if (animationType.value === 'slideLeft') {
-    // 从左往右：按行延迟
-    const cols = window.innerWidth <= 768 ? 3 : (window.innerWidth <= 1200 ? 4 : 8);
-    const row = Math.floor(index / cols);
-    style.animationDelay = `${row * 0.04}s`;
-  } else if (animationType.value === 'slideRight') {
-    // 从右往左：按行延迟（反向）
-    const cols = window.innerWidth <= 768 ? 3 : (window.innerWidth <= 1200 ? 4 : 8);
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-    style.animationDelay = `${(row + (cols - col - 1) * 0.01) * 0.03}s`;
-  } else if (animationType.value === 'convergeIn') {
-    // 从两边往中间靠拢：根据列的位置计算延迟
-    const cols = window.innerWidth <= 768 ? 3 : (window.innerWidth <= 1200 ? 4 : 8);
-    const col = index % cols;
-    const centerCol = Math.floor(cols / 2);
-    const distanceFromCenter = Math.abs(col - centerCol);
-    // 边缘的元素先出现，中间的最后出现
-    style.animationDelay = `${(cols - distanceFromCenter - 1) * 0.03}s`;
-  } else if (animationType.value === 'flipIn') {
-    // 翻转入场：按对角线延迟
-    const cols = window.innerWidth <= 768 ? 3 : (window.innerWidth <= 1200 ? 4 : 8);
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-    style.animationDelay = `${(row + col) * 0.02}s`;
-  }
-  
-  return style;
 }
 
 // 提取域名
@@ -477,212 +423,7 @@ const gradients = [
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
-/* 动画样式 */
-/* 从下往上滑入动画 */
-.animate-slideUp .link-item {
-  animation: slideUpIn 0.3s ease-out;
-}
-
-@keyframes slideUpIn {
-  0% {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 从中心扩散动画 */
-.animate-radial .link-item {
-  animation: radialIn 0.3s ease-out;
-}
-
-@keyframes radialIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.1);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* 淡入动画 */
-.animate-fadeIn .link-item {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 从左滑入动画 */
-.animate-slideLeft .link-item {
-  animation: slideLeftIn 0.3s ease-out;
-}
-
-@keyframes slideLeftIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-50px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* 从右滑入动画 */
-.animate-slideRight .link-item {
-  animation: slideRightIn 0.3s ease-out;
-}
-
-@keyframes slideRightIn {
-  0% {
-    opacity: 0;
-    transform: translateX(50px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* 从两边往中间靠拢动画 */
-.animate-convergeIn .link-item {
-  animation: convergeIn 0.3s ease-out;
-}
-
-.animate-convergeIn .link-item:nth-child(8n+1),
-.animate-convergeIn .link-item:nth-child(8n+8) {
-  /* 最边缘的列（第1列和第8列） */
-  transform: translateX(-100px);
-}
-
-.animate-convergeIn .link-item:nth-child(8n+2),
-.animate-convergeIn .link-item:nth-child(8n+7) {
-  /* 次边缘的列（第2列和第7列） */
-  transform: translateX(-60px);
-}
-
-.animate-convergeIn .link-item:nth-child(8n+3),
-.animate-convergeIn .link-item:nth-child(8n+6) {
-  /* 第3列和第6列 */
-  transform: translateX(-30px);
-}
-
-.animate-convergeIn .link-item:nth-child(8n+4),
-.animate-convergeIn .link-item:nth-child(8n+5) {
-  /* 中间的列（第4列和第5列） */
-  transform: translateY(-30px);
-}
-
-/* 在中等屏幕上（4列布局） */
-@media (max-width: 1200px) and (min-width: 769px) {
-  .animate-convergeIn .link-item:nth-child(4n+1),
-  .animate-convergeIn .link-item:nth-child(4n+4) {
-    transform: translateX(-60px);
-  }
-  
-  .animate-convergeIn .link-item:nth-child(4n+2),
-  .animate-convergeIn .link-item:nth-child(4n+3) {
-    transform: translateY(-30px);
-  }
-}
-
-/* 在小屏幕上（3列布局） */
-@media (max-width: 768px) {
-  .animate-convergeIn .link-item:nth-child(3n+1),
-  .animate-convergeIn .link-item:nth-child(3n+3) {
-    transform: translateX(-50px);
-  }
-  
-  .animate-convergeIn .link-item:nth-child(3n+2) {
-    transform: translateY(-30px);
-  }
-}
-
-@keyframes convergeIn {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-    transform: translate(0, 0);
-  }
-}
-
-/* 翻转入场动画 */
-.animate-flipIn .link-item {
-  animation: flipIn 0.3s ease-out;
-}
-
-@keyframes flipIn {
-  0% {
-    opacity: 0;
-    transform: rotateY(-90deg);
-  }
-  50% {
-    opacity: 1;
-    transform: rotateY(-45deg);
-  }
-  100% {
-    opacity: 1;
-    transform: rotateY(0deg);
-  }
-}
-
-/* 优化过渡效果 */
-.container:not(.animate-slideUp):not(.animate-radial):not(.animate-fadeIn) .link-item {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-/* 响应式动画调整 */
-@media (max-width: 768px) {
-  .animate-slideUp .link-item {
-    animation-duration: 0.4s;
-  }
-  
-  .animate-radial .link-item {
-    animation-duration: 0.4s;
-  }
-}
-
-/* 减少动画延迟在移动设备上 */
-@media (max-width: 480px) {
-  .animate-slideUp .link-item {
-    animation-delay: 0s !important;
-  }
-  
-  .animate-radial .link-item {
-    animation-delay: 0s !important;
-  }
-}
-
-/* 为移动设备提供更快的动画 */
-@media (prefers-reduced-motion: reduce) {
-  .animate-slideUp .link-item,
-  .animate-radial .link-item {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-}
+/* 所有旧动画已移除，只保留极简的首次加载动画 */
 
 /* 拖拽相关样式 */
 .edit-mode .link-item.draggable {
