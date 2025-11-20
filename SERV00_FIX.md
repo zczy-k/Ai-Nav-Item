@@ -119,7 +119,27 @@ curl -I https://nav.166889.xyz/api/menus
 
 ## 🔍 故障排查
 
-### 问题 1：找不到 TCP 端口
+### 问题 1：前端无法显示（空白页面）
+
+**症状**：访问网站显示空白页面，浏览器控制台报 404 错误
+
+**原因**：静态文件目录配置问题
+
+**解决**：
+```bash
+# 一键修复
+bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/fix-serv00-frontend.sh)
+```
+
+或手动修复：
+```bash
+cd ~/domains/your-domain.com/public_nodejs
+cp app.js app.js.backup
+curl -s https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/app.js -o app.js
+devil www restart your-domain.com
+```
+
+### 问题 2：找不到 TCP 端口
 
 ```bash
 devil port list
@@ -127,7 +147,7 @@ devil port list
 devil port add tcp random
 ```
 
-### 问题 2：应用无法启动
+### 问题 3：应用无法启动
 
 ```bash
 cd ~/domains/nav.166889.xyz/public_nodejs
@@ -137,7 +157,7 @@ ASSIGNED_PORT=$(devil port list | awk '$2 == "tcp" {print $1; exit}')
 PORT=$ASSIGNED_PORT node app.js
 ```
 
-### 问题 3：524 超时错误持续
+### 问题 4：524 超时错误持续
 
 ```bash
 # 检查进程是否在运行
