@@ -45,27 +45,20 @@ const staticDir = fs.existsSync(path.join(__dirname, 'web/dist/index.html'))
 console.log(`✓ Using static files from: ${staticDir}`);
 ```
 
-#### 3. 修改 `scripts/install-serv00.sh` - 自动获取端口
+#### 3. 修改 `scripts/install-serv00.sh` - 不设置 PORT
 
 ```bash
-# 获取 devil 分配的 TCP 端口
-ASSIGNED_PORT=$(devil port list | awk '$2 == "tcp" {print $1; exit}')
-
-if [ -z "$ASSIGNED_PORT" ]; then
-    # 如果没有端口，尝试添加
-    devil port add tcp random
-    ASSIGNED_PORT=$(devil port list | awk '$2 == "tcp" {print $1; exit}')
-fi
-
-# 创建 .env 文件，包含 PORT
+# 创建 .env 文件
+# 注意：不设置 PORT，Passenger 会自动管理端口
 cat > "${WORKDIR}/.env" <<EOF
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=123456
 NODE_ENV=production
 JWT_SECRET=${JWT_SECRET}
-PORT=${ASSIGNED_PORT}
 EOF
 ```
+
+**重要**：Passenger 会自动设置 PORT 环境变量，不需要在 .env 中配置。
 
 ## 🚀 重新部署步骤
 
