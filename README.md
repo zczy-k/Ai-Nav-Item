@@ -1,19 +1,56 @@
-# Con-Nav-Item - 个人导航站
+# Con-Nav-Item - 现代化个人导航站
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
+[![Vue](https://img.shields.io/badge/Vue.js-3-brightgreen.svg)](https://vuejs.org/)
 
-现代化的个人导航站，支持卡片式导航、智能搜索、自定义主题等功能。
+现代化的个人导航站，提供美观的卡片式导航界面和强大的后台管理系统。
 
-## ✨ 主要功能
+## 📸 界面预览
 
-- 🏠 卡片式导航界面
-- 🔍 智能搜索（支持拼音）
-- 🎨 自定义主题和壁纸
-- 📱 响应式设计
-- 🔐 JWT 认证
-- 💾 自动备份（本地 + WebDAV）
-- 📱 PWA 支持
+<div align="center">
+  <img width="1859" alt="首页导航界面" src="https://github.com/user-attachments/assets/819633a6-2c05-4ab0-ae37-ad928703ef50" />
+  <p><i>首页导航界面</i></p>
+  
+  <img width="1900" alt="后台管理界面" src="https://github.com/user-attachments/assets/7c909f50-8d9b-4287-a3be-98c9c0061b86" />
+  <p><i>后台管理界面</i></p>
+  
+  <img width="1909" alt="备份管理功能" src="https://github.com/user-attachments/assets/71067bec-66c0-46b0-a54c-27d59c121d5d" />
+  <p><i>备份管理功能</i></p>
+  
+  <img width="1830" alt="前端编辑界面" src="https://github.com/user-attachments/assets/c2d01a7a-b2ef-4ce6-b3a5-838f2df64dae" />
+  <p><i>前端编辑界面</i></p>
+</div>
+
+## ✨ 功能特性
+
+### 前端功能
+- 🏠 **卡片式导航** - 美观现代的导航界面
+- 🔍 **智能搜索** - 支持拼音搜索，输入首字母即可匹配中文卡片
+- 🔍 **聚合搜索** - 支持 Google、百度、Bing、GitHub 等多引擎搜索
+- 🎨 **自定义主题** - 渐变背景、一键切换壁纸
+- 📱 **响应式设计** - 完美适配桌面端和移动端
+- 🔗 **友情链接** - 展示和管理友情链接
+- 📢 **广告位** - 可选的左右两侧广告展示
+- 🚫 **重复检测** - 批量添加时自动标记重复卡片
+- 📱 **PWA 支持** - 可安装为独立应用，离线访问
+
+### 后台管理
+- 👤 **用户管理** - 支持修改用户名和密码
+- 📋 **栏目管理** - 主菜单和子菜单的增删改查
+- 🃏 **卡片管理** - 导航卡片批量管理，拖拽排序
+- 🔍 **搜索引擎** - 自定义搜索引擎配置
+- 🏷️ **标签管理** - 创建和管理卡片标签，支持颜色自定义
+- 🔄 **重复管理** - 一键检测和删除重复卡片
+- 💾 **自动备份** - 智能增量备份 + 定时备份
+- ☁️ **WebDAV 备份** - 支持坚果云、Nextcloud 等云备份
+
+### 技术特性
+- 🔐 **JWT 认证** - 安全的用户认证机制
+- 🗄️ **SQLite 数据库** - 轻量级，无需额外配置
+- 🎯 **PM2 部署** - 进程守护，开机自启
+- 🐳 **Docker 支持** - 容器化部署
+- 🔧 **一键部署** - 多平台自动化部署脚本
 
 ## 🚀 快速部署
 
