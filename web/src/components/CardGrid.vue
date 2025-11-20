@@ -269,8 +269,7 @@ const gradients = [
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 15px;
-  opacity: 1;
-  transition: opacity 0.2s ease;
+  opacity: 1 !important;
   position: relative;
   z-index: 1;
 }
