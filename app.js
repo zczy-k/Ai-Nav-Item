@@ -137,10 +137,20 @@ app.use(globalErrorHandler);
 if (require.main === module) {
   db.initPromise
     .then(() => {
-      // 绑定到 127.0.0.1 以兼容 Serv00 等平台
-      app.listen(PORT, '127.0.0.1', () => {
-        console.log(`✓ Server running on http://127.0.0.1:${PORT}`);
-      });
+      // 检查 PORT 是否为管道/Socket (非数字)
+      const isSocket = isNaN(PORT);
+      
+      if (isSocket) {
+        // 如果是 Socket，直接监听，不指定 IP
+        app.listen(PORT, () => {
+          console.log(`✓ Server running on Socket: ${PORT}`);
+        });
+      } else {
+        // 如果是端口，绑定到 127.0.0.1 (Serv00 要求)
+        app.listen(PORT, '127.0.0.1', () => {
+          console.log(`✓ Server running on http://127.0.0.1:${PORT}`);
+        });
+      }
     })
     .catch(err => {
       console.error('✗ Failed to start server due to database initialization error:', err);
