@@ -657,10 +657,9 @@ function closeSider() {
 .menu-toggle {
   display: none;
 }
-</style> 
+</style>
 
-<styl
-e scoped>
+<style scoped>
 /* 极速页面切换（几乎无动画） */
 .fade-enter-active {
   transition: opacity 0.08s ease-out;
