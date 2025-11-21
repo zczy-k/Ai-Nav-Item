@@ -73,8 +73,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, defineComponent } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { login } from '../api';
+import WelcomePage from './admin/WelcomePage.vue';
 import MenuManage from './admin/MenuManage.vue';
 import CardManage from './admin/CardManage.vue';
 import DuplicateManage from './admin/DuplicateManage.vue';
@@ -83,44 +84,6 @@ import AdManage from './admin/AdManage.vue';
 import FriendLinkManage from './admin/FriendLinkManage.vue';
 import UserManage from './admin/UserManage.vue';
 import BackupManage from './admin/BackupManage.vue';
-
-// 欢迎页面组件
-const WelcomePage = defineComponent({
-  name: 'WelcomePage',
-  props: {
-    lastLoginTime: String,
-    lastLoginIp: String,
-    currentUsername: String
-  },
-  template: `
-    <div class="welcome-page">
-      <h2 class="welcome-title">欢迎您，{{ currentUsername || 'admin' }}！</h2>
-      <div class="welcome-cards">
-        <div class="welcome-card">
-          <div class="welcome-icon time-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="#1abc9c" stroke-width="2"/>
-              <path d="M12 6v6l4 2" stroke="#1abc9c" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <div class="welcome-label">上次登录时间</div>
-          <div class="welcome-value">{{ lastLoginTime || '--' }}</div>
-        </div>
-        <div class="welcome-card">
-          <div class="welcome-icon ip-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="#1abc9c" stroke-width="2"/>
-              <path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" stroke="#1abc9c" stroke-width="2"/>
-              <circle cx="12" cy="12" r="2" fill="#1abc9c"/>
-            </svg>
-          </div>
-          <div class="welcome-label">上次登录IP</div>
-          <div class="welcome-value">{{ lastLoginIp || '--' }}</div>
-        </div>
-      </div>
-    </div>
-  `
-});
 
 const page = ref('welcome');
 
