@@ -1,33 +1,58 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import { copyFileSync, mkdirSync } from 'fs';
-import { resolve } from 'path';
+import { copyFileSync, mkdirSync, readdirSync, statSync, existsSync, rmSync } from 'fs';
+import { resolve, join } from 'path';
+
+// 递归复制目录
+function copyRecursive(src, dest) {
+  const exists = existsSync(src);
+  const stats = exists && statSync(src);
+  const isDirectory = exists && stats.isDirectory();
+  
+  if (isDirectory) {
+    if (!existsSync(dest)) {
+      mkdirSync(dest, { recursive: true });
+    }
+    readdirSync(src).forEach(childItemName => {
+      copyRecursive(
+        join(src, childItemName),
+        join(dest, childItemName)
+      );
+    });
+  } else {
+    copyFileSync(src, dest);
+  }
+}
 
 export default defineConfig({
   // Force rebuild: 202511120855
   plugins: [
     vue(),
     {
-      name: 'copy-pwa-files',
+      name: 'copy-to-public',
       closeBundle() {
-        // 复制 PWA 文件到 dist 目录
-        const publicDir = resolve(__dirname, 'public');
         const distDir = resolve(__dirname, 'dist');
-        const iconsDir = resolve(distDir, 'icons');
+        const publicDir = resolve(__dirname, '..', 'public');
+        const publicIconsDir = resolve(__dirname, 'public', 'icons');
+        const distIconsDir = resolve(distDir, 'icons');
         
         try {
-          // 确保 icons 目录存在
-          mkdirSync(iconsDir, { recursive: true });
+          // 1. 首先复制 PWA 文件到 dist 目录
+          mkdirSync(distIconsDir, { recursive: true });
           
-          // 复制 PWA 相关文件
-          copyFileSync(resolve(publicDir, 'manifest.json'), resolve(distDir, 'manifest.json'));
-          copyFileSync(resolve(publicDir, 'sw.js'), resolve(distDir, 'sw.js'));
-          copyFileSync(resolve(publicDir, 'icons/icon-192x192.png'), resolve(iconsDir, 'icon-192x192.png'));
-          copyFileSync(resolve(publicDir, 'icons/icon-512x512.png'), resolve(iconsDir, 'icon-512x512.png'));
+          copyFileSync(resolve(__dirname, 'public', 'manifest.json'), resolve(distDir, 'manifest.json'));
+          copyFileSync(resolve(__dirname, 'public', 'sw.js'), resolve(distDir, 'sw.js'));
+          copyFileSync(resolve(publicIconsDir, 'icon-192x192.png'), resolve(distIconsDir, 'icon-192x192.png'));
+          copyFileSync(resolve(publicIconsDir, 'icon-512x512.png'), resolve(distIconsDir, 'icon-512x512.png'));
           
           console.log('✅ PWA 文件复制成功');
+          
+          // 2. 然后将整个 dist 目录复制到 public 目录
+          console.log('🔄 正在复制构建文件到 public 目录...');
+          copyRecursive(distDir, publicDir);
+          console.log('✅ 构建文件已自动复制到 public 目录');
         } catch (err) {
-          console.error('❌ PWA 文件复制失败:', err.message);
+          console.error('❌ 文件复制失败:', err.message);
         }
       }
     }
