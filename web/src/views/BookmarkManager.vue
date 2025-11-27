@@ -243,10 +243,7 @@ function cancelImport() {
   window.location.href = '/';
 }
 
-onMounted(async () => {
-  await loadMenus();
-  
-  // 方式1: 从sessionStorage获取
+function loadBookmarksFromSession() {
   const sessionData = sessionStorage.getItem('pendingBookmarks');
   if (sessionData) {
     try {
@@ -263,19 +260,18 @@ onMounted(async () => {
       console.error('解析书签数据失败:', e);
     }
   }
+}
+
+onMounted(async () => {
+  await loadMenus();
   
-  // 方式2: 监听来自扩展的消息
-  if (typeof chrome !== 'undefined' && chrome.runtime) {
-    chrome.runtime.onMessage.addListener((message) => {
-      if (message.type === 'IMPORT_BOOKMARKS' && message.bookmarks) {
-        pendingBookmarks.value = message.bookmarks.map(b => ({
-          ...b,
-          status: '',
-          targetMenuId: suggestCategory(b.url)
-        }));
-      }
-    });
-  }
+  // 从sessionStorage加载书签
+  loadBookmarksFromSession();
+  
+  // 监听自定义事件（扩展注入数据后触发）
+  window.addEventListener('bookmarksReady', () => {
+    loadBookmarksFromSession();
+  });
 });
 </script>
 

@@ -435,25 +435,26 @@ document.getElementById('confirmBookmark').addEventListener('click', async funct
         const bookmarksToImport = Array.from(selectedBookmarks).map(index => allBookmarks[index]);
 
         // 创建新标签页
-        const tab = await chrome.tabs.create({ url: `${navUrl}/bookmarks?import=true` });
+        const tab = await chrome.tabs.create({ url: `${navUrl}/bookmarks` });
         
-        // 等待页面加载后，通过消息传递数据
+        // 等待页面加载完成后注入数据
         chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
             if (tabId === tab.id && info.status === 'complete') {
-                chrome.tabs.sendMessage(tabId, {
-                    type: 'IMPORT_BOOKMARKS',
-                    bookmarks: bookmarksToImport
-                }).catch(() => {
-                    // 如果消息发送失败，使用localStorage作为备用
-                    chrome.scripting.executeScript({
-                        target: { tabId: tabId },
-                        func: (data) => {
-                            sessionStorage.setItem('pendingBookmarks', JSON.stringify(data));
-                            window.location.reload();
-                        },
-                        args: [bookmarksToImport]
-                    });
+                // 直接注入数据到sessionStorage
+                chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    func: (data) => {
+                        sessionStorage.setItem('pendingBookmarks', JSON.stringify(data));
+                        // 触发自定义事件通知页面
+                        window.dispatchEvent(new CustomEvent('bookmarksReady'));
+                    },
+                    args: [bookmarksToImport]
+                }).then(() => {
+                    console.log('书签数据已注入');
+                }).catch((err) => {
+                    console.error('注入失败:', err);
                 });
+                
                 chrome.tabs.onUpdated.removeListener(listener);
             }
         });
