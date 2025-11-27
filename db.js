@@ -143,20 +143,7 @@ async function initializeDatabase() {
       await dbRun(`ALTER TABLE users ADD COLUMN last_login_ip TEXT`);
     } catch (e) { }
 
-    // 书签功能：为cards表添加扩展字段
-    try {
-      await dbRun(`ALTER TABLE cards ADD COLUMN type TEXT DEFAULT 'card'`);
-    } catch (e) { }
-    try {
-      await dbRun(`ALTER TABLE cards ADD COLUMN folder TEXT`);
-    } catch (e) { }
-    try {
-      await dbRun(`ALTER TABLE cards ADD COLUMN source TEXT DEFAULT 'manual'`);
-    } catch (e) { }
-    // 创建书签类型索引
-    try {
-      await dbRun(`CREATE INDEX IF NOT EXISTS idx_cards_type ON cards(type)`);
-    } catch (e) { }
+
 
     // 2. 检查并插入默认数据
     await seedDefaultData();
