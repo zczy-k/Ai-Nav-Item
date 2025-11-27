@@ -159,12 +159,21 @@ async function removeCard(cardId) {
   errorMsg.value = '';
   
   try {
-    await removeDuplicates([cardId]);
-    // 重新检测
-    await handleDetectDuplicates();
+    console.log('[去重管理] 删除单个卡片:', cardId);
+    const res = await removeDuplicates([cardId]);
+    console.log('[去重管理] 删除响应:', res.data);
+    
+    if (res.data.success) {
+      console.log('[去重管理] 删除成功，重新检测...');
+      // 重新检测
+      await handleDetectDuplicates();
+    } else {
+      errorMsg.value = '删除失败：' + (res.data.message || '未知错误');
+    }
   } catch (error) {
-    errorMsg.value = error.response?.data?.error || '删除失败';
-    console.error('删除卡片失败:', error);
+    console.error('[去重管理] 删除卡片失败:', error);
+    console.error('[去重管理] 错误详情:', error.response?.data);
+    errorMsg.value = error.response?.data?.error || error.message || '删除失败';
   } finally {
     removing.value = false;
   }
@@ -180,12 +189,21 @@ async function removeGroupDuplicates(group) {
   
   try {
     const cardIds = group.duplicates.map(d => d.id);
-    await removeDuplicates(cardIds);
-    // 重新检测
-    await handleDetectDuplicates();
+    console.log('[去重管理] 删除一组重复卡片:', cardIds);
+    const res = await removeDuplicates(cardIds);
+    console.log('[去重管理] 删除响应:', res.data);
+    
+    if (res.data.success) {
+      console.log('[去重管理] 删除成功，重新检测...');
+      // 重新检测
+      await handleDetectDuplicates();
+    } else {
+      errorMsg.value = '删除失败：' + (res.data.message || '未知错误');
+    }
   } catch (error) {
-    errorMsg.value = error.response?.data?.error || '删除失败';
-    console.error('删除重复卡片失败:', error);
+    console.error('[去重管理] 删除重复卡片失败:', error);
+    console.error('[去重管理] 错误详情:', error.response?.data);
+    errorMsg.value = error.response?.data?.error || error.message || '删除失败';
   } finally {
     removing.value = false;
   }
@@ -203,12 +221,21 @@ async function removeAllDuplicates() {
     const allDuplicateIds = duplicateGroups.value.flatMap(group => 
       group.duplicates.map(d => d.id)
     );
-    await removeDuplicates(allDuplicateIds);
-    // 重新检测
-    await handleDetectDuplicates();
+    console.log('[去重管理] 删除所有重复卡片:', allDuplicateIds);
+    const res = await removeDuplicates(allDuplicateIds);
+    console.log('[去重管理] 删除响应:', res.data);
+    
+    if (res.data.success) {
+      console.log('[去重管理] 删除成功，重新检测...');
+      // 重新检测
+      await handleDetectDuplicates();
+    } else {
+      errorMsg.value = '删除失败：' + (res.data.message || '未知错误');
+    }
   } catch (error) {
-    errorMsg.value = error.response?.data?.error || '删除失败';
-    console.error('删除所有重复失败:', error);
+    console.error('[去重管理] 删除所有重复失败:', error);
+    console.error('[去重管理] 错误详情:', error.response?.data);
+    errorMsg.value = error.response?.data?.error || error.message || '删除失败';
   } finally {
     removing.value = false;
   }

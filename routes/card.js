@@ -202,10 +202,45 @@ router.put('/:id', auth, (req, res) => {
 });
 
 router.delete('/:id', auth, (req, res) => {
-  db.run('DELETE FROM cards WHERE id=?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    triggerDebouncedBackup(); // 触发自动备份
-    res.json({ deleted: this.changes });
+  const cardId = req.params.id;
+  
+  // 使用事务确保数据一致性
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION', (err) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      
+      // 先删除关联的标签
+      db.run('DELETE FROM card_tags WHERE card_id=?', [cardId], (err) => {
+        if (err) {
+          db.run('ROLLBACK');
+          return res.status(500).json({ error: '删除标签关联失败: ' + err.message });
+        }
+        
+        // 再删除卡片
+        db.run('DELETE FROM cards WHERE id=?', [cardId], function(err) {
+          if (err) {
+            db.run('ROLLBACK');
+            return res.status(500).json({ error: '删除卡片失败: ' + err.message });
+          }
+          
+          const deletedCount = this.changes;
+          
+          db.run('COMMIT', (err) => {
+            if (err) {
+              return res.status(500).json({ error: '提交事务失败: ' + err.message });
+            }
+            
+            triggerDebouncedBackup();
+            res.json({ 
+              success: true,
+              deleted: deletedCount 
+            });
+          });
+        });
+      });
+    });
   });
 });
 
@@ -234,11 +269,44 @@ router.post('/remove-duplicates', auth, (req, res) => {
   
   const placeholders = cardIds.map(() => '?').join(',');
   
-  db.run(`DELETE FROM cards WHERE id IN (${placeholders})`, cardIds, function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    
-    triggerDebouncedBackup();
-    res.json({ deleted: this.changes });
+  // 使用事务确保数据一致性
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION', (err) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      
+      // 先删除关联的标签（防止外键约束问题）
+      db.run(`DELETE FROM card_tags WHERE card_id IN (${placeholders})`, cardIds, (err) => {
+        if (err) {
+          db.run('ROLLBACK');
+          return res.status(500).json({ error: '删除标签关联失败: ' + err.message });
+        }
+        
+        // 再删除卡片
+        db.run(`DELETE FROM cards WHERE id IN (${placeholders})`, cardIds, function(err) {
+          if (err) {
+            db.run('ROLLBACK');
+            return res.status(500).json({ error: '删除卡片失败: ' + err.message });
+          }
+          
+          const deletedCount = this.changes;
+          
+          db.run('COMMIT', (err) => {
+            if (err) {
+              return res.status(500).json({ error: '提交事务失败: ' + err.message });
+            }
+            
+            triggerDebouncedBackup();
+            res.json({ 
+              success: true,
+              deleted: deletedCount,
+              message: `成功删除 ${deletedCount} 张卡片`
+            });
+          });
+        });
+      });
+    });
   });
 });
 
