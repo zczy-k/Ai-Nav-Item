@@ -11,6 +11,7 @@ chrome.storage.sync.get(['navUrl'], function (result) {
     const openNavBtn = document.getElementById('openNav');
     const addCurrentBtn = document.getElementById('addCurrentTab');
     const selectTabsBtn = document.getElementById('selectTabs');
+    const importBookmarksBtn = document.getElementById('importBookmarks');
 
     if (result.navUrl) {
         navUrl = result.navUrl;
@@ -19,12 +20,14 @@ chrome.storage.sync.get(['navUrl'], function (result) {
         openNavBtn.disabled = false;
         addCurrentBtn.disabled = false;
         selectTabsBtn.disabled = false;
+        importBookmarksBtn.disabled = false;
     } else {
         urlElement.textContent = '未设置';
         urlElement.classList.add('empty');
         openNavBtn.disabled = true;
         addCurrentBtn.disabled = true;
         selectTabsBtn.disabled = true;
+        importBookmarksBtn.disabled = true;
     }
 });
 
@@ -259,6 +262,12 @@ function isSpecialPage(url) {
 document.getElementById('importBookmarks').addEventListener('click', async function () {
     if (!navUrl) {
         alert('请先设置导航站地址');
+        return;
+    }
+
+    // 检查浏览器是否支持 bookmarks API
+    if (!chrome.bookmarks) {
+        alert('当前浏览器不支持书签API，请使用Chrome、Edge或其他Chromium内核浏览器');
         return;
     }
 
