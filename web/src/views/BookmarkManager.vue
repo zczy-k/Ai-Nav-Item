@@ -229,11 +229,6 @@ async function doImport() {
 
     alert(`成功导入 ${totalAdded} 个书签`);
     
-    // 清除已导入的数据
-    if (typeof chrome !== 'undefined' && chrome.storage) {
-      await chrome.storage.local.remove(['pendingBookmarks', 'bookmarkImportTime']);
-    }
-    
     // 返回首页
     window.location.href = '/';
   } catch (e) {
@@ -245,31 +240,30 @@ async function doImport() {
 }
 
 function cancelImport() {
-  if (typeof chrome !== 'undefined' && chrome.storage) {
-    chrome.storage.local.remove(['pendingBookmarks', 'bookmarkImportTime']);
-  }
   window.location.href = '/';
 }
 
 onMounted(async () => {
   await loadMenus();
   
-  // 从chrome.storage获取待导入书签
-  if (typeof chrome !== 'undefined' && chrome.storage) {
+  // 从URL参数获取待导入书签
+  const urlParams = new URLSearchParams(window.location.search);
+  const base64Data = urlParams.get('data');
+  
+  if (base64Data) {
     try {
-      const result = await chrome.storage.local.get(['pendingBookmarks', 'bookmarkImportTime']);
-      if (result.pendingBookmarks && result.pendingBookmarks.length > 0) {
-        const isExpired = Date.now() - (result.bookmarkImportTime || 0) > 10 * 60 * 1000;
-        if (!isExpired) {
-          pendingBookmarks.value = result.pendingBookmarks.map(b => ({
-            ...b,
-            status: '',
-            targetMenuId: suggestCategory(b.url)
-          }));
-        }
+      const dataStr = decodeURIComponent(escape(atob(base64Data)));
+      const bookmarks = JSON.parse(dataStr);
+      
+      if (Array.isArray(bookmarks) && bookmarks.length > 0) {
+        pendingBookmarks.value = bookmarks.map(b => ({
+          ...b,
+          status: '',
+          targetMenuId: suggestCategory(b.url)
+        }));
       }
     } catch (e) {
-      console.error('获取待导入书签失败:', e);
+      console.error('解析书签数据失败:', e);
     }
   }
 });

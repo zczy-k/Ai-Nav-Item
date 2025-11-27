@@ -94,12 +94,11 @@
         </svg>
         <span class="tag-count">{{ allTags.length }}</span>
       </button>
-      <!-- 书签入口按钮 -->
-      <router-link to="/bookmarks" class="mini-bookmark-btn" title="书签管理">
+      <!-- 书签导入入口 -->
+      <router-link to="/bookmarks" class="mini-bookmark-btn" title="导入书签">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
         </svg>
-        <span class="bookmark-count" v-if="bookmarkCount > 0">{{ bookmarkCount }}</span>
       </router-link>
     </div>
     
@@ -681,7 +680,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeMount, computed, defineAsyncComponent, onUnmounted } from 'vue';
-import { getMenus, getCards, getAds, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags, getBookmarkCount } from '../api';
+import { getMenus, getCards, getAds, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags } from '../api';
 import MenuBar from '../components/MenuBar.vue';
 import { filterCardsWithPinyin } from '../utils/pinyin';
 import { isDuplicateCard } from '../utils/urlNormalizer';
@@ -701,7 +700,6 @@ const friendLinks = ref([]);
 const allTags = ref([]);
 const selectedTagId = ref(null);
 const showTagPanel = ref(false); // 标签选择浮层
-const bookmarkCount = ref(0); // 书签数量
 
 // 批量添加相关状态
 const showBatchAddModal = ref(false);
@@ -1062,20 +1060,14 @@ onBeforeMount(() => {
 });
 
 onMounted(async () => {
-  // 并行加载所有独立数据：菜单、广告、友链、标签、自定义搜索引擎、书签数量
-  const [menusRes, adsRes, friendsRes, tagsRes, enginesRes, bookmarkCountRes] = await Promise.allSettled([
+  // 并行加载所有独立数据：菜单、广告、友链、标签、自定义搜索引擎
+  const [menusRes, adsRes, friendsRes, tagsRes, enginesRes] = await Promise.allSettled([
     getMenus(),
     getAds(),
     getFriends(),
     getTags(),
-    getSearchEngines(),
-    getBookmarkCount()
+    getSearchEngines()
   ]);
-  
-  // 处理书签数量
-  if (bookmarkCountRes.status === 'fulfilled') {
-    bookmarkCount.value = bookmarkCountRes.value.data.count || 0;
-  }
   
   // 处理菜单数据（优先级最高）
   if (menusRes.status === 'fulfilled') {
@@ -2609,19 +2601,6 @@ async function saveCardEdit() {
   border-color: #f59e0b;
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3);
-}
-
-.bookmark-count {
-  background: rgba(245, 158, 11, 0.1);
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 11px;
-}
-
-.mini-bookmark-btn:hover .bookmark-count {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
 }
 
 /* 标签选择浮层 */

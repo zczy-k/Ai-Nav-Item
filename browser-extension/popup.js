@@ -434,14 +434,12 @@ document.getElementById('confirmBookmark').addEventListener('click', async funct
         // 获取选中的书签
         const bookmarksToImport = Array.from(selectedBookmarks).map(index => allBookmarks[index]);
 
-        // 将书签数据存储到chrome.storage，然后跳转到导航站
-        await chrome.storage.local.set({ 
-            pendingBookmarks: bookmarksToImport,
-            bookmarkImportTime: Date.now()
-        });
-
-        // 跳转到书签管理页面，页面会自动检测并导入
-        chrome.tabs.create({ url: `${navUrl}/bookmarks?import=pending` });
+        // 通过URL参数传递书签数据（Base64编码）
+        const dataStr = JSON.stringify(bookmarksToImport);
+        const base64Data = btoa(unescape(encodeURIComponent(dataStr)));
+        
+        // 跳转到书签导入页面
+        chrome.tabs.create({ url: `${navUrl}/bookmarks?data=${base64Data}` });
         window.close();
     } catch (error) {
         console.error('准备导入失败:', error);
