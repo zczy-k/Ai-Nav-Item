@@ -144,8 +144,20 @@ async function updateMenu(menu) {
 
 async function deleteMenu(id) {
   if (!confirm('确定要删除这个主菜单吗？删除后将同时删除其下的所有子菜单和卡片。')) return;
-  await apiDeleteMenu(id);
-  loadMenus();
+  
+  // 乐观更新：立即从列表中移除
+  const index = menus.value.findIndex(m => m.id === id);
+  if (index > -1) {
+    menus.value.splice(index, 1);
+  }
+  
+  try {
+    await apiDeleteMenu(id);
+  } catch (error) {
+    console.error('删除菜单失败:', error);
+    // 失败时重新加载
+    await loadMenus();
+  }
 }
 
 async function addSubMenu(menuId) {
@@ -168,8 +180,15 @@ async function updateSubMenu(subMenu) {
 
 async function deleteSubMenu(id) {
   if (!confirm('确定要删除这个子菜单吗？删除后将同时删除其下的所有卡片。')) return;
-  await apiDeleteSubMenu(id);
-  loadMenus();
+  
+  try {
+    await apiDeleteSubMenu(id);
+    // 删除成功后重新加载
+    await loadMenus();
+  } catch (error) {
+    console.error('删除子菜单失败:', error);
+    alert('删除失败：' + (error.response?.data?.error || error.message));
+  }
 }
 
 function toggleSubMenu(menuId) {

@@ -74,8 +74,26 @@ async function updateAd(ad) {
   loadAds();
 }
 async function deleteAd(id) {
-  await apiDeleteAd(id);
-  loadAds();
+  if (!confirm('确定要删除这个广告吗？')) return;
+  
+  // 乐观更新：立即从列表中移除
+  const leftIndex = leftAds.value.findIndex(ad => ad.id === id);
+  const rightIndex = rightAds.value.findIndex(ad => ad.id === id);
+  
+  if (leftIndex > -1) {
+    leftAds.value.splice(leftIndex, 1);
+  }
+  if (rightIndex > -1) {
+    rightAds.value.splice(rightIndex, 1);
+  }
+  
+  try {
+    await apiDeleteAd(id);
+  } catch (error) {
+    console.error('删除广告失败:', error);
+    // 失败时重新加载
+    await loadAds();
+  }
 }
 </script>
 

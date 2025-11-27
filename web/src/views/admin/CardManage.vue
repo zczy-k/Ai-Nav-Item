@@ -316,8 +316,21 @@ async function updateCard(card) {
 }
 
 async function deleteCard(id) {
-  await apiDeleteCard(id);
-  loadCards();
+  if (!confirm('确定要删除这张卡片吗？')) return;
+  
+  // 乐观更新：立即从列表中移除
+  const index = cards.value.findIndex(c => c.id === id);
+  if (index > -1) {
+    cards.value.splice(index, 1);
+  }
+  
+  try {
+    await apiDeleteCard(id);
+  } catch (error) {
+    console.error('删除卡片失败:', error);
+    // 失败时重新加载
+    await loadCards();
+  }
 }
 
 function openTagSelector(card) {

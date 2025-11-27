@@ -51,8 +51,21 @@ async function updateFriend(f) {
   loadFriends();
 }
 async function deleteFriend(id) {
-  await apiDeleteFriend(id);
-  loadFriends();
+  if (!confirm('确定要删除这个友链吗？')) return;
+  
+  // 乐观更新：立即从列表中移除
+  const index = friends.value.findIndex(f => f.id === id);
+  if (index > -1) {
+    friends.value.splice(index, 1);
+  }
+  
+  try {
+    await apiDeleteFriend(id);
+  } catch (error) {
+    console.error('删除友链失败:', error);
+    // 失败时重新加载
+    await loadFriends();
+  }
 }
 </script>
 
