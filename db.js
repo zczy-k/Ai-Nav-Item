@@ -14,7 +14,7 @@ const db = new sqlite3.Database(path.join(dbDir, 'nav.db'));
 // Promisify database operations
 const dbRun = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
+    db.run(sql, params, function (err) {
       if (err) reject(err);
       else resolve(this);
     });
@@ -49,7 +49,7 @@ async function initializeDatabase() {
       "order" INTEGER DEFAULT 0
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_menus_order ON menus("order")`);
-    
+
     await dbRun(`CREATE TABLE IF NOT EXISTS sub_menus (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       parent_id INTEGER NOT NULL,
@@ -59,7 +59,7 @@ async function initializeDatabase() {
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_sub_menus_parent_id ON sub_menus(parent_id)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_sub_menus_order ON sub_menus("order")`);
-    
+
     await dbRun(`CREATE TABLE IF NOT EXISTS cards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       menu_id INTEGER,
@@ -76,7 +76,7 @@ async function initializeDatabase() {
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_cards_menu_id ON cards(menu_id)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_cards_sub_menu_id ON cards(sub_menu_id)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_cards_order ON cards("order")`);
-    
+
     await dbRun(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
@@ -85,7 +85,7 @@ async function initializeDatabase() {
       last_login_ip TEXT
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
-    
+
     await dbRun(`CREATE TABLE IF NOT EXISTS ads (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       position TEXT NOT NULL,
@@ -93,7 +93,7 @@ async function initializeDatabase() {
       url TEXT NOT NULL
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_ads_position ON ads(position)`);
-    
+
     await dbRun(`CREATE TABLE IF NOT EXISTS friends (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -101,7 +101,7 @@ async function initializeDatabase() {
       logo TEXT
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_friends_title ON friends(title)`);
-    
+
     await dbRun(`CREATE TABLE IF NOT EXISTS custom_search_engines (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -112,7 +112,7 @@ async function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_custom_search_engines_order ON custom_search_engines("order")`);
-    
+
     // 标签表
     await dbRun(`CREATE TABLE IF NOT EXISTS tags (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,7 +123,7 @@ async function initializeDatabase() {
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_tags_order ON tags("order")`);
-    
+
     // 卡片-标签关联表（多对多）
     await dbRun(`CREATE TABLE IF NOT EXISTS card_tags (
       card_id INTEGER NOT NULL,
@@ -135,24 +135,28 @@ async function initializeDatabase() {
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_card_tags_card_id ON card_tags(card_id)`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_card_tags_tag_id ON card_tags(tag_id)`);
 
-    // 书签表
-    await dbRun(`CREATE TABLE IF NOT EXISTS bookmarks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      url TEXT NOT NULL,
-      icon TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await dbRun(`CREATE INDEX IF NOT EXISTS idx_bookmarks_title ON bookmarks(title)`);
-    await dbRun(`CREATE INDEX IF NOT EXISTS idx_bookmarks_url ON bookmarks(url)`);
-
     // 尝试添加登录信息列（静默处理，如果列已存在会失败）
     try {
       await dbRun(`ALTER TABLE users ADD COLUMN last_login_time TEXT`);
-    } catch (e) {}
+    } catch (e) { }
     try {
       await dbRun(`ALTER TABLE users ADD COLUMN last_login_ip TEXT`);
-    } catch (e) {}
+    } catch (e) { }
+
+    // 书签功能：为cards表添加扩展字段
+    try {
+      await dbRun(`ALTER TABLE cards ADD COLUMN type TEXT DEFAULT 'card'`);
+    } catch (e) { }
+    try {
+      await dbRun(`ALTER TABLE cards ADD COLUMN folder TEXT`);
+    } catch (e) { }
+    try {
+      await dbRun(`ALTER TABLE cards ADD COLUMN source TEXT DEFAULT 'manual'`);
+    } catch (e) { }
+    // 创建书签类型索引
+    try {
+      await dbRun(`CREATE INDEX IF NOT EXISTS idx_cards_type ON cards(type)`);
+    } catch (e) { }
 
     // 2. 检查并插入默认数据
     await seedDefaultData();
@@ -170,7 +174,7 @@ async function seedDefaultData() {
 
     // 检查菜单是否为空
     const menuCount = await dbGet('SELECT COUNT(*) as count FROM menus');
-    
+
     if (menuCount && menuCount.count === 0) {
       // 插入默认菜单
       const defaultMenus = [
@@ -181,7 +185,7 @@ async function seedDefaultData() {
         ['Tools', 5],
         ['Other', 6]
       ];
-      
+
       const menuMap = {};
       for (const [name, order] of defaultMenus) {
         const result = await dbRun('INSERT INTO menus (name, "order") VALUES (?, ?)', [name, order]);
@@ -198,7 +202,7 @@ async function seedDefaultData() {
         { parentMenu: 'Software', name: 'Android', order: 3 },
         { parentMenu: 'Software', name: 'Windows', order: 4 }
       ];
-      
+
       const subMenuMap = {};
       for (const subMenu of subMenus) {
         if (menuMap[subMenu.parentMenu]) {
@@ -213,25 +217,25 @@ async function seedDefaultData() {
       // 插入默认卡片
       const cards = [
         // Home
-        { menu: 'Home', title: 'Baidu', url: 'https://www.baidu.com', logo_url: 'https://api.xinac.net/icon/?url=https://www.baidu.com&sz=128', desc: '全球最大的中文搜索引擎'  },
-        { menu: 'Home', title: 'Youtube', url: 'https://www.youtube.com', logo_url: 'https://api.xinac.net/icon/?url=https://www.youtube.com&sz=128', desc: '全球最大的视频社区'  },
-        { menu: 'Home', title: 'Gmail', url: 'https://mail.google.com', logo_url: 'https://api.xinac.net/icon/?url=https://mail.google.com&sz=128', desc: ''  },
-        { menu: 'Home', title: 'GitHub', url: 'https://github.com', logo_url: 'https://api.xinac.net/icon/?url=https://github.com&sz=128', desc: '全球最大的代码托管平台'  },
-        { menu: 'Home', title: 'ip.sb', url: 'https://ip.sb', logo_url: 'https://api.xinac.net/icon/?url=https://ip.sb&sz=128', desc: 'ip地址查询'  },
-        { menu: 'Home', title: 'Cloudflare', url: 'https://dash.cloudflare.com', logo_url: 'https://api.xinac.net/icon/?url=https://dash.cloudflare.com&sz=128', desc: '全球最大的cdn服务商'  },
-        { menu: 'Home', title: 'ChatGPT', url: 'https://chat.openai.com', logo_url: 'https://api.xinac.net/icon/?url=https://chat.openai.com&sz=128', desc: '人工智能AI聊天机器人'  },
-        { menu: 'Home', title: 'Huggingface', url: 'https://huggingface.co', logo_url: 'https://api.xinac.net/icon/?url=https://huggingface.co&sz=128', desc: '全球最大的开源模型托管平台'  },
-        { menu: 'Home', title: 'ITDOG - 在线ping', url: 'https://www.itdog.cn/tcping', logo_url: 'https://api.xinac.net/icon/?url=https://www.itdog.cn&sz=128', desc: '在线tcping'  },
-        { menu: 'Home', title: 'Ping0', url: 'https://ping0.cc', logo_url: 'https://api.xinac.net/icon/?url=https://ping0.cc&sz=128', desc: 'ip地址查询'  },
-        { menu: 'Home', title: '浏览器指纹', url: 'https://www.browserscan.net/zh', logo_url: 'https://api.xinac.net/icon/?url=https://www.browserscan.net&sz=128', desc: '浏览器指纹查询'  },
-        { menu: 'Home', title: 'nezha面板', url: 'https://ssss.nyc.mn', logo_url: 'https://api.xinac.net/icon/?url=https://ssss.nyc.mn&sz=128', desc: 'nezha面板'  },
-        { menu: 'Home', title: 'Api测试', url: 'https://hoppscotch.io', logo_url: 'https://api.xinac.net/icon/?url=https://hoppscotch.io&sz=128', desc: '在线api测试工具'  },
+        { menu: 'Home', title: 'Baidu', url: 'https://www.baidu.com', logo_url: 'https://api.xinac.net/icon/?url=https://www.baidu.com&sz=128', desc: '全球最大的中文搜索引擎' },
+        { menu: 'Home', title: 'Youtube', url: 'https://www.youtube.com', logo_url: 'https://api.xinac.net/icon/?url=https://www.youtube.com&sz=128', desc: '全球最大的视频社区' },
+        { menu: 'Home', title: 'Gmail', url: 'https://mail.google.com', logo_url: 'https://api.xinac.net/icon/?url=https://mail.google.com&sz=128', desc: '' },
+        { menu: 'Home', title: 'GitHub', url: 'https://github.com', logo_url: 'https://api.xinac.net/icon/?url=https://github.com&sz=128', desc: '全球最大的代码托管平台' },
+        { menu: 'Home', title: 'ip.sb', url: 'https://ip.sb', logo_url: 'https://api.xinac.net/icon/?url=https://ip.sb&sz=128', desc: 'ip地址查询' },
+        { menu: 'Home', title: 'Cloudflare', url: 'https://dash.cloudflare.com', logo_url: 'https://api.xinac.net/icon/?url=https://dash.cloudflare.com&sz=128', desc: '全球最大的cdn服务商' },
+        { menu: 'Home', title: 'ChatGPT', url: 'https://chat.openai.com', logo_url: 'https://api.xinac.net/icon/?url=https://chat.openai.com&sz=128', desc: '人工智能AI聊天机器人' },
+        { menu: 'Home', title: 'Huggingface', url: 'https://huggingface.co', logo_url: 'https://api.xinac.net/icon/?url=https://huggingface.co&sz=128', desc: '全球最大的开源模型托管平台' },
+        { menu: 'Home', title: 'ITDOG - 在线ping', url: 'https://www.itdog.cn/tcping', logo_url: 'https://api.xinac.net/icon/?url=https://www.itdog.cn&sz=128', desc: '在线tcping' },
+        { menu: 'Home', title: 'Ping0', url: 'https://ping0.cc', logo_url: 'https://api.xinac.net/icon/?url=https://ping0.cc&sz=128', desc: 'ip地址查询' },
+        { menu: 'Home', title: '浏览器指纹', url: 'https://www.browserscan.net/zh', logo_url: 'https://api.xinac.net/icon/?url=https://www.browserscan.net&sz=128', desc: '浏览器指纹查询' },
+        { menu: 'Home', title: 'nezha面板', url: 'https://ssss.nyc.mn', logo_url: 'https://api.xinac.net/icon/?url=https://ssss.nyc.mn&sz=128', desc: 'nezha面板' },
+        { menu: 'Home', title: 'Api测试', url: 'https://hoppscotch.io', logo_url: 'https://api.xinac.net/icon/?url=https://hoppscotch.io&sz=128', desc: '在线api测试工具' },
         { menu: 'Home', title: '域名检查', url: 'https://who.cx', logo_url: 'https://api.xinac.net/icon/?url=https://who.cx&sz=128', desc: '域名可用性查询' },
         { menu: 'Home', title: '域名比价', url: 'https://www.whois.com', logo_url: 'https://api.xinac.net/icon/?url=https://www.whois.com&sz=128', desc: '域名价格比较' },
         { menu: 'Home', title: 'NodeSeek', url: 'https://www.nodeseek.com', logo_url: 'https://api.xinac.net/icon/?url=https://www.nodeseek.com&sz=128', desc: '主机论坛' },
         { menu: 'Home', title: 'Linux do', url: 'https://linux.do', logo_url: 'https://api.xinac.net/icon/?url=https://linux.do&sz=128', desc: '新的理想型社区' },
         { menu: 'Home', title: '在线音乐', url: 'https://music.eooce.com', logo_url: 'https://api.xinac.net/icon/?url=https://music.eooce.com&sz=128', desc: '在线音乐' },
-        { menu: 'Home', title: '在线电影', url: 'https://libretv.eooce.com', logo_url: 'https://api.xinac.net/icon/?url=https://libretv.eooce.com&sz=128', desc: '在线电影'  },
+        { menu: 'Home', title: '在线电影', url: 'https://libretv.eooce.com', logo_url: 'https://api.xinac.net/icon/?url=https://libretv.eooce.com&sz=128', desc: '在线电影' },
         { menu: 'Home', title: '免费接码', url: 'https://www.smsonline.cloud/zh', logo_url: 'https://api.xinac.net/icon/?url=https://www.smsonline.cloud&sz=128', desc: '免费接收短信验证码' },
         { menu: 'Home', title: '订阅转换', url: 'https://sublink.eooce.com', logo_url: 'https://api.xinac.net/icon/?url=https://sublink.eooce.com&sz=128', desc: '最好用的订阅转换工具' },
         { menu: 'Home', title: 'webssh', url: 'https://ssh.eooce.com', logo_url: 'https://api.xinac.net/icon/?url=https://ssh.eooce.com&sz=128', desc: '最好用的webssh终端管理工具' },
@@ -278,7 +282,7 @@ async function seedDefaultData() {
         { menu: 'Other', title: '雅虎邮箱', url: 'https://mail.yahoo.com', logo_url: 'https://api.xinac.net/icon/?url=https://mail.yahoo.com&sz=128', desc: '雅虎邮箱' },
         { menu: 'Other', title: '10分钟临时邮箱', url: 'https://linshiyouxiang.net', logo_url: 'https://api.xinac.net/icon/?url=https://linshiyouxiang.net&sz=128', desc: '10分钟临时邮箱' },
       ];
-      
+
       let cardCount = 0;
       for (const card of cards) {
         if (card.subMenu) {
@@ -290,7 +294,7 @@ async function seedDefaultData() {
               break;
             }
           }
-          
+
           if (subMenuId) {
             await dbRun(
               'INSERT INTO cards (menu_id, sub_menu_id, title, url, logo_url, desc) VALUES (?, ?, ?, ?, ?, ?)',
@@ -344,11 +348,11 @@ async function seedDefaultData() {
 async function seedTags() {
   try {
     const tagCount = await dbGet('SELECT COUNT(*) as count FROM tags');
-    
+
     if (tagCount && tagCount.count > 0) {
       return;
     }
-    
+
     // 预置标签
     const DEFAULT_TAGS = [
       { name: '搜索引擎', color: '#3b82f6', order: 1 },
@@ -366,7 +370,7 @@ async function seedTags() {
       { name: '图片处理', color: '#22d3ee', order: 13 },
       { name: '域名工具', color: '#fb923c', order: 14 }
     ];
-    
+
     const tagMap = {};
     for (const tag of DEFAULT_TAGS) {
       const result = await dbRun(
@@ -375,7 +379,7 @@ async function seedTags() {
       );
       tagMap[tag.name] = result.lastID;
     }
-    
+
     // 为卡片分配标签
     const CARD_TAG_RULES = [
       { urlPattern: 'baidu.com', tags: ['搜索引擎'] },
@@ -434,13 +438,13 @@ async function seedTags() {
       { urlPattern: 'filebox.nnuu.nyc.mn', tags: ['工具'] },
       { urlPattern: 'address.nnuu.nyc.mn', tags: ['工具'] }
     ];
-    
+
     const cards = await dbAll('SELECT id, url FROM cards');
     let assignCount = 0;
-    
+
     for (const card of cards) {
       const matchedTags = new Set();
-      
+
       for (const rule of CARD_TAG_RULES) {
         if (card.url.includes(rule.urlPattern)) {
           rule.tags.forEach(tagName => {
@@ -450,7 +454,7 @@ async function seedTags() {
           });
         }
       }
-      
+
       if (matchedTags.size > 0) {
         for (const tagId of matchedTags) {
           await dbRun(

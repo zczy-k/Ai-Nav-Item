@@ -78,7 +78,7 @@
     </div>
     
     <!-- 迷你标签栏 -->
-    <div v-if="allTags.length > 0" class="mini-tag-bar">
+    <div class="mini-tag-bar">
       <!-- 已选标签显示 -->
       <div class="selected-tag-display" v-if="selectedTagId">
         <span class="mini-tag-chip" :style="{ backgroundColor: getTagById(selectedTagId)?.color }">
@@ -87,13 +87,20 @@
         </span>
       </div>
       <!-- 标签选择按钮 -->
-      <button class="mini-tag-btn" @click="showTagPanel = !showTagPanel" :title="showTagPanel ? '关闭标签' : '选择标签'">
+      <button v-if="allTags.length > 0" class="mini-tag-btn" @click="showTagPanel = !showTagPanel" :title="showTagPanel ? '关闭标签' : '选择标签'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
           <line x1="7" y1="7" x2="7.01" y2="7"/>
         </svg>
         <span class="tag-count">{{ allTags.length }}</span>
       </button>
+      <!-- 书签入口按钮 -->
+      <router-link to="/bookmarks" class="mini-bookmark-btn" title="书签管理">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="bookmark-count" v-if="bookmarkCount > 0">{{ bookmarkCount }}</span>
+      </router-link>
     </div>
     
     <!-- 标签选择浮层 -->
@@ -207,20 +214,6 @@
         <button v-if="activeMenu" v-show="showFabMenu" @click="openBatchAddModal" class="batch-add-btn" title="批量添加网站">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14M5 12h14"/>
-          </svg>
-        </button>
-      </transition>
-
-      <!-- 书签管理按钮 -->
-      <transition name="fab-item">
-        <button 
-          v-show="showFabMenu" 
-          @click="$router.push('/bookmarks')" 
-          class="bookmark-btn" 
-          title="书签管理"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
           </svg>
         </button>
       </transition>
@@ -688,7 +681,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeMount, computed, defineAsyncComponent, onUnmounted } from 'vue';
-import { getMenus, getCards, getAds, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags, getBookmarks } from '../api';
+import { getMenus, getCards, getAds, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags, getBookmarkCount } from '../api';
 import MenuBar from '../components/MenuBar.vue';
 import { filterCardsWithPinyin } from '../utils/pinyin';
 import { isDuplicateCard } from '../utils/urlNormalizer';
@@ -708,7 +701,7 @@ const friendLinks = ref([]);
 const allTags = ref([]);
 const selectedTagId = ref(null);
 const showTagPanel = ref(false); // 标签选择浮层
-const bookmarks = ref([]); // 书签数据
+const bookmarkCount = ref(0); // 书签数量
 
 // 批量添加相关状态
 const showBatchAddModal = ref(false);
@@ -1045,20 +1038,6 @@ const filteredCards = computed(() => {
   // 再应用搜索筛选（支持拼音搜索）
   if (searchQuery.value) {
     result = filterCardsWithPinyin(result, searchQuery.value);
-    
-    // 如果有搜索词，也搜索书签
-    if (bookmarks.value.length > 0) {
-      const matchedBookmarks = filterCardsWithPinyin(bookmarks.value, searchQuery.value).map(b => ({
-        ...b,
-        id: 'bm_' + b.id, // 避免ID冲突
-        logo_url: b.icon,
-        desc: '来自书签',
-        isBookmark: true,
-        menu_id: null,
-        sub_menu_id: null
-      }));
-      result = [...result, ...matchedBookmarks];
-    }
   }
   
   return result;
@@ -1083,16 +1062,20 @@ onBeforeMount(() => {
 });
 
 onMounted(async () => {
-  // 并行加载所有独立数据：菜单、广告、友链、标签、自定义搜索引擎、书签
-  const [menusRes, adsRes, friendsRes, tagsRes, enginesRes, bookmarksRes] = await Promise.allSettled([
+  // 并行加载所有独立数据：菜单、广告、友链、标签、自定义搜索引擎、书签数量
+  const [menusRes, adsRes, friendsRes, tagsRes, enginesRes, bookmarkCountRes] = await Promise.allSettled([
     getMenus(),
     getAds(),
     getFriends(),
     getTags(),
-    getTags(),
     getSearchEngines(),
-    getBookmarks({ page: 1, pageSize: 2000 }) // 预加载书签用于搜索
+    getBookmarkCount()
   ]);
+  
+  // 处理书签数量
+  if (bookmarkCountRes.status === 'fulfilled') {
+    bookmarkCount.value = bookmarkCountRes.value.data.count || 0;
+  }
   
   // 处理菜单数据（优先级最高）
   if (menusRes.status === 'fulfilled') {
@@ -1142,11 +1125,6 @@ onMounted(async () => {
   } else {
     console.error('加载自定义搜索引擎失败:', enginesRes.reason);
     searchEngines.value = [...defaultEngines];
-  }
-
-  // 处理书签数据
-  if (bookmarksRes.status === 'fulfilled') {
-    bookmarks.value = bookmarksRes.value.data.data;
   }
 
   // 从 localStorage 初始化默认搜索引擎
@@ -2604,6 +2582,44 @@ async function saveCardEdit() {
 }
 
 .mini-tag-btn:hover .tag-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* 书签入口按钮 */
+.mini-bookmark-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid rgba(245, 158, 11, 0.3);
+  border-radius: 16px;
+  font-size: 12px;
+  color: #f59e0b;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+}
+
+.mini-bookmark-btn:hover {
+  background: #f59e0b;
+  color: white;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3);
+}
+
+.bookmark-count {
+  background: rgba(245, 158, 11, 0.1);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.mini-bookmark-btn:hover .bookmark-count {
   background: rgba(255, 255, 255, 0.2);
   color: white;
 }

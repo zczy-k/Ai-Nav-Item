@@ -2,6 +2,8 @@
 let allTabs = [];
 let selectedTabs = new Set();
 let navUrl = '';
+let allBookmarks = [];
+let selectedBookmarks = new Set();
 
 // 加载当前设置
 chrome.storage.sync.get(['navUrl'], function (result) {
@@ -9,7 +11,6 @@ chrome.storage.sync.get(['navUrl'], function (result) {
     const openNavBtn = document.getElementById('openNav');
     const addCurrentBtn = document.getElementById('addCurrentTab');
     const selectTabsBtn = document.getElementById('selectTabs');
-    const syncBookmarksBtn = document.getElementById('syncBookmarks');
 
     if (result.navUrl) {
         navUrl = result.navUrl;
@@ -18,14 +19,12 @@ chrome.storage.sync.get(['navUrl'], function (result) {
         openNavBtn.disabled = false;
         addCurrentBtn.disabled = false;
         selectTabsBtn.disabled = false;
-        syncBookmarksBtn.disabled = false;
     } else {
         urlElement.textContent = '未设置';
         urlElement.classList.add('empty');
         openNavBtn.disabled = true;
         addCurrentBtn.disabled = true;
         selectTabsBtn.disabled = true;
-        syncBookmarksBtn.disabled = true;
     }
 });
 
@@ -89,107 +88,6 @@ document.getElementById('selectTabs').addEventListener('click', async function (
         alert('获取标签页列表失败');
     }
 });
-
-// 同步书签
-document.getElementById('syncBookmarks').addEventListener('click', async function () {
-    if (!navUrl) return;
-
-    try {
-        // 获取所有书签
-        const tree = await chrome.bookmarks.getTree();
-        const bookmarks = flattenBookmarks(tree);
-
-        if (bookmarks.length === 0) {
-            alert('没有可同步的书签');
-            return;
-        }
-
-        if (!confirm(`准备同步 ${bookmarks.length} 个书签到导航站。\n注意：这将覆盖服务器上的所有现有书签！\n是否继续？`)) {
-            return;
-        }
-
-        // 打开或激活导航站页面
-        let targetTab = null;
-        const tabs = await chrome.tabs.query({ url: navUrl + '*' });
-
-        if (tabs.length > 0) {
-            targetTab = tabs[0];
-            await chrome.tabs.update(targetTab.id, { active: true });
-        } else {
-            targetTab = await chrome.tabs.create({ url: navUrl + '/bookmarks' });
-            // 等待页面加载
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        // 注入脚本执行同步
-        chrome.scripting.executeScript({
-            target: { tabId: targetTab.id },
-            func: (bookmarksData) => {
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    alert('请先登录导航站，然后再次点击同步按钮');
-                    return;
-                }
-
-                const btn = document.createElement('div');
-                btn.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:white;padding:20px;border-radius:8px;z-index:9999;';
-                btn.textContent = '正在同步书签...';
-                document.body.appendChild(btn);
-
-                fetch('/api/bookmarks/sync', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ bookmarks: bookmarksData })
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        document.body.removeChild(btn);
-                        if (data.error) {
-                            alert('同步失败: ' + data.error);
-                        } else {
-                            alert(`同步成功！已导入 ${data.count} 个书签`);
-                            location.reload();
-                        }
-                    })
-                    .catch(err => {
-                        document.body.removeChild(btn);
-                        alert('同步请求失败: ' + err.message);
-                    });
-            },
-            args: [bookmarks]
-        });
-
-    } catch (error) {
-        console.error('同步书签失败:', error);
-        alert('同步书签失败: ' + error.message);
-    }
-});
-
-// 扁平化书签树
-function flattenBookmarks(nodes) {
-    let result = [];
-
-    for (const node of nodes) {
-        if (node.url) {
-            // 是书签
-            result.push({
-                title: node.title,
-                url: node.url,
-                icon: null // 无法直接获取favicon，后端或前端会处理
-            });
-        }
-
-        if (node.children) {
-            // 是文件夹，递归
-            result = result.concat(flattenBookmarks(node.children));
-        }
-    }
-
-    return result;
-}
 
 // 显示标签页选择界面
 function showTabsSelector() {
@@ -353,4 +251,224 @@ function isSpecialPage(url) {
         'file://'
     ];
     return specialPrefixes.some(prefix => url.startsWith(prefix));
+}
+
+// ========== 书签导入功能 ==========
+
+// 导入书签按钮
+document.getElementById('importBookmarks').addEventListener('click', async function () {
+    if (!navUrl) {
+        alert('请先设置导航站地址');
+        return;
+    }
+
+    try {
+        // 获取所有书签
+        const bookmarkTree = await chrome.bookmarks.getTree();
+        allBookmarks = flattenBookmarks(bookmarkTree);
+
+        if (allBookmarks.length === 0) {
+            alert('没有找到书签');
+            return;
+        }
+
+        // 显示书签选择界面
+        showBookmarkSelector();
+    } catch (error) {
+        console.error('获取书签失败:', error);
+        alert('获取书签失败: ' + error.message);
+    }
+});
+
+// 扁平化书签树
+function flattenBookmarks(nodes, folder = '') {
+    let bookmarks = [];
+    
+    for (const node of nodes) {
+        if (node.children) {
+            // 文件夹
+            const folderPath = folder ? `${folder}/${node.title}` : node.title;
+            bookmarks = bookmarks.concat(flattenBookmarks(node.children, folderPath));
+        } else if (node.url && !isSpecialPage(node.url)) {
+            // 书签
+            bookmarks.push({
+                id: node.id,
+                title: node.title || '无标题',
+                url: node.url,
+                folder: folder || '根目录'
+            });
+        }
+    }
+    
+    return bookmarks;
+}
+
+// 显示书签选择界面
+function showBookmarkSelector() {
+    const selector = document.getElementById('bookmarkSelector');
+    const bookmarkList = document.getElementById('bookmarkList');
+    const bookmarkCount = document.getElementById('bookmarkCount');
+
+    // 重置选择
+    selectedBookmarks.clear();
+
+    // 更新计数
+    bookmarkCount.textContent = `${allBookmarks.length} 个`;
+
+    // 按文件夹分组
+    const folderMap = new Map();
+    allBookmarks.forEach((bookmark, index) => {
+        if (!folderMap.has(bookmark.folder)) {
+            folderMap.set(bookmark.folder, []);
+        }
+        folderMap.get(bookmark.folder).push({ ...bookmark, index });
+    });
+
+    // 生成书签列表
+    bookmarkList.innerHTML = '';
+    
+    folderMap.forEach((bookmarks, folderName) => {
+        const folderDiv = document.createElement('div');
+        folderDiv.className = 'bookmark-folder';
+
+        // 文件夹头部
+        const folderHeader = document.createElement('div');
+        folderHeader.className = 'folder-header';
+        folderHeader.innerHTML = `📁 ${folderName} (${bookmarks.length})`;
+        
+        // 文件夹内容
+        const folderItems = document.createElement('div');
+        folderItems.className = 'folder-items';
+        folderItems.style.display = 'none';
+
+        folderHeader.addEventListener('click', () => {
+            folderItems.style.display = folderItems.style.display === 'none' ? 'block' : 'none';
+        });
+
+        bookmarks.forEach(bookmark => {
+            const item = document.createElement('div');
+            item.className = 'bookmark-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.dataset.index = bookmark.index;
+
+            const title = document.createElement('span');
+            title.className = 'bookmark-title';
+            title.textContent = bookmark.title;
+            title.title = bookmark.url;
+
+            item.appendChild(checkbox);
+            item.appendChild(title);
+
+            item.addEventListener('click', (e) => {
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
+            });
+
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+                if (checkbox.checked) {
+                    selectedBookmarks.add(bookmark.index);
+                } else {
+                    selectedBookmarks.delete(bookmark.index);
+                }
+                updateBookmarkConfirmButton();
+            });
+
+            folderItems.appendChild(item);
+        });
+
+        folderDiv.appendChild(folderHeader);
+        folderDiv.appendChild(folderItems);
+        bookmarkList.appendChild(folderDiv);
+    });
+
+    // 显示选择器
+    selector.classList.add('active');
+    updateBookmarkConfirmButton();
+}
+
+// 全选书签
+document.getElementById('selectAllBookmarks').addEventListener('click', function () {
+    const checkboxes = document.querySelectorAll('#bookmarkList input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        selectedBookmarks.add(parseInt(checkbox.dataset.index));
+    });
+    updateBookmarkConfirmButton();
+});
+
+// 清除书签选择
+document.getElementById('clearAllBookmarks').addEventListener('click', function () {
+    const checkboxes = document.querySelectorAll('#bookmarkList input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    selectedBookmarks.clear();
+    updateBookmarkConfirmButton();
+});
+
+// 取消书签选择
+document.getElementById('cancelBookmark').addEventListener('click', function () {
+    document.getElementById('bookmarkSelector').classList.remove('active');
+    selectedBookmarks.clear();
+});
+
+// 确认导入书签
+document.getElementById('confirmBookmark').addEventListener('click', async function () {
+    if (selectedBookmarks.size === 0 || !navUrl) return;
+
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = '导入中...';
+
+    try {
+        // 获取选中的书签
+        const bookmarksToImport = Array.from(selectedBookmarks).map(index => allBookmarks[index]);
+
+        // 获取token（需要先登录）
+        const token = localStorage.getItem('nav_token');
+        
+        // 发送到后端
+        const response = await fetch(`${navUrl}/api/bookmarks/import`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify({ bookmarks: bookmarksToImport })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(`导入成功！\n导入: ${result.imported} 个\n跳过(重复): ${result.skipped} 个`);
+            document.getElementById('bookmarkSelector').classList.remove('active');
+            selectedBookmarks.clear();
+        } else {
+            // 如果需要认证，跳转到导航站登录
+            if (response.status === 401) {
+                alert('请先登录导航站后台，然后重试');
+                chrome.tabs.create({ url: `${navUrl}/admin` });
+            } else {
+                alert('导入失败: ' + (result.error || '未知错误'));
+            }
+        }
+    } catch (error) {
+        console.error('导入书签失败:', error);
+        alert('导入失败: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        updateBookmarkConfirmButton();
+    }
+});
+
+// 更新书签确认按钮状态
+function updateBookmarkConfirmButton() {
+    const confirmBtn = document.getElementById('confirmBookmark');
+    confirmBtn.textContent = `导入 (${selectedBookmarks.size})`;
+    confirmBtn.disabled = selectedBookmarks.size === 0;
 }

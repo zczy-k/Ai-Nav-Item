@@ -17,11 +17,6 @@ yarn-error.log*
 database/*.db
 database/*.db-*
 
-# Uploads
-uploads/*
-!uploads/.gitkeep
-!uploads/default-favicon.png
-
 # SSL Certificates
 certs/
 *.key

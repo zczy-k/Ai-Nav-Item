@@ -2,12 +2,12 @@
 
 const Home = () => import('./views/Home.vue');
 const Admin = () => import('./views/Admin.vue');
-const Bookmarks = () => import('./views/Bookmarks.vue');
+const BookmarkManager = () => import('./views/BookmarkManager.vue');
 
 const routes = [
   { path: '/', component: Home },
   { path: '/admin', component: Admin },
-  { path: '/bookmarks', component: Bookmarks }
+  { path: '/bookmarks', component: BookmarkManager }
 ];
 
 const router = createRouter({

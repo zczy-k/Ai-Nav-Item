@@ -72,8 +72,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// uploads 目录已废弃，不再需要静态资源服务
-
 // 根据环境选择静态文件目录
 // 开发环境使用 web/dist，生产环境（如 serv00）使用 public
 const fs = require('fs');
@@ -125,10 +123,10 @@ app.use('/api/friends', friendRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/batch', batchRoutes);
 app.use('/api/wallpaper', wallpaperRoutes);
+app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/search-engines', searchEngineRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/tags', tagRoutes);
-app.use('/api/bookmarks', bookmarkRoutes);
 
 // 启动定时备份任务
 try {

@@ -14,5 +14,4 @@ services:
       - JWT_SECRET=change-this-secret  # JWT密钥（必须修改！）
     volumes:
       - ./database:/app/database       # 持久化数据库文件
-      - ./uploads:/app/uploads         # 持久化上传文件
     restart: unless-stopped

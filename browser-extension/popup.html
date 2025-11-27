@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             width: 380px;
             max-height: 600px;
@@ -18,24 +19,24 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: #f9fafb;
         }
-        
+
         .header {
             display: flex;
             align-items: center;
             gap: 12px;
             margin-bottom: 16px;
         }
-        
+
         .header img {
             width: 32px;
             height: 32px;
         }
-        
+
         .header h2 {
             font-size: 16px;
             color: #333;
         }
-        
+
         .info {
             background: white;
             border-radius: 8px;
@@ -43,13 +44,13 @@
             margin-bottom: 12px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
-        
+
         .info-label {
             font-size: 12px;
             color: #666;
             margin-bottom: 4px;
         }
-        
+
         .info-value {
             font-size: 13px;
             color: #333;
@@ -59,18 +60,18 @@
             padding: 6px 8px;
             border-radius: 4px;
         }
-        
+
         .info-value.empty {
             color: #999;
             font-style: italic;
         }
-        
+
         .buttons {
             display: flex;
             flex-direction: column;
             gap: 8px;
         }
-        
+
         button {
             width: 100%;
             padding: 10px;
@@ -81,27 +82,27 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
-        
+
         .btn-primary:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
-        
+
         .btn-secondary {
             background: white;
             color: #333;
             border: 1px solid #e5e7eb;
         }
-        
+
         .btn-secondary:hover {
             background: #f9fafb;
         }
-        
+
         .section-title {
             font-size: 13px;
             font-weight: 600;
@@ -111,27 +112,27 @@
             align-items: center;
             gap: 6px;
         }
-        
+
         .btn-add-current {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
         }
-        
+
         .btn-add-current:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
         }
-        
+
         .btn-select-tabs {
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
         }
-        
+
         .btn-select-tabs:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
-        
+
         /* 标签页选择界面 */
         .tabs-selector {
             display: none;
@@ -141,11 +142,11 @@
             margin-top: 12px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
-        
+
         .tabs-selector.active {
             display: block;
         }
-        
+
         .tabs-header {
             display: flex;
             justify-content: space-between;
@@ -154,24 +155,24 @@
             padding-bottom: 8px;
             border-bottom: 1px solid #e5e7eb;
         }
-        
+
         .tabs-title {
             font-size: 14px;
             font-weight: 600;
             color: #333;
         }
-        
+
         .tabs-count {
             font-size: 12px;
             color: #666;
         }
-        
+
         .tabs-actions {
             display: flex;
             gap: 8px;
             margin-bottom: 12px;
         }
-        
+
         .btn-small {
             padding: 4px 12px;
             font-size: 12px;
@@ -182,18 +183,18 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .btn-small:hover {
             background: #f3f4f6;
             border-color: #9ca3af;
         }
-        
+
         .tabs-list {
             max-height: 300px;
             overflow-y: auto;
             margin-bottom: 12px;
         }
-        
+
         .tab-item {
             display: flex;
             align-items: flex-start;
@@ -204,33 +205,33 @@
             transition: background 0.2s;
             margin-bottom: 4px;
         }
-        
+
         .tab-item:hover {
             background: #f9fafb;
         }
-        
+
         .tab-item.current {
             background: #eff6ff;
             border: 1px solid #bfdbfe;
         }
-        
+
         .tab-checkbox {
             margin-top: 2px;
             cursor: pointer;
         }
-        
+
         .tab-favicon {
             width: 16px;
             height: 16px;
             margin-top: 2px;
             flex-shrink: 0;
         }
-        
+
         .tab-info {
             flex: 1;
             min-width: 0;
         }
-        
+
         .tab-title {
             font-size: 13px;
             color: #333;
@@ -239,7 +240,7 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        
+
         .tab-url {
             font-size: 11px;
             color: #999;
@@ -247,7 +248,7 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        
+
         .tab-badge {
             display: inline-block;
             padding: 2px 6px;
@@ -257,39 +258,117 @@
             border-radius: 3px;
             margin-left: 6px;
         }
-        
+
         .tabs-footer {
             display: flex;
             gap: 8px;
         }
-        
+
         .btn-cancel {
             flex: 1;
             background: #f3f4f6;
             color: #666;
         }
-        
+
         .btn-cancel:hover {
             background: #e5e7eb;
         }
-        
+
         .btn-confirm {
             flex: 2;
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
         }
-        
+
         .btn-confirm:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
-        
+
         .btn-confirm:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
-        
+
+        .btn-bookmark {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-bookmark:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .bookmark-selector {
+            display: none;
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .bookmark-selector.active {
+            display: block;
+        }
+
+        .bookmark-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+        }
+
+        .bookmark-folder {
+            margin-bottom: 8px;
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .folder-header:hover {
+            background: #e5e7eb;
+        }
+
+        .folder-items {
+            padding-left: 20px;
+            margin-top: 4px;
+        }
+
+        .bookmark-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .bookmark-item:hover {
+            background: #f9fafb;
+        }
+
+        .bookmark-title {
+            flex: 1;
+            font-size: 12px;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         .footer {
             margin-top: 12px;
             padding-top: 12px;
@@ -300,58 +379,89 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <img src="icons/icon48.png" alt="导航站">
         <h2>导航站插件</h2>
     </div>
-    
+
     <div class="info">
         <div class="info-label">当前导航站地址</div>
         <div class="info-value" id="currentUrl">未设置</div>
     </div>
-    
+
     <div class="buttons">
         <button class="btn-primary" id="openSettings">设置导航站地址</button>
         <button class="btn-secondary" id="openNav">访问导航站</button>
     </div>
-    
+
     <div class="section-title">
         📋 快速添加
     </div>
-    
+
     <div class="buttons">
         <button class="btn-add-current" id="addCurrentTab">➕ 添加当前标签页</button>
         <button class="btn-select-tabs" id="selectTabs">📋 选择标签页批量添加</button>
-        <button class="btn-secondary" id="syncBookmarks" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none;">🔄 同步浏览器书签</button>
     </div>
-    
+
+    <div class="section-title">
+        📚 书签管理
+    </div>
+
+    <div class="buttons">
+        <button class="btn-bookmark" id="importBookmarks">📥 导入浏览器书签</button>
+    </div>
+
+    <!-- 书签导入界面 -->
+    <div class="bookmark-selector" id="bookmarkSelector">
+        <div class="tabs-header">
+            <div class="tabs-title">选择要导入的书签</div>
+            <div class="tabs-count" id="bookmarkCount">0 个</div>
+        </div>
+
+        <div class="tabs-actions">
+            <button class="btn-small" id="selectAllBookmarks">✔️ 全选</button>
+            <button class="btn-small" id="clearAllBookmarks">❌ 清除</button>
+        </div>
+
+        <div class="bookmark-list" id="bookmarkList">
+            <!-- 书签列表将动态生成 -->
+        </div>
+
+        <div class="tabs-footer">
+            <button class="btn-cancel" id="cancelBookmark">取消</button>
+            <button class="btn-confirm" id="confirmBookmark" disabled>导入 (0)</button>
+        </div>
+    </div>
+
     <!-- 标签页选择界面 -->
     <div class="tabs-selector" id="tabsSelector">
         <div class="tabs-header">
             <div class="tabs-title">选择要添加的标签页</div>
             <div class="tabs-count" id="tabsCount">0 个</div>
         </div>
-        
+
         <div class="tabs-actions">
             <button class="btn-small" id="selectAll">✔️ 全选</button>
             <button class="btn-small" id="clearAll">❌ 清除</button>
         </div>
-        
+
         <div class="tabs-list" id="tabsList">
             <!-- 标签页列表将动态生成 -->
         </div>
-        
+
         <div class="tabs-footer">
             <button class="btn-cancel" id="cancelSelect">取消</button>
             <button class="btn-confirm" id="confirmAdd" disabled>添加 (0)</button>
         </div>
     </div>
-    
+
     <div class="footer">
         v1.1.0
     </div>
 
     <script src="popup.js"></script>
 </body>
+
 </html>
