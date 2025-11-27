@@ -434,12 +434,30 @@ document.getElementById('confirmBookmark').addEventListener('click', async funct
         // 获取选中的书签
         const bookmarksToImport = Array.from(selectedBookmarks).map(index => allBookmarks[index]);
 
-        // 通过URL参数传递书签数据（Base64编码）
-        const dataStr = JSON.stringify(bookmarksToImport);
-        const base64Data = btoa(unescape(encodeURIComponent(dataStr)));
+        // 创建新标签页
+        const tab = await chrome.tabs.create({ url: `${navUrl}/bookmarks?import=true` });
         
-        // 跳转到书签导入页面
-        chrome.tabs.create({ url: `${navUrl}/bookmarks?data=${base64Data}` });
+        // 等待页面加载后，通过消息传递数据
+        chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+            if (tabId === tab.id && info.status === 'complete') {
+                chrome.tabs.sendMessage(tabId, {
+                    type: 'IMPORT_BOOKMARKS',
+                    bookmarks: bookmarksToImport
+                }).catch(() => {
+                    // 如果消息发送失败，使用localStorage作为备用
+                    chrome.scripting.executeScript({
+                        target: { tabId: tabId },
+                        func: (data) => {
+                            sessionStorage.setItem('pendingBookmarks', JSON.stringify(data));
+                            window.location.reload();
+                        },
+                        args: [bookmarksToImport]
+                    });
+                });
+                chrome.tabs.onUpdated.removeListener(listener);
+            }
+        });
+        
         window.close();
     } catch (error) {
         console.error('准备导入失败:', error);

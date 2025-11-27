@@ -246,25 +246,35 @@ function cancelImport() {
 onMounted(async () => {
   await loadMenus();
   
-  // 从URL参数获取待导入书签
-  const urlParams = new URLSearchParams(window.location.search);
-  const base64Data = urlParams.get('data');
-  
-  if (base64Data) {
+  // 方式1: 从sessionStorage获取
+  const sessionData = sessionStorage.getItem('pendingBookmarks');
+  if (sessionData) {
     try {
-      const dataStr = decodeURIComponent(escape(atob(base64Data)));
-      const bookmarks = JSON.parse(dataStr);
-      
+      const bookmarks = JSON.parse(sessionData);
       if (Array.isArray(bookmarks) && bookmarks.length > 0) {
         pendingBookmarks.value = bookmarks.map(b => ({
           ...b,
           status: '',
           targetMenuId: suggestCategory(b.url)
         }));
+        sessionStorage.removeItem('pendingBookmarks');
       }
     } catch (e) {
       console.error('解析书签数据失败:', e);
     }
+  }
+  
+  // 方式2: 监听来自扩展的消息
+  if (typeof chrome !== 'undefined' && chrome.runtime) {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === 'IMPORT_BOOKMARKS' && message.bookmarks) {
+        pendingBookmarks.value = message.bookmarks.map(b => ({
+          ...b,
+          status: '',
+          targetMenuId: suggestCategory(b.url)
+        }));
+      }
+    });
   }
 });
 </script>
