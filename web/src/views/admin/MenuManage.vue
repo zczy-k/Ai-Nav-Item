@@ -123,6 +123,7 @@ async function loadMenus() {
   const res = await getMenus();
   menus.value = res.data.map(menu => ({
     ...menu,
+    subMenus: menu.subMenus || [], // 确保subMenus始终是数组
     showSubMenu: false // 添加展开状态
   }));
 }
@@ -165,8 +166,9 @@ async function addSubMenu(menuId) {
   const subMenuName = prompt('请输入子菜单名称：');
   if (!subMenuName?.trim()) return;
   
-  const maxOrder = menu.subMenus?.length
-    ? Math.max(...menu.subMenus.map(sm => sm.order || 0))
+  const subMenus = menu?.subMenus || [];
+  const maxOrder = subMenus.length
+    ? Math.max(...subMenus.map(sm => sm.order || 0))
     : 0;
     
   await apiAddSubMenu(menuId, { name: subMenuName.trim(), order: maxOrder + 1 });
