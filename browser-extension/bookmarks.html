@@ -491,7 +491,7 @@
         </div>
     </div>
 
-    <!-- 右键菜单 -->
+    <!-- 书签右键菜单 -->
     <div class="context-menu" id="contextMenu">
         <div class="context-menu-item" id="ctxBatchMove">
             <span>📁</span>
@@ -505,6 +505,70 @@
         <div class="context-menu-item danger" id="ctxBatchDelete">
             <span>🗑️</span>
             <span>批量删除</span>
+        </div>
+    </div>
+
+    <!-- 文件夹右键菜单 -->
+    <div class="context-menu" id="folderContextMenu">
+        <div class="context-menu-item" id="ctxFolderToNav">
+            <span>🚀</span>
+            <span>导入到导航页</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" id="ctxFolderEdit">
+            <span>✏️</span>
+            <span>重命名</span>
+        </div>
+        <div class="context-menu-item danger" id="ctxFolderDelete">
+            <span>🗑️</span>
+            <span>删除文件夹</span>
+        </div>
+    </div>
+
+    <!-- 导入文件夹到导航页弹窗 -->
+    <div class="modal" id="importFolderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🚀 导入文件夹到导航页</h3>
+                <button class="modal-close" id="importFolderClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>文件夹名称</label>
+                    <input type="text" id="importFolderName" readonly style="background: #f3f4f6;">
+                </div>
+                <div class="form-group">
+                    <label>包含书签数量</label>
+                    <input type="text" id="importFolderCount" readonly style="background: #f3f4f6;">
+                </div>
+                <div class="form-group">
+                    <label>导入方式</label>
+                    <select id="importFolderType" style="width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <option value="menu">作为新的主分类</option>
+                        <option value="submenu">作为子分类（需选择父分类）</option>
+                    </select>
+                </div>
+                <div class="form-group" id="parentMenuGroup" style="display: none;">
+                    <label>选择父分类</label>
+                    <select id="importParentMenu" style="width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                        <option value="">-- 请选择 --</option>
+                    </select>
+                </div>
+                <div style="background: #fef3c7; border-radius: 8px; padding: 12px; margin-top: 12px;">
+                    <div style="font-size: 12px; color: #92400e;">
+                        ⚠️ 将创建名为"<span id="importMenuName"></span>"的分类，并导入该文件夹下的所有书签作为卡片
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-left">
+                    <span id="importFolderStatus" style="font-size: 13px; color: #666;"></span>
+                </div>
+                <div class="modal-footer-right">
+                    <button class="btn btn-secondary" id="btnCancelImportFolder">取消</button>
+                    <button class="btn btn-primary" id="btnConfirmImportFolder">确认导入</button>
+                </div>
+            </div>
         </div>
     </div>
 

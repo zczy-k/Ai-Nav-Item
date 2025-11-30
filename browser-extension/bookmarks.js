@@ -615,6 +615,16 @@ function createFolderItem(folder, level, isAll = false) {
         }
     }
     
+    // 文件夹右键菜单
+    if (!isAll && folder.id) {
+        div.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            rightClickedFolderId = folder.id;
+            showFolderContextMenu(e.clientX, e.clientY, folder);
+        });
+    }
+    
     // 文件夹拖拽
     if (!isAll && folder.id) {
         div.addEventListener('dragstart', (e) => {
@@ -1063,6 +1073,17 @@ function bindEvents() {
     document.getElementById('defaultMenuSelect').addEventListener('change', onDefaultMenuChange);
     document.getElementById('btnNewMenuFromSettings').addEventListener('click', () => showNewMenuModalFromSettings('menu'));
     document.getElementById('btnNewSubMenuFromSettings').addEventListener('click', () => showNewMenuModalFromSettings('submenu'));
+    
+    // 文件夹右键菜单
+    document.getElementById('ctxFolderToNav').addEventListener('click', () => { hideFolderContextMenu(); showImportFolderModal(); });
+    document.getElementById('ctxFolderEdit').addEventListener('click', () => { hideFolderContextMenu(); editFolder(rightClickedFolderId); });
+    document.getElementById('ctxFolderDelete').addEventListener('click', () => { hideFolderContextMenu(); deleteFolder(rightClickedFolderId); });
+    
+    // 导入文件夹弹窗
+    document.getElementById('importFolderClose').addEventListener('click', closeImportFolderModal);
+    document.getElementById('btnCancelImportFolder').addEventListener('click', closeImportFolderModal);
+    document.getElementById('btnConfirmImportFolder').addEventListener('click', confirmImportFolder);
+    document.getElementById('importFolderType').addEventListener('change', onImportTypeChange);
     
     // 合并文件夹
     document.getElementById('btnMergeFolders').addEventListener('click', showMergeFoldersModal);
@@ -4352,5 +4373,260 @@ async function confirmNewMenuFromSettings() {
         
     } catch (e) {
         alert('创建分类失败: ' + e.message);
+    }
+}
+
+
+// ==================== 文件夹右键菜单 ====================
+let rightClickedFolderId = null;
+let rightClickedFolder = null;
+
+function showFolderContextMenu(x, y, folder) {
+    rightClickedFolder = folder;
+    const menu = document.getElementById('folderContextMenu');
+    
+    // 计算书签数量
+    const bookmarkCount = countFolderBookmarks(folder);
+    document.querySelector('#ctxFolderToNav span:last-child').textContent = `导入到导航页 (${bookmarkCount}个书签)`;
+    
+    menu.classList.add('active');
+    
+    // 调整位置
+    let left = x;
+    let top = y;
+    
+    if (x + 200 > window.innerWidth) {
+        left = x - 200;
+    }
+    if (y + 150 > window.innerHeight) {
+        top = y - 150;
+    }
+    
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    
+    // 点击其他地方关闭
+    setTimeout(() => {
+        document.addEventListener('click', hideFolderContextMenuOnClick);
+    }, 0);
+}
+
+function hideFolderContextMenuOnClick(e) {
+    if (!e.target.closest('#folderContextMenu')) {
+        hideFolderContextMenu();
+    }
+}
+
+function hideFolderContextMenu() {
+    document.getElementById('folderContextMenu').classList.remove('active');
+    document.removeEventListener('click', hideFolderContextMenuOnClick);
+}
+
+// ==================== 导入文件夹到导航页 ====================
+let importFolderData = null;
+
+function showImportFolderModal() {
+    if (!rightClickedFolder) return;
+    
+    const folder = rightClickedFolder;
+    const bookmarks = [];
+    collectFolderBookmarks(folder, bookmarks);
+    
+    importFolderData = {
+        folder: folder,
+        bookmarks: bookmarks
+    };
+    
+    document.getElementById('importFolderName').value = folder.title || '未命名';
+    document.getElementById('importFolderCount').value = bookmarks.length + ' 个';
+    document.getElementById('importMenuName').textContent = folder.title || '未命名';
+    document.getElementById('importFolderType').value = 'menu';
+    document.getElementById('parentMenuGroup').style.display = 'none';
+    document.getElementById('importFolderStatus').textContent = '';
+    
+    // 加载父分类列表
+    loadImportParentMenus();
+    
+    document.getElementById('importFolderModal').classList.add('active');
+}
+
+function closeImportFolderModal() {
+    document.getElementById('importFolderModal').classList.remove('active');
+    importFolderData = null;
+}
+
+// 收集文件夹下的所有书签（不包括子文件夹中的）
+function collectFolderBookmarks(folder, result) {
+    if (!folder.children) return;
+    
+    for (const child of folder.children) {
+        if (child.url && !isSeparatorBookmark(child.url)) {
+            result.push(child);
+        }
+    }
+}
+
+// 导入类型变化
+function onImportTypeChange() {
+    const type = document.getElementById('importFolderType').value;
+    document.getElementById('parentMenuGroup').style.display = type === 'submenu' ? 'block' : 'none';
+}
+
+// 加载父分类列表
+async function loadImportParentMenus() {
+    try {
+        const config = await chrome.storage.sync.get(['navUrl']);
+        if (!config.navUrl) return;
+        
+        const response = await fetch(`${config.navUrl}/api/menus`);
+        if (!response.ok) return;
+        
+        const menus = await response.json();
+        const select = document.getElementById('importParentMenu');
+        select.innerHTML = '<option value="">-- 请选择 --</option>';
+        
+        menus.forEach(menu => {
+            const option = document.createElement('option');
+            option.value = menu.id;
+            option.textContent = menu.name;
+            select.appendChild(option);
+        });
+    } catch (e) {
+        console.error('加载分类失败:', e);
+    }
+}
+
+// 确认导入文件夹
+async function confirmImportFolder() {
+    if (!importFolderData) return;
+    
+    const statusDiv = document.getElementById('importFolderStatus');
+    const confirmBtn = document.getElementById('btnConfirmImportFolder');
+    
+    const config = await chrome.storage.sync.get(['navUrl']);
+    if (!config.navUrl) {
+        statusDiv.innerHTML = '<span style="color: #dc2626;">请先在导航页设置中配置导航站地址</span>';
+        return;
+    }
+    
+    const token = await getNavAuthToken();
+    if (!token) return;
+    
+    const importType = document.getElementById('importFolderType').value;
+    const parentMenuId = document.getElementById('importParentMenu').value;
+    const folderName = importFolderData.folder.title || '未命名';
+    const bookmarks = importFolderData.bookmarks;
+    
+    if (importType === 'submenu' && !parentMenuId) {
+        statusDiv.innerHTML = '<span style="color: #dc2626;">请选择父分类</span>';
+        return;
+    }
+    
+    if (bookmarks.length === 0) {
+        statusDiv.innerHTML = '<span style="color: #dc2626;">该文件夹下没有书签</span>';
+        return;
+    }
+    
+    confirmBtn.disabled = true;
+    statusDiv.innerHTML = '<span style="color: #666;">正在导入...</span>';
+    
+    try {
+        const serverUrl = config.navUrl.replace(/\/$/, '');
+        let menuId, subMenuId = null;
+        
+        // 1. 创建菜单或子菜单
+        if (importType === 'menu') {
+            // 创建主菜单
+            const menuResponse = await fetch(`${serverUrl}/api/menus`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ name: folderName, order: 999 })
+            });
+            
+            if (!menuResponse.ok) {
+                throw new Error('创建分类失败');
+            }
+            
+            const menuResult = await menuResponse.json();
+            menuId = menuResult.id;
+        } else {
+            // 创建子菜单
+            const subMenuResponse = await fetch(`${serverUrl}/api/menus/${parentMenuId}/submenus`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ name: folderName, order: 999 })
+            });
+            
+            if (!subMenuResponse.ok) {
+                throw new Error('创建子分类失败');
+            }
+            
+            const subMenuResult = await subMenuResponse.json();
+            menuId = parseInt(parentMenuId);
+            subMenuId = subMenuResult.id;
+        }
+        
+        // 2. 批量添加书签作为卡片
+        const cards = bookmarks.map(bookmark => {
+            let logo = '';
+            try {
+                const urlObj = new URL(bookmark.url);
+                logo = `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
+            } catch (e) {}
+            
+            return {
+                title: bookmark.title || '无标题',
+                url: bookmark.url,
+                logo: logo,
+                description: ''
+            };
+        });
+        
+        const addResponse = await fetch(`${serverUrl}/api/batch/add`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                menu_id: menuId,
+                sub_menu_id: subMenuId,
+                cards: cards
+            })
+        });
+        
+        if (!addResponse.ok) {
+            throw new Error('添加卡片失败');
+        }
+        
+        const addResult = await addResponse.json();
+        
+        // 刷新右键菜单
+        try {
+            await chrome.runtime.sendMessage({ action: 'refreshMenus' });
+        } catch (e) {}
+        
+        let message = `✓ 成功创建分类"${folderName}"，添加了 ${addResult.added} 个卡片`;
+        if (addResult.skipped > 0) {
+            message += `，跳过 ${addResult.skipped} 个重复`;
+        }
+        
+        statusDiv.innerHTML = `<span style="color: #059669;">${message}</span>`;
+        
+        setTimeout(() => {
+            closeImportFolderModal();
+        }, 2000);
+        
+    } catch (e) {
+        console.error('导入失败:', e);
+        statusDiv.innerHTML = `<span style="color: #dc2626;">导入失败: ${e.message}</span>`;
+    } finally {
+        confirmBtn.disabled = false;
     }
 }
