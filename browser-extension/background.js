@@ -193,11 +193,9 @@ async function addToSpecificCategory(menuItemId, url, title) {
         }
         
         const navServerUrl = config.navUrl.replace(/\/$/, '');
-        let logo = '';
-        try {
-            const urlObj = new URL(url);
-            logo = `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
-        } catch (e) {}
+        
+        // 构建卡片数据（包含自动生成的标签和描述）
+        const card = await buildCardData(url, title, navServerUrl, token);
         
         const response = await fetch(`${navServerUrl}/api/batch/add`, {
             method: 'POST',
@@ -208,7 +206,7 @@ async function addToSpecificCategory(menuItemId, url, title) {
             body: JSON.stringify({
                 menu_id: menuId,
                 sub_menu_id: subMenuId,
-                cards: [{ title: title || '无标题', url, logo, description: '' }]
+                cards: [card]
             })
         });
         
@@ -258,11 +256,9 @@ async function quickAddToNav(url, title) {
         }
         
         const navServerUrl = config.navUrl.replace(/\/$/, '');
-        let logo = '';
-        try {
-            const urlObj = new URL(url);
-            logo = `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
-        } catch (e) {}
+        
+        // 构建卡片数据（包含自动生成的标签和描述）
+        const card = await buildCardData(url, title, navServerUrl, token);
         
         const response = await fetch(`${navServerUrl}/api/batch/add`, {
             method: 'POST',
@@ -273,7 +269,7 @@ async function quickAddToNav(url, title) {
             body: JSON.stringify({
                 menu_id: parseInt(config.lastMenuId),
                 sub_menu_id: config.lastSubMenuId ? parseInt(config.lastSubMenuId) : null,
-                cards: [{ title: title || '无标题', url, logo, description: '' }]
+                cards: [card]
             })
         });
         
@@ -289,7 +285,7 @@ async function quickAddToNav(url, title) {
         const result = await response.json();
         
         if (result.added > 0) {
-            showNotification('添加成功', `已添加 "${title || '网站'}" 到导航页`);
+            showNotification('添加成功', `已添加 "${card.title}" 到导航页`);
         } else if (result.skipped > 0) {
             showNotification('已跳过', '该网站已存在于导航页');
         }
@@ -307,6 +303,160 @@ function showNotification(title, message) {
         title: title,
         message: message
     }).catch(e => console.warn('创建通知失败:', e));
+}
+
+// ==================== 自动生成标签和描述 ====================
+
+// 截断文本到指定长度
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    text = text.trim();
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 1) + '…';
+}
+
+// 自动生成描述
+function generateDescription(title, domain) {
+    if (!title && !domain) return '';
+    
+    let desc = '';
+    if (title) {
+        desc = title.replace(/[\|\-–—_]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    
+    if (domain && !desc.toLowerCase().includes(domain.toLowerCase())) {
+        desc = desc ? `${desc} - ${domain}` : domain;
+    }
+    
+    return truncateText(desc, 100);
+}
+
+// 自动生成标签名称
+function generateTagNames(url, title) {
+    const tags = [];
+    
+    try {
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname.replace(/^www\./, '');
+        const pathname = urlObj.pathname.toLowerCase();
+        
+        const domainTagMap = {
+            'github.com': '开发', 'gitlab.com': '开发', 'stackoverflow.com': '技术',
+            'youtube.com': '视频', 'bilibili.com': '视频', 'zhihu.com': '问答',
+            'juejin.cn': '技术', 'csdn.net': '技术', 'cnblogs.com': '技术',
+            'medium.com': '博客', 'dev.to': '技术', 'twitter.com': '社交',
+            'x.com': '社交', 'facebook.com': '社交', 'linkedin.com': '职场',
+            'reddit.com': '社区', 'v2ex.com': '社区', 'taobao.com': '购物',
+            'jd.com': '购物', 'amazon.com': '购物', 'douban.com': '影视',
+            'netflix.com': '影视', 'spotify.com': '音乐', 'wikipedia.org': '百科',
+            'notion.so': '工具', 'figma.com': '设计', 'dribbble.com': '设计',
+            'google.com': '搜索', 'baidu.com': '搜索', 'bing.com': '搜索'
+        };
+        
+        for (const [site, tag] of Object.entries(domainTagMap)) {
+            if (domain.includes(site)) {
+                tags.push(tag);
+                break;
+            }
+        }
+        
+        const pathKeywords = {
+            '/doc': '文档', '/docs': '文档', '/api': 'API', '/blog': '博客',
+            '/news': '新闻', '/tool': '工具', '/download': '下载', '/learn': '学习'
+        };
+        
+        for (const [path, tag] of Object.entries(pathKeywords)) {
+            if (pathname.includes(path) && !tags.includes(tag)) {
+                tags.push(tag);
+                break;
+            }
+        }
+        
+        if (title) {
+            const titleLower = title.toLowerCase();
+            const titleKeywords = {
+                '文档': '文档', 'doc': '文档', 'api': 'API', '教程': '教程',
+                '工具': '工具', 'tool': '工具', '官网': '官网'
+            };
+            
+            for (const [keyword, tag] of Object.entries(titleKeywords)) {
+                if (titleLower.includes(keyword) && !tags.includes(tag)) {
+                    tags.push(tag);
+                    break;
+                }
+            }
+        }
+    } catch (e) {}
+    
+    return tags.slice(0, 2).map(tag => truncateText(tag, 8));
+}
+
+// 获取或创建标签ID
+async function getOrCreateTagIds(tagNames, navServerUrl, token) {
+    if (!tagNames || tagNames.length === 0) return [];
+    
+    const tagIds = [];
+    
+    // 获取已有标签
+    let existingTags = [];
+    try {
+        const response = await fetch(`${navServerUrl}/api/tags`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+            existingTags = await response.json();
+        }
+    } catch (e) {}
+    
+    for (const tagName of tagNames) {
+        const existing = existingTags.find(t => t.name === tagName);
+        if (existing) {
+            tagIds.push(existing.id);
+        } else {
+            try {
+                const response = await fetch(`${navServerUrl}/api/tags`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name: tagName })
+                });
+                
+                if (response.ok) {
+                    const newTag = await response.json();
+                    tagIds.push(newTag.id);
+                    existingTags.push({ id: newTag.id, name: tagName });
+                }
+            } catch (e) {}
+        }
+    }
+    
+    return tagIds;
+}
+
+// 构建卡片数据（包含自动生成的标签和描述）
+async function buildCardData(url, title, navServerUrl, token) {
+    let logo = '';
+    let domain = '';
+    try {
+        const urlObj = new URL(url);
+        logo = `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
+        domain = urlObj.hostname.replace(/^www\./, '');
+    } catch (e) {}
+    
+    const cardTitle = truncateText(title || domain || '无标题', 20);
+    const description = generateDescription(title, domain);
+    const tagNames = generateTagNames(url, title);
+    const tagIds = await getOrCreateTagIds(tagNames, navServerUrl, token);
+    
+    return {
+        title: cardTitle,
+        url,
+        logo,
+        description,
+        tagIds
+    };
 }
 
 // 监听来自内容脚本和其他页面的消息

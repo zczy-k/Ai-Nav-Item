@@ -4889,8 +4889,8 @@ function generateTagNames(url, title) {
     return tags.slice(0, 2).map(tag => truncateText(tag, 8));
 }
 
-// 获取或创建标签ID
-async function getOrCreateTagIds(tagNames, existingTags, token) {
+// 获取或创建标签ID（支持传入token或使用fetchWithAuth）
+async function getOrCreateTagIds(tagNames, existingTags, token = null) {
     if (!tagNames || tagNames.length === 0) return [];
     
     const tagIds = [];
@@ -4903,14 +4903,24 @@ async function getOrCreateTagIds(tagNames, existingTags, token) {
         } else {
             // 创建新标签
             try {
-                const response = await fetch(`${navServerUrl}/api/tags`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ name: tagName })
-                });
+                let response;
+                if (token) {
+                    // 使用传入的token
+                    response = await fetch(`${navServerUrl}/api/tags`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ name: tagName })
+                    });
+                } else {
+                    // 使用fetchWithAuth自动获取token
+                    response = await fetchWithAuth(`${navServerUrl}/api/tags`, {
+                        method: 'POST',
+                        body: JSON.stringify({ name: tagName })
+                    });
+                }
                 
                 if (response.ok) {
                     const newTag = await response.json();
@@ -5383,21 +5393,38 @@ async function confirmImportFolder() {
             subMenuId = subMenuResult.id;
         }
         
-        // 2. 批量添加书签作为卡片
-        const cards = bookmarks.map(bookmark => {
+        // 2. 获取已有标签
+        let existingTags = [];
+        try {
+            const tagsResponse = await fetchWithAuth(`${serverUrl}/api/tags`);
+            if (tagsResponse.ok) {
+                existingTags = await tagsResponse.json();
+            }
+        } catch (e) {}
+        
+        // 3. 批量添加书签作为卡片（包含自动生成的标签和描述）
+        const cards = await Promise.all(bookmarks.map(async bookmark => {
             let logo = '';
+            let domain = '';
             try {
                 const urlObj = new URL(bookmark.url);
                 logo = `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
+                domain = urlObj.hostname.replace(/^www\./, '');
             } catch (e) {}
             
+            const title = truncateText(bookmark.title || domain || '无标题', 20);
+            const description = generateDescription(bookmark.title, domain);
+            const tagNames = generateTagNames(bookmark.url, bookmark.title);
+            const tagIds = await getOrCreateTagIds(tagNames, existingTags, token);
+            
             return {
-                title: bookmark.title || '无标题',
+                title,
                 url: bookmark.url,
-                logo: logo,
-                description: ''
+                logo,
+                description,
+                tagIds
             };
-        });
+        }));
         
         const addResponse = await fetchWithAuth(`${serverUrl}/api/batch/add`, {
             method: 'POST',
