@@ -338,8 +338,40 @@ router.post('/upload', authMiddleware, backupLimiter, upload.single('backup'), (
 router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res) => {
   try {
     const { filename } = req.params;
+    const { skipEnv = true } = req.body; // 默认跳过.env文件
     const filePath = validateBackupFile(filename, res);
     if (!filePath) return;
+
+    const projectRoot = path.join(__dirname, '..');
+    const preRestoreBackupDir = path.join(__dirname, '..', 'backups', 'pre-restore');
+    
+    // 0. 恢复前自动备份当前关键配置
+    if (!fs.existsSync(preRestoreBackupDir)) {
+      fs.mkdirSync(preRestoreBackupDir, { recursive: true });
+    }
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const preRestoreFiles = [];
+    
+    // 备份当前.env文件
+    const envPath = path.join(projectRoot, '.env');
+    if (fs.existsSync(envPath)) {
+      const backupEnvPath = path.join(preRestoreBackupDir, `.env.pre-restore-${timestamp}`);
+      fs.copyFileSync(envPath, backupEnvPath);
+      preRestoreFiles.push('.env');
+    }
+    
+    // 备份当前JWT密钥
+    const jwtSecretPath = path.join(projectRoot, 'config', '.jwt-secret');
+    if (fs.existsSync(jwtSecretPath)) {
+      const backupJwtPath = path.join(preRestoreBackupDir, `.jwt-secret.pre-restore-${timestamp}`);
+      fs.copyFileSync(jwtSecretPath, backupJwtPath);
+      preRestoreFiles.push('config/.jwt-secret');
+    }
+    
+    if (preRestoreFiles.length > 0) {
+      console.log(`✓ 恢复前已备份关键配置: ${preRestoreFiles.join(', ')}`);
+    }
 
     // 1. 解压到临时目录
     const tempDir = path.join(__dirname, '..', `temp-restore-${Date.now()}`);
@@ -352,9 +384,10 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
         .on('error', reject);
     });
 
-    // 2. 覆盖文件
-    const projectRoot = path.join(__dirname, '..');
+    // 2. 覆盖文件（保护关键配置）
     const backupContents = fs.readdirSync(tempDir);
+    const skippedFiles = [];
+    const restoredFiles = [];
 
     for (const item of backupContents) {
       const sourcePath = path.join(tempDir, item);
@@ -364,6 +397,7 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
         const webdavConfigPath = getWebDAVConfigPath();
         fs.copyFileSync(sourcePath, webdavConfigPath);
         fs.chmodSync(webdavConfigPath, 0o600);
+        restoredFiles.push('webdav-config.json');
         continue;
       }
       
@@ -372,23 +406,81 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
         continue;
       }
       
+      // 保护.env文件（默认跳过，除非明确要求恢复）
+      if (item === '.env' && skipEnv) {
+        skippedFiles.push('.env (保护当前环境配置)');
+        continue;
+      }
+      
       const destPath = path.join(projectRoot, item);
       
       if (fs.statSync(sourcePath).isDirectory()) {
-        // 如果目标目录已存在，先删除
+        // 特殊处理config目录，保护.jwt-secret
+        if (item === 'config') {
+          if (!fs.existsSync(destPath)) {
+            fs.mkdirSync(destPath, { recursive: true });
+          }
+          // 逐个复制config目录中的文件，跳过.jwt-secret
+          const configFiles = fs.readdirSync(sourcePath);
+          for (const configFile of configFiles) {
+            if (configFile === '.jwt-secret') {
+              skippedFiles.push('config/.jwt-secret (保护当前JWT密钥)');
+              continue;
+            }
+            const srcFile = path.join(sourcePath, configFile);
+            const destFile = path.join(destPath, configFile);
+            if (fs.statSync(srcFile).isDirectory()) {
+              fs.cpSync(srcFile, destFile, { recursive: true });
+            } else {
+              fs.copyFileSync(srcFile, destFile);
+            }
+            restoredFiles.push(`config/${configFile}`);
+          }
+          continue;
+        }
+        
+        // 其他目录正常恢复
         if (fs.existsSync(destPath)) {
           fs.rmSync(destPath, { recursive: true, force: true });
         }
         fs.cpSync(sourcePath, destPath, { recursive: true });
+        restoredFiles.push(`${item}/`);
       } else {
         fs.copyFileSync(sourcePath, destPath);
+        restoredFiles.push(item);
       }
     }
 
     // 3. 清理临时文件
     fs.rmSync(tempDir, { recursive: true, force: true });
+    
+    // 清理超过7天的pre-restore备份
+    try {
+      const preRestoreBackups = fs.readdirSync(preRestoreBackupDir);
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      for (const file of preRestoreBackups) {
+        const filePath = path.join(preRestoreBackupDir, file);
+        const stats = fs.statSync(filePath);
+        if (stats.mtimeMs < sevenDaysAgo) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    } catch (e) {
+      // 清理失败不影响主流程
+    }
 
-    res.json({ success: true, message: '备份恢复成功！应用可能需要重启以生效。' });
+    let message = '备份恢复成功！应用可能需要重启以生效。';
+    if (skippedFiles.length > 0) {
+      message += ` 已跳过: ${skippedFiles.join(', ')}`;
+    }
+
+    res.json({ 
+      success: true, 
+      message,
+      restored: restoredFiles,
+      skipped: skippedFiles,
+      preRestoreBackup: preRestoreFiles.length > 0 ? `backups/pre-restore/*-${timestamp}` : null
+    });
 
   } catch (error) {
     console.error('恢复备份失败:', error);
@@ -716,6 +808,34 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
     const remotePath = `/Con-Nav-Item-Backups/${filename}`;
     const fileBuffer = await client.getFileContents(remotePath);
     
+    const { skipEnv = true } = req.body; // 默认跳过.env文件
+    const projectRoot = path.join(__dirname, '..');
+    const preRestoreBackupDir = path.join(__dirname, '..', 'backups', 'pre-restore');
+    
+    // 0. 恢复前自动备份当前关键配置
+    if (!fs.existsSync(preRestoreBackupDir)) {
+      fs.mkdirSync(preRestoreBackupDir, { recursive: true });
+    }
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const preRestoreFiles = [];
+    
+    // 备份当前.env文件
+    const envPath = path.join(projectRoot, '.env');
+    if (fs.existsSync(envPath)) {
+      const backupEnvPath = path.join(preRestoreBackupDir, `.env.pre-restore-${timestamp}`);
+      fs.copyFileSync(envPath, backupEnvPath);
+      preRestoreFiles.push('.env');
+    }
+    
+    // 备份当前JWT密钥
+    const jwtSecretPath = path.join(projectRoot, 'config', '.jwt-secret');
+    if (fs.existsSync(jwtSecretPath)) {
+      const backupJwtPath = path.join(preRestoreBackupDir, `.jwt-secret.pre-restore-${timestamp}`);
+      fs.copyFileSync(jwtSecretPath, backupJwtPath);
+      preRestoreFiles.push('config/.jwt-secret');
+    }
+    
     // 保存到临时文件
     const tempPath = path.join(__dirname, '..', `temp-webdav-${Date.now()}.zip`);
     fs.writeFileSync(tempPath, fileBuffer);
@@ -731,9 +851,10 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
         .on('error', reject);
     });
     
-    // 恢复文件
-    const projectRoot = path.join(__dirname, '..');
+    // 恢复文件（保护关键配置）
     const backupContents = fs.readdirSync(tempDir);
+    const skippedFiles = [];
+    const restoredFiles = [];
     
     for (const item of backupContents) {
       const sourcePath = path.join(tempDir, item);
@@ -743,6 +864,7 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
         const webdavConfigPath = getWebDAVConfigPath();
         fs.copyFileSync(sourcePath, webdavConfigPath);
         fs.chmodSync(webdavConfigPath, 0o600);
+        restoredFiles.push('webdav-config.json');
         continue;
       }
       
@@ -751,16 +873,46 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
         continue;
       }
       
-      const destPath = path.join(projectRoot, item);
-      
-      if (fs.existsSync(destPath) && fs.statSync(destPath).isDirectory()) {
-        fs.rmSync(destPath, { recursive: true, force: true });
+      // 保护.env文件
+      if (item === '.env' && skipEnv) {
+        skippedFiles.push('.env (保护当前环境配置)');
+        continue;
       }
       
+      const destPath = path.join(projectRoot, item);
+      
       if (fs.statSync(sourcePath).isDirectory()) {
+        // 特殊处理config目录，保护.jwt-secret
+        if (item === 'config') {
+          if (!fs.existsSync(destPath)) {
+            fs.mkdirSync(destPath, { recursive: true });
+          }
+          const configFiles = fs.readdirSync(sourcePath);
+          for (const configFile of configFiles) {
+            if (configFile === '.jwt-secret') {
+              skippedFiles.push('config/.jwt-secret (保护当前JWT密钥)');
+              continue;
+            }
+            const srcFile = path.join(sourcePath, configFile);
+            const destFile = path.join(destPath, configFile);
+            if (fs.statSync(srcFile).isDirectory()) {
+              fs.cpSync(srcFile, destFile, { recursive: true });
+            } else {
+              fs.copyFileSync(srcFile, destFile);
+            }
+            restoredFiles.push(`config/${configFile}`);
+          }
+          continue;
+        }
+        
+        if (fs.existsSync(destPath)) {
+          fs.rmSync(destPath, { recursive: true, force: true });
+        }
         fs.cpSync(sourcePath, destPath, { recursive: true });
+        restoredFiles.push(`${item}/`);
       } else {
         fs.copyFileSync(sourcePath, destPath);
+        restoredFiles.push(item);
       }
     }
     
@@ -768,9 +920,16 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
     fs.unlinkSync(tempPath);
     fs.rmSync(tempDir, { recursive: true, force: true });
     
+    let message = '从 WebDAV恢复成功！应用可能需要重启以生效。';
+    if (skippedFiles.length > 0) {
+      message += ` 已跳过: ${skippedFiles.join(', ')}`;
+    }
+    
     res.json({ 
       success: true, 
-      message: '从 WebDAV恢复成功！应用可能需要重启以生效。' 
+      message,
+      restored: restoredFiles,
+      skipped: skippedFiles
     });
     
   } catch (error) {
