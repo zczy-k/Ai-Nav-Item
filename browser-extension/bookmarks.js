@@ -1329,18 +1329,6 @@ function bindContextMenu() {
         hideContextMenu();
         deleteSelectedBookmarks();
     });
-    
-    document.getElementById('ctxQuickAddToNav').addEventListener('click', (e) => {
-        e.stopPropagation();
-        hideContextMenu();
-        quickAddToNav();
-    });
-    
-    document.getElementById('ctxAddToNav').addEventListener('click', (e) => {
-        e.stopPropagation();
-        hideContextMenu();
-        showAddToNavModal();
-    });
 }
 
 function showContextMenu(x, y) {
@@ -1348,8 +1336,6 @@ function showContextMenu(x, y) {
     const count = selectedBookmarks.size;
     
     // 更新菜单文本显示选中数量
-    document.querySelector('#ctxQuickAddToNav span:last-child').textContent = `快速添加 (${count})`;
-    document.querySelector('#ctxAddToNav span:last-child').textContent = `选择分类添加 (${count})`;
     document.querySelector('#ctxBatchMove span:last-child').textContent = `批量移动 (${count})`;
     document.querySelector('#ctxBatchRename span:last-child').textContent = `批量重命名 (${count})`;
     document.querySelector('#ctxBatchDelete span:last-child').textContent = `批量删除 (${count})`;

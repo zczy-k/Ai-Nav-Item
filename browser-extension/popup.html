@@ -1,56 +1,33 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>导航站插件</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            width: 380px;
-            max-height: 600px;
+            width: 320px;
             padding: 16px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #f9fafb;
         }
-
         .header {
             display: flex;
             align-items: center;
             gap: 12px;
             margin-bottom: 16px;
         }
-
-        .header img {
-            width: 32px;
-            height: 32px;
-        }
-
-        .header h2 {
-            font-size: 16px;
-            color: #333;
-        }
-
+        .header img { width: 32px; height: 32px; }
+        .header h2 { font-size: 16px; color: #333; }
         .info {
             background: white;
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-
-        .info-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 4px;
-        }
-
+        .info-label { font-size: 12px; color: #666; margin-bottom: 4px; }
         .info-value {
             font-size: 13px;
             color: #333;
@@ -60,18 +37,8 @@
             padding: 6px 8px;
             border-radius: 4px;
         }
-
-        .info-value.empty {
-            color: #999;
-            font-style: italic;
-        }
-
-        .buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
+        .info-value.empty { color: #999; font-style: italic; }
+        .buttons { display: flex; flex-direction: column; gap: 8px; }
         button {
             width: 100%;
             padding: 10px;
@@ -82,301 +49,45 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
-
         .btn-primary:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.4);
         }
-
         .btn-secondary {
             background: white;
             color: #333;
             border: 1px solid #e5e7eb;
         }
-
-        .btn-secondary:hover {
-            background: #f9fafb;
+        .btn-secondary:hover { background: #f9fafb; }
+        .btn-bookmarks {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
         }
-
+        .btn-bookmarks:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245,158,11,0.4);
+        }
         .section-title {
             font-size: 13px;
             font-weight: 600;
             color: #666;
             margin: 16px 0 8px 0;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
-
-        .btn-add-current {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-        }
-
-        .btn-add-current:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-        }
-
-        .btn-select-tabs {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
-        }
-
-        .btn-select-tabs:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-        }
-
-        /* 标签页选择界面 */
-        .tabs-selector {
-            display: none;
-            background: white;
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .tabs-selector.active {
-            display: block;
-        }
-
-        .tabs-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .tabs-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .tabs-count {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .tabs-actions {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .btn-small {
-            padding: 4px 12px;
-            font-size: 12px;
-            border-radius: 4px;
-            border: 1px solid #d1d5db;
-            background: white;
-            color: #666;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-small:hover {
-            background: #f3f4f6;
-            border-color: #9ca3af;
-        }
-
-        .tabs-list {
-            max-height: 300px;
-            overflow-y: auto;
-            margin-bottom: 12px;
-        }
-
-        .tab-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            padding: 8px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-bottom: 4px;
-        }
-
-        .tab-item:hover {
-            background: #f9fafb;
-        }
-
-        .tab-item.current {
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-        }
-
-        .tab-checkbox {
-            margin-top: 2px;
-            cursor: pointer;
-        }
-
-        .tab-favicon {
-            width: 16px;
-            height: 16px;
-            margin-top: 2px;
-            flex-shrink: 0;
-        }
-
-        .tab-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .tab-title {
-            font-size: 13px;
-            color: #333;
-            margin-bottom: 2px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .tab-url {
-            font-size: 11px;
-            color: #999;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .tab-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            background: #3b82f6;
-            color: white;
-            font-size: 10px;
-            border-radius: 3px;
-            margin-left: 6px;
-        }
-
-        .tabs-footer {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn-cancel {
-            flex: 1;
-            background: #f3f4f6;
-            color: #666;
-        }
-
-        .btn-cancel:hover {
-            background: #e5e7eb;
-        }
-
-        .btn-confirm {
-            flex: 2;
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
-        }
-
-        .btn-confirm:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-        }
-
-        .btn-confirm:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-bookmarks {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            color: white;
-        }
-
-        .btn-bookmarks:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
-        }
-
-        .footer {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e5e7eb;
-            text-align: center;
-            font-size: 12px;
-            color: #999;
-        }
-    </style>
-</head>
-
-<body>
-    <div class="header">
-        <img src="icons/icon48.png" alt="导航站">
-        <h2>导航站插件</h2>
-    </div>
-
-    <div class="info">
-        <div class="info-label">新标签页模式</div>
-        <select id="newtabMode" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; margin-top: 4px;">
-            <option value="nav">导航站模式</option>
-            <option value="quickaccess">快速访问面板</option>
-        </select>
-    </div>
-
-    <div class="info" id="navUrlInfo">
-        <div class="info-label">当前导航站地址</div>
-        <div class="info-value" id="currentUrl">未设置</div>
-    </div>
-
-    <div class="buttons" id="navButtons">
-        <button class="btn-primary" id="openSettings">设置导航站地址</button>
-        <button class="btn-secondary" id="openNav">访问导航站</button>
-    </div>
-
-    <div class="section-title">
-        📋 快速添加
-    </div>
-
-    <div class="buttons">
-        <button class="btn-add-current" id="addCurrentTab">➕ 添加当前标签页</button>
-        <button class="btn-select-tabs" id="selectTabs">📋 选择标签页批量添加</button>
-    </div>
-
-    <div class="info" style="margin-top: 12px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <div class="info-label" style="margin-bottom: 0;">浮动快捷按钮</div>
-                <div style="font-size: 11px; color: #999;">在网页右下角显示快速添加按钮</div>
-            </div>
-            <label class="switch">
-                <input type="checkbox" id="floatBtnEnabled" checked>
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
-
-    <style>
         .switch {
             position: relative;
             display: inline-block;
             width: 44px;
             height: 24px;
         }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+        .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
             position: absolute;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background-color: #ccc;
             transition: .3s;
             border-radius: 24px;
@@ -398,43 +109,80 @@
         input:checked + .slider:before {
             transform: translateX(20px);
         }
+        .tip-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #1e40af;
+            margin-top: 12px;
+        }
+        .tip-box strong { display: block; margin-bottom: 4px; }
+        .footer {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+        }
     </style>
-
-    <div class="section-title">
-        🔖 本地书签
+</head>
+<body>
+    <div class="header">
+        <img src="icons/icon48.png" alt="导航站">
+        <h2>导航站插件</h2>
     </div>
+
+    <div class="info">
+        <div class="info-label">新标签页模式</div>
+        <select id="newtabMode" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; margin-top: 4px;">
+            <option value="nav">导航站模式</option>
+            <option value="quickaccess">快速访问面板</option>
+        </select>
+    </div>
+
+    <div class="info" id="navUrlInfo">
+        <div class="info-label">当前导航站地址</div>
+        <div class="info-value" id="currentUrl">未设置</div>
+    </div>
+
+    <div class="buttons" id="navButtons">
+        <button class="btn-primary" id="openSettings">⚙️ 设置导航站地址</button>
+        <button class="btn-secondary" id="openNav">🌐 访问导航站</button>
+    </div>
+
+    <div class="section-title">⚡ 快捷功能</div>
+
+    <div class="info">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <div class="info-label" style="margin-bottom: 0;">浮动快捷按钮</div>
+                <div style="font-size: 11px; color: #999;">在网页右下角显示快速添加按钮</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="floatBtnEnabled" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="tip-box">
+        <strong>💡 添加网站到导航页</strong>
+        • 右键点击网页 → 选择分类添加<br>
+        • 点击网页右下角浮动按钮<br>
+        • 在书签管理器中批量添加
+    </div>
+
+    <div class="section-title">🔖 本地书签</div>
 
     <div class="buttons">
         <button class="btn-bookmarks" id="openBookmarks">📚 书签管理器</button>
     </div>
 
-    <!-- 标签页选择界面 -->
-    <div class="tabs-selector" id="tabsSelector">
-        <div class="tabs-header">
-            <div class="tabs-title">选择要添加的标签页</div>
-            <div class="tabs-count" id="tabsCount">0 个</div>
-        </div>
-
-        <div class="tabs-actions">
-            <button class="btn-small" id="selectAll">✔️ 全选</button>
-            <button class="btn-small" id="clearAll">❌ 清除</button>
-        </div>
-
-        <div class="tabs-list" id="tabsList">
-            <!-- 标签页列表将动态生成 -->
-        </div>
-
-        <div class="tabs-footer">
-            <button class="btn-cancel" id="cancelSelect">取消</button>
-            <button class="btn-confirm" id="confirmAdd" disabled>添加 (0)</button>
-        </div>
-    </div>
-
-    <div class="footer">
-        v1.0.0
-    </div>
+    <div class="footer">v1.3.0</div>
 
     <script src="popup.js"></script>
 </body>
-
 </html>
