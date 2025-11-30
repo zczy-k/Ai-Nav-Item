@@ -373,6 +373,20 @@ const gradients = [
 .edit-mode .link-item .link-text {
   pointer-events: auto;
 }
+
+/* 确保编辑模式下的按钮可以点击 */
+.edit-mode .card-btns {
+  pointer-events: auto !important;
+  z-index: 100 !important;
+}
+
+.edit-mode .card-btn {
+  pointer-events: auto !important;
+}
+
+.edit-mode .card-checkbox {
+  pointer-events: auto !important;
+}
 .link-icon {
   width: 28px;
   height: 28px;

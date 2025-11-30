@@ -178,6 +178,8 @@
                         </label>
                         <button class="btn btn-small btn-secondary" id="btnBatchMove" style="display: none;">移动</button>
                         <button class="btn btn-small btn-secondary" id="btnBatchRename" style="display: none;">重命名</button>
+                        <button class="btn btn-small btn-primary" id="btnQuickAddToNav" style="display: none;" title="快速添加到上次选择的分类">⚡ 快速添加</button>
+                        <button class="btn btn-small btn-secondary" id="btnAddToNav" style="display: none;" title="选择分类后添加">🚀 添加到导航页</button>
                         <button class="btn btn-small btn-danger" id="btnDeleteSelected" style="display: none;">删除</button>
                         <button class="btn btn-small btn-secondary" id="btnAddBookmark">+ 添加</button>
                     </div>
@@ -359,8 +361,91 @@
     <!-- 拖拽提示 -->
     <div class="drag-hint" id="dragHint">拖拽到左侧文件夹以移动书签</div>
 
+    <!-- 添加到导航页弹窗 -->
+    <div class="modal" id="addToNavModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>🚀 添加到导航页</h3>
+                <button class="modal-close" id="addToNavClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>导航站地址</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="navServerUrl" placeholder="例如: http://localhost:3000" style="flex: 1;">
+                        <button class="btn btn-secondary" id="btnLoadMenus">加载分类</button>
+                    </div>
+                    <div style="font-size: 12px; color: #999; margin-top: 4px;">请输入您的导航站服务器地址</div>
+                </div>
+                <div class="form-group">
+                    <label>选择分类（菜单）</label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="navMenuSelect" style="flex: 1; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                            <option value="">-- 请先加载分类 --</option>
+                        </select>
+                        <button class="btn btn-secondary" id="btnAddMenu">+ 新建</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>选择子分类（可选）</label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="navSubMenuSelect" style="flex: 1; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                            <option value="">-- 不使用子分类 --</option>
+                        </select>
+                        <button class="btn btn-secondary" id="btnAddSubMenu">+ 新建</button>
+                    </div>
+                </div>
+                <div style="margin-top: 16px;">
+                    <label style="font-weight: 500; margin-bottom: 8px; display: block;">待添加的书签 (<span id="navBookmarkCount">0</span> 个)</label>
+                    <div id="navBookmarkList" style="max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-left">
+                    <span id="navAddStatus" style="font-size: 13px; color: #666;"></span>
+                </div>
+                <div class="modal-footer-right">
+                    <button class="btn btn-secondary" id="btnCancelAddToNav">取消</button>
+                    <button class="btn btn-primary" id="btnConfirmAddToNav">确认添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建分类弹窗 -->
+    <div class="modal" id="newMenuModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="newMenuTitle">新建分类</h3>
+                <button class="modal-close" id="newMenuClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>分类名称</label>
+                    <input type="text" id="newMenuName" placeholder="输入分类名称">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div></div>
+                <div class="modal-footer-right">
+                    <button class="btn btn-secondary" id="btnCancelNewMenu">取消</button>
+                    <button class="btn btn-primary" id="btnConfirmNewMenu">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 右键菜单 -->
     <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" id="ctxQuickAddToNav">
+            <span>⚡</span>
+            <span>快速添加到导航页</span>
+        </div>
+        <div class="context-menu-item" id="ctxAddToNav">
+            <span>🚀</span>
+            <span>选择分类添加</span>
+        </div>
+        <div class="context-menu-divider"></div>
         <div class="context-menu-item" id="ctxBatchMove">
             <span>📁</span>
             <span>批量移动</span>

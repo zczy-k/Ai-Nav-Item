@@ -8,12 +8,6 @@ chrome.storage.sync.get(['newtabMode', 'navUrl', 'offlineHtml'], function(result
         return;
     }
     
-    // 如果是统一搜索模式，跳转到统一页面
-    if (mode === 'unified') {
-        window.location.href = 'unified-newtab.html';
-        return;
-    }
-    
     // 导航站模式
     const navFrame = document.getElementById('navFrame');
     const setupContainer = document.getElementById('setupContainer');
@@ -101,7 +95,7 @@ document.getElementById('saveBtn').addEventListener('click', function() {
                 location.reload();
             });
         })
-        .catch(err => {
+        .catch(() => {
             // 即使获取失败也保存URL
             chrome.storage.sync.set({ navUrl: url }, function() {
                 location.reload();

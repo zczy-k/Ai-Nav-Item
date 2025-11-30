@@ -37,6 +37,72 @@ async function init() {
     bindEvents();
     loadAutoSortSetting();
     renderTagCloud();
+    // 预加载导航页配置
+    await initNavConfig();
+    // 检查URL参数，处理从右键菜单传递的添加请求
+    handleUrlParams();
+}
+
+// 处理URL参数（从右键菜单传递）
+function handleUrlParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const addToNav = urlParams.get('addToNav');
+    const url = urlParams.get('url');
+    const title = urlParams.get('title');
+    
+    if (addToNav === 'true' && url) {
+        // 创建一个临时书签对象
+        pendingNavBookmarks = [{
+            id: 'temp_' + Date.now(),
+            url: decodeURIComponent(url),
+            title: title ? decodeURIComponent(title) : ''
+        }];
+        
+        // 延迟显示弹窗，等待页面完全加载
+        setTimeout(() => {
+            showAddToNavModalDirect();
+        }, 500);
+        
+        // 清除URL参数
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
+
+// 直接显示添加到导航页弹窗（不检查选中书签）
+async function showAddToNavModalDirect() {
+    if (pendingNavBookmarks.length === 0) {
+        return;
+    }
+    
+    // 加载配置
+    if (!navConfigLoaded) {
+        await initNavConfig();
+    }
+    
+    // 设置服务器地址
+    if (navServerUrl) {
+        document.getElementById('navServerUrl').value = navServerUrl;
+    }
+    
+    // 渲染待添加书签列表
+    renderPendingNavBookmarks();
+    
+    // 显示弹窗
+    document.getElementById('addToNavModal').classList.add('active');
+    document.getElementById('navAddStatus').textContent = '';
+    
+    // 如果已有服务器地址，自动加载分类并恢复上次选择
+    if (navServerUrl) {
+        await loadNavMenus();
+        // 恢复上次选择
+        if (lastSelectedMenuId) {
+            document.getElementById('navMenuSelect').value = lastSelectedMenuId;
+            onMenuSelectChange();
+            if (lastSelectedSubMenuId) {
+                document.getElementById('navSubMenuSelect').value = lastSelectedSubMenuId;
+            }
+        }
+    }
 }
 
 // 加载使用频率数据
@@ -903,6 +969,8 @@ function updateSelectionUI() {
     const deleteBtn = document.getElementById('btnDeleteSelected');
     const moveBtn = document.getElementById('btnBatchMove');
     const renameBtn = document.getElementById('btnBatchRename');
+    const addToNavBtn = document.getElementById('btnAddToNav');
+    const quickAddBtn = document.getElementById('btnQuickAddToNav');
     const selectAllCheckbox = document.getElementById('selectAllBookmarks');
     const bookmarks = getBookmarksForCurrentFolder();
     
@@ -910,11 +978,17 @@ function updateSelectionUI() {
         deleteBtn.style.display = 'block';
         moveBtn.style.display = 'block';
         renameBtn.style.display = 'block';
+        addToNavBtn.style.display = 'block';
+        quickAddBtn.style.display = 'block';
         deleteBtn.textContent = `删除 (${selectedBookmarks.size})`;
+        addToNavBtn.textContent = `🚀 选择分类 (${selectedBookmarks.size})`;
+        quickAddBtn.textContent = `⚡ 快速添加 (${selectedBookmarks.size})`;
     } else {
         deleteBtn.style.display = 'none';
         moveBtn.style.display = 'none';
         renameBtn.style.display = 'none';
+        addToNavBtn.style.display = 'none';
+        quickAddBtn.style.display = 'none';
     }
     
     selectAllCheckbox.checked = bookmarks.length > 0 && selectedBookmarks.size === bookmarks.length;
@@ -1024,6 +1098,20 @@ function bindEvents() {
     document.getElementById('btnCancelBatchRename').addEventListener('click', closeBatchRenameModal);
     document.getElementById('btnConfirmBatchRename').addEventListener('click', confirmBatchRename);
     document.getElementById('renameRule').addEventListener('change', updateRenameUI);
+    
+    // 添加到导航页
+    document.getElementById('btnQuickAddToNav').addEventListener('click', quickAddToNav);
+    document.getElementById('btnAddToNav').addEventListener('click', showAddToNavModal);
+    document.getElementById('addToNavClose').addEventListener('click', closeAddToNavModal);
+    document.getElementById('btnCancelAddToNav').addEventListener('click', closeAddToNavModal);
+    document.getElementById('btnLoadMenus').addEventListener('click', loadNavMenus);
+    document.getElementById('btnConfirmAddToNav').addEventListener('click', confirmAddToNav);
+    document.getElementById('navMenuSelect').addEventListener('change', onMenuSelectChange);
+    document.getElementById('btnAddMenu').addEventListener('click', () => showNewMenuModal('menu'));
+    document.getElementById('btnAddSubMenu').addEventListener('click', () => showNewMenuModal('submenu'));
+    document.getElementById('newMenuClose').addEventListener('click', closeNewMenuModal);
+    document.getElementById('btnCancelNewMenu').addEventListener('click', closeNewMenuModal);
+    document.getElementById('btnConfirmNewMenu').addEventListener('click', confirmNewMenu);
     
     // 右键菜单
     bindContextMenu();
@@ -1241,6 +1329,18 @@ function bindContextMenu() {
         hideContextMenu();
         deleteSelectedBookmarks();
     });
+    
+    document.getElementById('ctxQuickAddToNav').addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideContextMenu();
+        quickAddToNav();
+    });
+    
+    document.getElementById('ctxAddToNav').addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideContextMenu();
+        showAddToNavModal();
+    });
 }
 
 function showContextMenu(x, y) {
@@ -1248,6 +1348,8 @@ function showContextMenu(x, y) {
     const count = selectedBookmarks.size;
     
     // 更新菜单文本显示选中数量
+    document.querySelector('#ctxQuickAddToNav span:last-child').textContent = `快速添加 (${count})`;
+    document.querySelector('#ctxAddToNav span:last-child').textContent = `选择分类添加 (${count})`;
     document.querySelector('#ctxBatchMove span:last-child').textContent = `批量移动 (${count})`;
     document.querySelector('#ctxBatchRename span:last-child').textContent = `批量重命名 (${count})`;
     document.querySelector('#ctxBatchDelete span:last-child').textContent = `批量删除 (${count})`;
@@ -1256,8 +1358,8 @@ function showContextMenu(x, y) {
     contextMenu.classList.add('active');
     
     // 调整位置，确保不超出屏幕
-    const menuWidth = 180;
-    const menuHeight = 120;
+    const menuWidth = 200;
+    const menuHeight = 200;
     
     let left = x;
     let top = y;
@@ -2756,14 +2858,12 @@ function startAutoSort() {
     
     // 每15分钟执行一次
     autoSortInterval = setInterval(autoSortBookmarkBar, 15 * 60 * 1000);
-    console.log('自动排序已启动，每15分钟执行一次');
 }
 
 function stopAutoSort() {
     if (autoSortInterval) {
         clearInterval(autoSortInterval);
         autoSortInterval = null;
-        console.log('自动排序已停止');
     }
 }
 
@@ -2772,8 +2872,6 @@ const UNUSED_DAYS_THRESHOLD = 365;
 
 async function autoSortBookmarkBar() {
     try {
-        console.log('开始自动排序...');
-        
         // 1. 对书签栏根目录排序
         await sortFolderByUsage('1');
         
@@ -2790,8 +2888,6 @@ async function autoSortBookmarkBar() {
         // 刷新书签数据
         const tree = await chrome.bookmarks.getTree();
         allBookmarks = tree;
-        
-        console.log('自动排序完成');
     } catch (error) {
         console.error('自动排序失败:', error);
     }
@@ -3048,7 +3144,6 @@ async function findOrCreateUnusedFolder() {
                 parentId: '2',
                 title: UNUSED_FOLDER_NAME
             });
-            console.log('已创建"长期未使用"文件夹');
         }
         
         return folder;
@@ -3110,7 +3205,6 @@ async function syncFavoritesFolder() {
             }
         }
         
-        console.log(`常用文件夹已同步，共 ${frequentBookmarks.length} 个书签`);
     } catch (e) {
         console.error('同步常用文件夹失败:', e);
     }
@@ -3174,7 +3268,6 @@ async function syncRecentFolder() {
             }
         }
         
-        console.log(`最近使用文件夹已同步，共 ${recentBookmarks.length} 个书签`);
     } catch (e) {
         console.error('同步最近使用文件夹失败:', e);
     }
@@ -3192,7 +3285,6 @@ async function findOrCreateSpecialFolder(name, parentId, index) {
                 title: name,
                 index: index
             });
-            console.log(`已创建"${name}"文件夹`);
         }
         
         return folder;
@@ -3245,5 +3337,577 @@ async function isDescendant(targetId, ancestorId) {
         return false;
     } catch (e) {
         return false;
+    }
+}
+
+// ==================== 添加到导航页功能 ====================
+let navMenus = [];
+let navServerUrl = '';
+let pendingNavBookmarks = [];
+let newMenuType = 'menu'; // 'menu' 或 'submenu'
+let lastSelectedMenuId = ''; // 记住上次选择的菜单
+let lastSelectedSubMenuId = ''; // 记住上次选择的子菜单
+let navConfigLoaded = false; // 是否已加载配置
+
+// 初始化导航页配置（在页面加载时调用）
+async function initNavConfig() {
+    try {
+        const result = await chrome.storage.sync.get(['navUrl', 'lastMenuId', 'lastSubMenuId']);
+        if (result.navUrl) {
+            navServerUrl = result.navUrl;
+        }
+        if (result.lastMenuId) {
+            lastSelectedMenuId = result.lastMenuId;
+        }
+        if (result.lastSubMenuId) {
+            lastSelectedSubMenuId = result.lastSubMenuId;
+        }
+        navConfigLoaded = true;
+    } catch (e) {
+        console.error('加载导航配置失败:', e);
+    }
+}
+
+// 快速添加到导航页（使用上次的分类，无需弹窗）
+async function quickAddToNav() {
+    if (selectedBookmarks.size === 0) {
+        alert('请先选择要添加的书签');
+        return;
+    }
+    
+    // 检查是否有保存的配置
+    if (!navServerUrl || !lastSelectedMenuId) {
+        // 没有配置，显示完整弹窗
+        showAddToNavModal();
+        return;
+    }
+    
+    // 获取选中的书签
+    const bookmarksToAdd = getSelectedBookmarksData();
+    if (bookmarksToAdd.length === 0) {
+        alert('没有有效的书签可添加');
+        return;
+    }
+    
+    // 获取认证token
+    const token = await getNavAuthToken();
+    if (!token) return;
+    
+    // 直接添加
+    try {
+        const cards = bookmarksToAdd.map(bookmark => ({
+            title: bookmark.title || '无标题',
+            url: bookmark.url,
+            logo: getNavFaviconUrl(bookmark.url),
+            description: ''
+        }));
+        
+        const response = await fetch(`${navServerUrl}/api/batch/add`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                menu_id: parseInt(lastSelectedMenuId),
+                sub_menu_id: lastSelectedSubMenuId ? parseInt(lastSelectedSubMenuId) : null,
+                cards
+            })
+        });
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                await chrome.storage.local.remove(['navAuthToken']);
+            }
+            throw new Error('添加失败');
+        }
+        
+        const result = await response.json();
+        let msg = `✅ 已添加 ${result.added} 个书签`;
+        if (result.skipped > 0) msg += `，跳过 ${result.skipped} 个重复`;
+        
+        showToast(msg);
+        selectedBookmarks.clear();
+        updateSelectionUI();
+        renderBookmarkList();
+    } catch (error) {
+        console.error('快速添加失败:', error);
+        // 失败时显示完整弹窗
+        showAddToNavModal();
+    }
+}
+
+// 获取选中书签的数据
+function getSelectedBookmarksData() {
+    const allBookmarksList = [];
+    collectAllBookmarks(allBookmarks, allBookmarksList);
+    
+    const result = [];
+    for (const id of selectedBookmarks) {
+        const bookmark = allBookmarksList.find(b => b.id === id);
+        if (bookmark && bookmark.url) {
+            result.push(bookmark);
+        }
+    }
+    return result;
+}
+
+// 获取导航页用的favicon URL
+function getNavFaviconUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        return `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
+    } catch (e) {
+        return '';
+    }
+}
+
+// 显示Toast提示
+function showToast(message, duration = 3000) {
+    let toast = document.getElementById('navToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'navToast';
+        toast.style.cssText = `
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #333; color: white; padding: 12px 24px; border-radius: 8px;
+            font-size: 14px; z-index: 10000; opacity: 0; transition: opacity 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    setTimeout(() => { toast.style.opacity = '0'; }, duration);
+}
+
+// 显示添加到导航页弹窗
+async function showAddToNavModal() {
+    if (selectedBookmarks.size === 0) {
+        alert('请先选择要添加的书签');
+        return;
+    }
+    
+    // 获取选中的书签详情
+    pendingNavBookmarks = getSelectedBookmarksData();
+    
+    if (pendingNavBookmarks.length === 0) {
+        alert('没有有效的书签可添加');
+        return;
+    }
+    
+    // 加载配置
+    if (!navConfigLoaded) {
+        await initNavConfig();
+    }
+    
+    // 设置服务器地址
+    if (navServerUrl) {
+        document.getElementById('navServerUrl').value = navServerUrl;
+    }
+    
+    // 渲染待添加书签列表
+    renderPendingNavBookmarks();
+    
+    // 显示弹窗
+    document.getElementById('addToNavModal').classList.add('active');
+    document.getElementById('navAddStatus').textContent = '';
+    
+    // 如果已有服务器地址，自动加载分类并恢复上次选择
+    if (navServerUrl) {
+        await loadNavMenus();
+        // 恢复上次选择
+        if (lastSelectedMenuId) {
+            document.getElementById('navMenuSelect').value = lastSelectedMenuId;
+            onMenuSelectChange();
+            if (lastSelectedSubMenuId) {
+                document.getElementById('navSubMenuSelect').value = lastSelectedSubMenuId;
+            }
+        }
+    }
+}
+
+// 渲染待添加的书签列表
+function renderPendingNavBookmarks() {
+    const container = document.getElementById('navBookmarkList');
+    document.getElementById('navBookmarkCount').textContent = pendingNavBookmarks.length;
+    
+    if (pendingNavBookmarks.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">没有待添加的书签</div>';
+        return;
+    }
+    
+    container.innerHTML = pendingNavBookmarks.map((bookmark, index) => `
+        <div style="display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid #f0f0f0;">
+            <img src="${getFaviconUrl(bookmark.url)}" style="width: 16px; height: 16px;" onerror="this.src='icons/icon16.png'">
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(bookmark.title || '无标题')}</div>
+                <div style="font-size: 11px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(bookmark.url)}</div>
+            </div>
+            <button class="btn btn-small btn-secondary" onclick="removePendingNavBookmark(${index})" title="移除">✕</button>
+        </div>
+    `).join('');
+}
+
+// 移除待添加的书签（暴露到全局以便onclick调用）
+window.removePendingNavBookmark = function(index) {
+    pendingNavBookmarks.splice(index, 1);
+    renderPendingNavBookmarks();
+};
+
+// 关闭添加到导航页弹窗
+function closeAddToNavModal() {
+    document.getElementById('addToNavModal').classList.remove('active');
+    pendingNavBookmarks = [];
+}
+
+// 加载导航页分类
+async function loadNavMenus() {
+    const serverUrl = document.getElementById('navServerUrl').value.trim();
+    if (!serverUrl) {
+        alert('请输入导航站地址');
+        return;
+    }
+    
+    navServerUrl = serverUrl.replace(/\/$/, ''); // 移除末尾斜杠
+    
+    // 保存服务器地址
+    try {
+        await chrome.storage.sync.set({ navUrl: navServerUrl });
+    } catch (e) {}
+    
+    document.getElementById('navAddStatus').textContent = '正在加载分类...';
+    
+    try {
+        const response = await fetch(`${navServerUrl}/api/menus`);
+        if (!response.ok) throw new Error('请求失败');
+        
+        navMenus = await response.json();
+        
+        // 填充菜单下拉框
+        const menuSelect = document.getElementById('navMenuSelect');
+        menuSelect.innerHTML = '<option value="">-- 请选择分类 --</option>';
+        
+        navMenus.forEach(menu => {
+            const option = document.createElement('option');
+            option.value = menu.id;
+            option.textContent = menu.name;
+            menuSelect.appendChild(option);
+        });
+        
+        // 清空子菜单
+        document.getElementById('navSubMenuSelect').innerHTML = '<option value="">-- 不使用子分类 --</option>';
+        
+        document.getElementById('navAddStatus').textContent = `已加载 ${navMenus.length} 个分类`;
+    } catch (error) {
+        console.error('加载分类失败:', error);
+        document.getElementById('navAddStatus').textContent = '加载分类失败，请检查服务器地址';
+        alert('加载分类失败: ' + error.message);
+    }
+}
+
+// 菜单选择变化时加载子菜单
+function onMenuSelectChange() {
+    const menuId = document.getElementById('navMenuSelect').value;
+    const subMenuSelect = document.getElementById('navSubMenuSelect');
+    
+    subMenuSelect.innerHTML = '<option value="">-- 不使用子分类 --</option>';
+    
+    if (!menuId) return;
+    
+    const menu = navMenus.find(m => m.id == menuId);
+    if (menu && menu.subMenus && menu.subMenus.length > 0) {
+        menu.subMenus.forEach(sub => {
+            const option = document.createElement('option');
+            option.value = sub.id;
+            option.textContent = sub.name;
+            subMenuSelect.appendChild(option);
+        });
+    }
+}
+
+// 显示新建分类弹窗
+function showNewMenuModal(type) {
+    // 确保服务器地址已设置
+    const serverUrl = document.getElementById('navServerUrl').value.trim();
+    if (!serverUrl) {
+        alert('请先输入导航站地址并加载分类');
+        return;
+    }
+    navServerUrl = serverUrl.replace(/\/$/, '');
+    
+    newMenuType = type;
+    
+    if (type === 'menu') {
+        document.getElementById('newMenuTitle').textContent = '新建分类';
+    } else {
+        const menuId = document.getElementById('navMenuSelect').value;
+        if (!menuId) {
+            alert('请先选择一个主分类');
+            return;
+        }
+        document.getElementById('newMenuTitle').textContent = '新建子分类';
+    }
+    
+    document.getElementById('newMenuName').value = '';
+    document.getElementById('newMenuModal').classList.add('active');
+}
+
+// 关闭新建分类弹窗
+function closeNewMenuModal() {
+    document.getElementById('newMenuModal').classList.remove('active');
+}
+
+// 确认新建分类
+async function confirmNewMenu() {
+    const name = document.getElementById('newMenuName').value.trim();
+    if (!name) {
+        alert('请输入分类名称');
+        return;
+    }
+    
+    if (!navServerUrl) {
+        alert('请先设置导航站地址');
+        return;
+    }
+    
+    // 获取认证token
+    const token = await getNavAuthToken();
+    if (!token) {
+        return;
+    }
+    
+    try {
+        let url, body;
+        
+        if (newMenuType === 'menu') {
+            url = `${navServerUrl}/api/menus`;
+            body = { name, order: navMenus.length };
+        } else {
+            const menuId = document.getElementById('navMenuSelect').value;
+            if (!menuId) {
+                alert('请先选择一个主分类');
+                return;
+            }
+            const menu = navMenus.find(m => String(m.id) === String(menuId));
+            url = `${navServerUrl}/api/menus/${menuId}/submenus`;
+            body = { name, order: menu?.subMenus?.length || 0 };
+        }
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(body)
+        });
+        
+        if (!response.ok) {
+            let errorMsg = '创建失败';
+            try {
+                const error = await response.json();
+                errorMsg = error.error || errorMsg;
+            } catch (e) {
+                errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+            }
+            if (response.status === 401) {
+                await chrome.storage.local.remove(['navAuthToken']);
+                errorMsg = '认证失败，请重新输入密码';
+            }
+            throw new Error(errorMsg);
+        }
+        
+        const result = await response.json();
+        
+        closeNewMenuModal();
+        
+        // 重新加载分类
+        await loadNavMenus();
+        
+        // 自动选中新创建的分类
+        if (newMenuType === 'menu') {
+            document.getElementById('navMenuSelect').value = result.id;
+            onMenuSelectChange();
+        } else {
+            const menuId = document.getElementById('navMenuSelect').value;
+            document.getElementById('navMenuSelect').value = menuId;
+            onMenuSelectChange();
+            document.getElementById('navSubMenuSelect').value = result.id;
+        }
+        
+        document.getElementById('navAddStatus').textContent = '分类创建成功';
+    } catch (error) {
+        console.error('创建分类失败:', error);
+        alert('创建分类失败: ' + error.message);
+    }
+}
+
+// 获取认证token
+async function getNavAuthToken() {
+    // 确保服务器地址已设置
+    if (!navServerUrl) {
+        const serverUrl = document.getElementById('navServerUrl').value.trim();
+        if (!serverUrl) {
+            alert('请先输入导航站地址');
+            return null;
+        }
+        navServerUrl = serverUrl.replace(/\/$/, '');
+    }
+    
+    // 尝试从存储中获取token
+    try {
+        const result = await chrome.storage.local.get(['navAuthToken']);
+        if (result.navAuthToken) {
+            return result.navAuthToken;
+        }
+    } catch (e) {
+        console.error('获取存储的token失败:', e);
+    }
+    
+    // 没有token，提示用户输入密码
+    const password = prompt('请输入导航站管理密码：');
+    if (!password) return null;
+    
+    try {
+        // 使用verify-password接口，只需要密码
+        const response = await fetch(`${navServerUrl}/api/verify-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        
+        if (!response.ok) {
+            let errorMsg = '密码验证失败';
+            try {
+                const error = await response.json();
+                errorMsg = error.error || errorMsg;
+            } catch (e) {
+                errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMsg);
+        }
+        
+        const data = await response.json();
+        const token = data.token;
+        
+        if (!token) {
+            throw new Error('服务器未返回token');
+        }
+        
+        // 保存token
+        await chrome.storage.local.set({ navAuthToken: token });
+        
+        return token;
+    } catch (error) {
+        console.error('登录失败:', error);
+        alert('登录失败: ' + error.message);
+        return null;
+    }
+}
+
+// 确认添加到导航页
+async function confirmAddToNav() {
+    const menuId = document.getElementById('navMenuSelect').value;
+    const subMenuId = document.getElementById('navSubMenuSelect').value;
+    
+    if (!menuId) {
+        alert('请选择一个分类');
+        return;
+    }
+    
+    if (pendingNavBookmarks.length === 0) {
+        alert('没有待添加的书签');
+        return;
+    }
+    
+    if (!navServerUrl) {
+        alert('请先设置导航站地址');
+        return;
+    }
+    
+    // 获取认证token
+    const token = await getNavAuthToken();
+    if (!token) {
+        return;
+    }
+    
+    document.getElementById('navAddStatus').textContent = '正在准备书签信息...';
+    document.getElementById('btnConfirmAddToNav').disabled = true;
+    
+    try {
+        // 直接使用本地书签信息构建卡片（不调用parse API）
+        const cards = pendingNavBookmarks.map(bookmark => {
+            let logo = '';
+            try {
+                const urlObj = new URL(bookmark.url);
+                logo = `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
+            } catch (e) {}
+            
+            return {
+                title: bookmark.title || '无标题',
+                url: bookmark.url,
+                logo: logo,
+                description: ''
+            };
+        });
+        
+        document.getElementById('navAddStatus').textContent = '正在添加到导航页...';
+        
+        // 批量添加卡片
+        const addResponse = await fetch(`${navServerUrl}/api/batch/add`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                menu_id: parseInt(menuId),
+                sub_menu_id: subMenuId ? parseInt(subMenuId) : null,
+                cards
+            })
+        });
+        
+        if (!addResponse.ok) {
+            const error = await addResponse.json();
+            // 如果是认证失败，清除token
+            if (addResponse.status === 401) {
+                await chrome.storage.local.remove(['navAuthToken']);
+            }
+            throw new Error(error.error || '添加失败');
+        }
+        
+        const addResult = await addResponse.json();
+        
+        let message = `成功添加 ${addResult.added} 个书签到导航页`;
+        if (addResult.skipped > 0) {
+            message += `，跳过 ${addResult.skipped} 个重复项`;
+        }
+        
+        // 保存用户选择，下次快速添加时使用
+        lastSelectedMenuId = menuId;
+        lastSelectedSubMenuId = subMenuId;
+        try {
+            await chrome.storage.sync.set({ 
+                navUrl: navServerUrl,
+                lastMenuId: menuId, 
+                lastSubMenuId: subMenuId 
+            });
+        } catch (e) {}
+        
+        document.getElementById('navAddStatus').textContent = message;
+        showToast(message);
+        
+        closeAddToNavModal();
+        selectedBookmarks.clear();
+        updateSelectionUI();
+        renderBookmarkList();
+        
+    } catch (error) {
+        console.error('添加到导航页失败:', error);
+        document.getElementById('navAddStatus').textContent = '添加失败: ' + error.message;
+        alert('添加失败: ' + error.message);
+    } finally {
+        document.getElementById('btnConfirmAddToNav').disabled = false;
     }
 }

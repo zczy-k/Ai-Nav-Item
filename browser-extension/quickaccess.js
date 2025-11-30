@@ -74,10 +74,6 @@ let urlToTagsMap = new Map();
 function buildUrlToTagsMap() {
     urlToTagsMap.clear();
     
-    console.log('开始构建URL到标签映射');
-    console.log('bookmarkTags数量:', bookmarkTags.size);
-    console.log('originalBookmarksMap数量:', originalBookmarksMap.size);
-    
     // 遍历所有书签标签
     for (const [bookmarkId, tags] of bookmarkTags.entries()) {
         // 查找这个ID对应的书签
@@ -97,9 +93,6 @@ function buildUrlToTagsMap() {
             }
         }
     }
-    
-    console.log('URL到标签映射完成，数量:', urlToTagsMap.size);
-    console.log('映射内容:', Array.from(urlToTagsMap.entries()).slice(0, 5));
 }
 
 // 获取书签的标签（通过URL匹配）
@@ -347,21 +340,15 @@ async function renderBookmarks() {
             break;
     }
     
-    console.log('标签页筛选后书签数量:', bookmarks.length);
-    
     // 第二步：根据当前标签页的书签，更新标签云
     renderTagCloudForBookmarks(bookmarks);
     
     // 第三步：如果有标签筛选，在当前书签中应用
     if (currentTagFilter) {
-        console.log('应用标签筛选:', currentTagFilter);
-        
         bookmarks = bookmarks.filter(b => {
             const tags = getBookmarkTagsForDisplay(b);
             return tags.includes(currentTagFilter);
         });
-        
-        console.log('标签筛选后书签数量:', bookmarks.length);
     }
     
     // 更新标签显示数量
@@ -372,11 +359,6 @@ async function renderBookmarks() {
 
 // 更新标签数量显示
 function updateTabCounts() {
-    const frequentCount = allBookmarks.filter(b => {
-        // 简单估算，实际需要异步获取
-        return true;
-    }).length;
-    
     const pinnedCount = allBookmarks.filter(b => pinnedBookmarks.has(b.id)).length;
     const allCount = allBookmarks.length;
     

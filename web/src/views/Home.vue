@@ -2036,12 +2036,24 @@ async function handleCardsReordered(cardIds, targetMenuId, targetSubMenuId) {
   try {
     await batchUpdateCards(updates);
     // 静默保存，不弹出提示
-    // 更新缓存的卡片数据
-    if (editMode.value) {
-      await loadAllCards();
-    } else {
-      await loadCards();
+    
+    // 本地更新卡片顺序，避免重新加载导致的闪烁
+    const reorderedCards = cardIds.map(id => {
+      return cards.value.find(c => c.id === id) || allCards.value.find(c => c.id === id);
+    }).filter(Boolean);
+    
+    // 更新当前显示的卡片列表
+    if (reorderedCards.length > 0) {
+      cards.value = reorderedCards;
     }
+    
+    // 后台静默更新缓存（不影响当前显示）
+    setTimeout(() => {
+      if (editMode.value) {
+        loadAllCards();
+      }
+    }, 500);
+    
   } catch (error) {
     alert('保存失败：' + (error.response?.data?.error || error.message));
     // 保存失败时重新加载，恢复原始顺序
