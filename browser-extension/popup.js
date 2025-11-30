@@ -4,7 +4,15 @@ let selectedTabs = new Set();
 let navUrl = '';
 
 // 加载当前设置
-chrome.storage.sync.get(['navUrl', 'newtabMode'], function (result) {
+chrome.storage.sync.get(['navUrl', 'newtabMode', 'floatBtnEnabled'], function (result) {
+    // 浮动按钮开关
+    const floatBtnCheckbox = document.getElementById('floatBtnEnabled');
+    if (floatBtnCheckbox) {
+        floatBtnCheckbox.checked = result.floatBtnEnabled !== false; // 默认启用
+        floatBtnCheckbox.addEventListener('change', function() {
+            chrome.storage.sync.set({ floatBtnEnabled: this.checked });
+        });
+    }
     const urlElement = document.getElementById('currentUrl');
     const openNavBtn = document.getElementById('openNav');
     const addCurrentBtn = document.getElementById('addCurrentTab');
