@@ -4,11 +4,38 @@ let selectedTabs = new Set();
 let navUrl = '';
 
 // 加载当前设置
-chrome.storage.sync.get(['navUrl'], function (result) {
+chrome.storage.sync.get(['navUrl', 'newtabMode'], function (result) {
     const urlElement = document.getElementById('currentUrl');
     const openNavBtn = document.getElementById('openNav');
     const addCurrentBtn = document.getElementById('addCurrentTab');
     const selectTabsBtn = document.getElementById('selectTabs');
+    const modeSelect = document.getElementById('newtabMode');
+    const navUrlInfo = document.getElementById('navUrlInfo');
+    const navButtons = document.getElementById('navButtons');
+
+    // 设置模式
+    const mode = result.newtabMode || 'nav';
+    modeSelect.value = mode;
+    
+    // 更新模式描述
+    const modeDescriptions = {
+        'nav': '使用 iframe 嵌入你的导航站',
+        'unified': '整合导航卡片 + 本地书签的统一搜索',
+        'quickaccess': '纯本地书签快速访问面板'
+    };
+    const descEl = document.getElementById('modeDesc');
+    if (descEl) {
+        descEl.textContent = modeDescriptions[mode] || '';
+    }
+    
+    // 根据模式显示/隐藏导航站相关元素
+    if (mode === 'quickaccess') {
+        navUrlInfo.style.display = 'none';
+        navButtons.style.display = 'none';
+    } else {
+        navUrlInfo.style.display = 'block';
+        navButtons.style.display = 'flex';
+    }
 
     if (result.navUrl) {
         navUrl = result.navUrl;
@@ -24,6 +51,44 @@ chrome.storage.sync.get(['navUrl'], function (result) {
         addCurrentBtn.disabled = true;
         selectTabsBtn.disabled = true;
     }
+});
+
+// 模式描述
+const modeDescriptions = {
+    'nav': '使用 iframe 嵌入你的导航站',
+    'unified': '整合导航卡片 + 本地书签的统一搜索',
+    'quickaccess': '纯本地书签快速访问面板'
+};
+
+// 更新模式描述
+function updateModeDesc(mode) {
+    const descEl = document.getElementById('modeDesc');
+    if (descEl) {
+        descEl.textContent = modeDescriptions[mode] || '';
+    }
+}
+
+// 模式切换
+document.getElementById('newtabMode').addEventListener('change', function(e) {
+    const mode = e.target.value;
+    const navUrlInfo = document.getElementById('navUrlInfo');
+    const navButtons = document.getElementById('navButtons');
+    
+    chrome.storage.sync.set({ newtabMode: mode }, function() {
+        // 根据模式显示/隐藏导航站相关元素
+        if (mode === 'quickaccess') {
+            navUrlInfo.style.display = 'none';
+            navButtons.style.display = 'none';
+        } else {
+            navUrlInfo.style.display = 'block';
+            navButtons.style.display = 'flex';
+        }
+        
+        updateModeDesc(mode);
+        
+        // 提示用户刷新新标签页
+        alert('模式已切换，请刷新或重新打开新标签页查看效果');
+    });
 });
 
 // 打开设置页面
@@ -250,3 +315,9 @@ function isSpecialPage(url) {
     ];
     return specialPrefixes.some(prefix => url.startsWith(prefix));
 }
+
+// 打开书签管理器
+document.getElementById('openBookmarks').addEventListener('click', function () {
+    chrome.tabs.create({ url: chrome.runtime.getURL('bookmarks.html') });
+    window.close();
+});

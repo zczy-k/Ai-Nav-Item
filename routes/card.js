@@ -5,6 +5,54 @@ const { triggerDebouncedBackup } = require('../utils/autoBackup');
 const { detectDuplicates, isDuplicateCard } = require('../utils/urlNormalizer');
 const router = express.Router();
 
+// 获取所有卡片（用于扩展搜索）
+router.get('/all', (req, res) => {
+  db.all('SELECT * FROM cards ORDER BY menu_id, "order"', [], (err, cards) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    if (cards.length === 0) {
+      return res.json([]);
+    }
+    
+    // 获取所有卡片的标签
+    const cardIds = cards.map(c => c.id);
+    const placeholders = cardIds.map(() => '?').join(',');
+    
+    db.all(
+      `SELECT ct.card_id, t.id, t.name, t.color 
+       FROM card_tags ct 
+       JOIN tags t ON ct.tag_id = t.id 
+       WHERE ct.card_id IN (${placeholders})
+       ORDER BY t."order", t.name`,
+      cardIds,
+      (err, tagRows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        // 将标签按 card_id 分组
+        const tagsByCard = {};
+        tagRows.forEach(tag => {
+          if (!tagsByCard[tag.card_id]) {
+            tagsByCard[tag.card_id] = [];
+          }
+          tagsByCard[tag.card_id].push({
+            id: tag.id,
+            name: tag.name,
+            color: tag.color
+          });
+        });
+        
+        // 将标签添加到卡片数据中
+        const result = cards.map(card => ({
+          ...card,
+          tags: tagsByCard[card.id] || []
+        }));
+        
+        res.json(result);
+      }
+    );
+  });
+});
+
 // 获取指定菜单的卡片（包含标签）
 router.get('/:menuId', (req, res) => {
   const { subMenuId } = req.query;

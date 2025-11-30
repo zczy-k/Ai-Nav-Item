@@ -1,5 +1,20 @@
-﻿// 检查是否已保存导航站地址
-chrome.storage.sync.get(['navUrl', 'offlineHtml'], function(result) {
+﻿// 检查模式和配置
+chrome.storage.sync.get(['newtabMode', 'navUrl', 'offlineHtml'], function(result) {
+    const mode = result.newtabMode || 'nav';
+    
+    // 如果是快速访问模式，直接跳转
+    if (mode === 'quickaccess') {
+        window.location.href = 'quickaccess.html';
+        return;
+    }
+    
+    // 如果是统一搜索模式，跳转到统一页面
+    if (mode === 'unified') {
+        window.location.href = 'unified-newtab.html';
+        return;
+    }
+    
+    // 导航站模式
     const navFrame = document.getElementById('navFrame');
     const setupContainer = document.getElementById('setupContainer');
     

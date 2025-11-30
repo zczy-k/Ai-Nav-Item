@@ -291,6 +291,16 @@
             transform: none;
         }
 
+        .btn-bookmarks {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-bookmarks:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        }
+
         .footer {
             margin-top: 12px;
             padding-top: 12px;
@@ -309,11 +319,21 @@
     </div>
 
     <div class="info">
+        <div class="info-label">新标签页模式</div>
+        <select id="newtabMode" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; margin-top: 4px;">
+            <option value="nav">导航站模式</option>
+            <option value="unified">统一搜索模式</option>
+            <option value="quickaccess">快速访问面板</option>
+        </select>
+        <div id="modeDesc" style="font-size: 11px; color: #888; margin-top: 6px;"></div>
+    </div>
+
+    <div class="info" id="navUrlInfo">
         <div class="info-label">当前导航站地址</div>
         <div class="info-value" id="currentUrl">未设置</div>
     </div>
 
-    <div class="buttons">
+    <div class="buttons" id="navButtons">
         <button class="btn-primary" id="openSettings">设置导航站地址</button>
         <button class="btn-secondary" id="openNav">访问导航站</button>
     </div>
@@ -325,6 +345,14 @@
     <div class="buttons">
         <button class="btn-add-current" id="addCurrentTab">➕ 添加当前标签页</button>
         <button class="btn-select-tabs" id="selectTabs">📋 选择标签页批量添加</button>
+    </div>
+
+    <div class="section-title">
+        🔖 本地书签
+    </div>
+
+    <div class="buttons">
+        <button class="btn-bookmarks" id="openBookmarks">📚 书签管理器</button>
     </div>
 
     <!-- 标签页选择界面 -->
