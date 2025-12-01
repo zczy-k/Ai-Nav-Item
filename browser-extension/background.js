@@ -90,7 +90,7 @@ function createCategorySubMenus(menus) {
     // 最多显示10个常用分类
     const topMenus = menus.slice(0, 10);
     
-    topMenus.forEach((menu, index) => {
+    topMenus.forEach((menu) => {
         // 创建主分类
         chrome.contextMenus.create({
             id: `nav_menu_${menu.id}`,
@@ -460,7 +460,7 @@ async function buildCardData(url, title, navServerUrl, token) {
 }
 
 // 监听来自内容脚本和其他页面的消息
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.action === 'quickAddToNav') {
         quickAddToNav(request.url, request.title)
             .then(() => sendResponse({ success: true }))
