@@ -804,8 +804,9 @@ const defaultEngines = [
   }
 ];
 
-const searchEngines = ref([]);
-const selectedEngine = ref(null);
+// 初始化时立即设置默认搜索引擎，避免搜索框延迟显示
+const searchEngines = ref([...defaultEngines]);
+const selectedEngine = ref(defaultEngines[0]);
 
 // 自定义搜索引擎相关状态
 const showAddEngineModal = ref(false);
@@ -1101,6 +1102,15 @@ onMounted(async () => {
           keyword: engine.keyword
         }));
         searchEngines.value = [...defaultEngines, ...customEngines];
+      }
+      
+      // 从缓存恢复用户选择的搜索引擎
+      const savedEngineName = localStorage.getItem('default_search_engine');
+      if (savedEngineName) {
+        const foundEngine = searchEngines.value.find(e => e.name === savedEngineName);
+        if (foundEngine) {
+          selectedEngine.value = foundEngine;
+        }
       }
     }
     
