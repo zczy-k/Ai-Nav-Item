@@ -1055,6 +1055,57 @@ onBeforeMount(() => {
 });
 
 onMounted(async () => {
+  // ========== 优化：先加载缓存数据实现秒开 ==========
+  const CACHE_KEY = 'nav_data_cache';
+  const CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存有效期
+  
+  // 尝试从缓存加载数据
+  let cacheUsed = false;
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const isValid = Date.now() - timestamp < CACHE_TTL;
+      
+      // 立即使用缓存数据渲染（即使过期也先显示）
+      if (data.menus?.length) {
+        menus.value = data.menus;
+        activeMenu.value = menus.value[0];
+        cacheUsed = true;
+      }
+      if (data.cards) {
+        cards.value = data.cards;
+      }
+      if (data.tags) {
+        allTags.value = data.tags;
+      }
+      if (data.ads) {
+        leftAds.value = data.ads.filter(ad => ad.position === 'left');
+        rightAds.value = data.ads.filter(ad => ad.position === 'right');
+      }
+      if (data.friends) {
+        friendLinks.value = data.friends;
+      }
+      if (data.engines) {
+        const customEngines = data.engines.map(engine => ({
+          name: 'custom_' + engine.id,
+          label: engine.name,
+          iconUrl: null,
+          iconFallback: '🔎',
+          placeholder: `${engine.name} 搜索...`,
+          url: q => engine.search_url.replace('{searchTerms}', encodeURIComponent(q)),
+          custom: true,
+          id: engine.id,
+          keyword: engine.keyword
+        }));
+        searchEngines.value = [...defaultEngines, ...customEngines];
+      }
+    }
+  } catch (e) {
+    // 缓存读取失败，忽略
+  }
+  
+  // ========== 后台加载最新数据 ==========
   // 并行加载所有独立数据：菜单、广告、友链、标签、自定义搜索引擎
   const [menusRes, adsRes, friendsRes, tagsRes, enginesRes] = await Promise.allSettled([
     getMenus(),
@@ -1064,12 +1115,19 @@ onMounted(async () => {
     getSearchEngines()
   ]);
   
+  // 准备缓存数据
+  const cacheData = { menus: null, cards: null, tags: null, ads: null, friends: null, engines: null };
+  
   // 处理菜单数据（优先级最高）
   if (menusRes.status === 'fulfilled') {
     menus.value = menusRes.value.data;
+    cacheData.menus = menusRes.value.data;
     if (menus.value.length) {
-      activeMenu.value = menus.value[0];
-      loadCards();
+      if (!cacheUsed) {
+        activeMenu.value = menus.value[0];
+      }
+      await loadCards();
+      cacheData.cards = cards.value;
       // 延迟 1 秒后加载搜索卡片，让首屏更快
       setTimeout(() => {
         loadAllCardsForSearch();
@@ -1081,16 +1139,19 @@ onMounted(async () => {
   if (adsRes.status === 'fulfilled') {
     leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
     rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
+    cacheData.ads = adsRes.value.data;
   }
   
   // 处理友链数据
   if (friendsRes.status === 'fulfilled') {
     friendLinks.value = friendsRes.value.data;
+    cacheData.friends = friendsRes.value.data;
   }
   
   // 处理标签数据
   if (tagsRes.status === 'fulfilled') {
     allTags.value = tagsRes.value.data;
+    cacheData.tags = tagsRes.value.data;
   } else {
     console.error('加载标签失败:', tagsRes.reason);
   }
@@ -1109,9 +1170,22 @@ onMounted(async () => {
       keyword: engine.keyword
     }));
     searchEngines.value = [...defaultEngines, ...customEngines];
+    cacheData.engines = enginesRes.value.data;
   } else {
     console.error('加载自定义搜索引擎失败:', enginesRes.reason);
     searchEngines.value = [...defaultEngines];
+  }
+  
+  // ========== 保存缓存数据 ==========
+  try {
+    if (cacheData.menus) {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        data: cacheData,
+        timestamp: Date.now()
+      }));
+    }
+  } catch (e) {
+    // 缓存保存失败，忽略（可能是存储空间不足）
   }
 
   // 从 localStorage 初始化默认搜索引擎
