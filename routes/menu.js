@@ -5,9 +5,12 @@ const { triggerDebouncedBackup } = require('../utils/autoBackup');
 const { paginateQuery } = require('../utils/dbHelpers');
 const router = express.Router();
 
-// 获取所有菜单（包含子菜单）
+// 获取所有菜单（包含子菜单）- 优化：单次查询获取所有数据
 router.get('/', (req, res) => {
   const { page, pageSize } = req.query;
+  
+  // 设置缓存头，允许浏览器缓存60秒
+  res.set('Cache-Control', 'public, max-age=60');
   
   // 设置 20 秒超时保护
   const timeout = setTimeout(() => {
@@ -18,7 +21,7 @@ router.get('/', (req, res) => {
   }, 20000);
   
   if (!page && !pageSize) {
-    // 获取主菜单
+    // 优化：使用单次查询获取所有菜单和子菜单，避免N+1问题
     db.all('SELECT * FROM menus ORDER BY "order"', [], (err, menus) => {
       if (err) {
         clearTimeout(timeout);
@@ -30,37 +33,30 @@ router.get('/', (req, res) => {
         return res.json([]);
       }
       
-      // 为每个主菜单获取子菜单
-      const getSubMenus = (menu) => {
-        return new Promise((resolve, reject) => {
-          const subTimeout = setTimeout(() => reject(new Error('Submenu query timeout')), 5000);
-          
-          db.all('SELECT * FROM sub_menus WHERE parent_id = ? ORDER BY "order"', [menu.id], (err, subMenus) => {
-            clearTimeout(subTimeout);
-            if (err) reject(err);
-            else resolve(subMenus || []);
-          });
+      // 一次性获取所有子菜单
+      db.all('SELECT * FROM sub_menus ORDER BY "order"', [], (err, allSubMenus) => {
+        clearTimeout(timeout);
+        if (err) {
+          return res.status(500).json({error: err.message});
+        }
+        
+        // 按 parent_id 分组子菜单
+        const subMenusByParent = {};
+        (allSubMenus || []).forEach(sub => {
+          if (!subMenusByParent[sub.parent_id]) {
+            subMenusByParent[sub.parent_id] = [];
+          }
+          subMenusByParent[sub.parent_id].push(sub);
         });
-      };
-      
-      Promise.all(menus.map(async (menu) => {
-        try {
-          const subMenus = await getSubMenus(menu);
-          return { ...menu, subMenus };
-        } catch (err) {
-          console.error(`获取菜单 ${menu.id} 的子菜单失败:`, err.message);
-          return { ...menu, subMenus: [] };
-        }
-      })).then(menusWithSubMenus => {
-        clearTimeout(timeout);
+        
+        // 组装结果
+        const result = menus.map(menu => ({
+          ...menu,
+          subMenus: subMenusByParent[menu.id] || []
+        }));
+        
         if (!res.headersSent) {
-          res.json(menusWithSubMenus);
-        }
-      }).catch(err => {
-        clearTimeout(timeout);
-        if (!res.headersSent) {
-          console.error('Promise.all 失败:', err.message);
-          res.status(500).json({error: err.message});
+          res.json(result);
         }
       });
     });

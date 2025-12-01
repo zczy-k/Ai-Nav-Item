@@ -675,7 +675,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeMount, computed, defineAsyncComponent, onUnmounted } from 'vue';
-import { getMenus, getCards, getAds, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags } from '../api';
+import { getMenus, getCards, getAllCards, getAds, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags } from '../api';
 import MenuBar from '../components/MenuBar.vue';
 import { filterCardsWithPinyin } from '../utils/pinyin';
 import { isDuplicateCard } from '../utils/urlNormalizer';
@@ -1057,15 +1057,17 @@ onBeforeMount(() => {
 onMounted(async () => {
   // ========== 优化：先加载缓存数据实现秒开 ==========
   const CACHE_KEY = 'nav_data_cache';
+  const CARDS_CACHE_KEY = 'nav_cards_cache'; // 分类卡片缓存
   const CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存有效期
   
   // 尝试从缓存加载数据
   let cacheUsed = false;
+  let cachedCardsMap = {}; // 缓存的分类卡片映射
+  
   try {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       const { data, timestamp } = JSON.parse(cached);
-      const isValid = Date.now() - timestamp < CACHE_TTL;
       
       // 立即使用缓存数据渲染（即使过期也先显示）
       if (data.menus?.length) {
@@ -1099,6 +1101,24 @@ onMounted(async () => {
           keyword: engine.keyword
         }));
         searchEngines.value = [...defaultEngines, ...customEngines];
+      }
+    }
+    
+    // 加载分类卡片缓存到内存
+    const cardsCacheStr = localStorage.getItem(CARDS_CACHE_KEY);
+    if (cardsCacheStr) {
+      const { data: cardsData, timestamp } = JSON.parse(cardsCacheStr);
+      if (Date.now() - timestamp < CACHE_TTL) {
+        cachedCardsMap = cardsData || {};
+        cardsCache.value = cachedCardsMap;
+        
+        // 如果有首屏分类的缓存，立即显示
+        if (menus.value.length > 0) {
+          const firstMenuKey = `${menus.value[0].id}_null`;
+          if (cachedCardsMap[firstMenuKey]) {
+            cards.value = cachedCardsMap[firstMenuKey];
+          }
+        }
       }
     }
   } catch (e) {
@@ -1361,60 +1381,157 @@ async function selectMenu(menu, parentMenu = null) {
     activeMenu.value = menu;
     activeSubMenu.value = null;
   }
-  loadCards();
+  await loadCards();
+  
+  // 预加载相邻分类的卡片（后台静默执行）
+  preloadAdjacentCategories();
+}
+
+// 预加载相邻分类的卡片
+function preloadAdjacentCategories() {
+  if (!activeMenu.value || menus.value.length === 0) return;
+  
+  const currentIndex = menus.value.findIndex(m => m.id === activeMenu.value.id);
+  const toPreload = [];
+  
+  // 预加载前后各1个分类
+  [-1, 1].forEach(offset => {
+    const idx = currentIndex + offset;
+    if (idx >= 0 && idx < menus.value.length) {
+      const menu = menus.value[idx];
+      const key = getCardsCacheKey(menu.id, null);
+      if (!cardsCache.value[key]) {
+        toPreload.push({ menuId: menu.id, subMenuId: null, key });
+      }
+      // 预加载子菜单
+      if (menu.subMenus?.length > 0) {
+        const subKey = getCardsCacheKey(menu.id, menu.subMenus[0].id);
+        if (!cardsCache.value[subKey]) {
+          toPreload.push({ menuId: menu.id, subMenuId: menu.subMenus[0].id, key: subKey });
+        }
+      }
+    }
+  });
+  
+  // 当前菜单的子菜单也预加载
+  if (activeMenu.value.subMenus?.length > 0) {
+    activeMenu.value.subMenus.forEach(sub => {
+      const key = getCardsCacheKey(activeMenu.value.id, sub.id);
+      if (!cardsCache.value[key]) {
+        toPreload.push({ menuId: activeMenu.value.id, subMenuId: sub.id, key });
+      }
+    });
+  }
+  
+  // 后台静默预加载（不阻塞UI）
+  toPreload.forEach(({ menuId, subMenuId, key }) => {
+    getCards(menuId, subMenuId)
+      .then(res => {
+        cardsCache.value[key] = res.data;
+        saveCardsCache();
+      })
+      .catch(() => {});
+  });
 }
 
 // 加载所有分类的卡片（编辑模式用）
 const allCategoryCards = ref({});
 
-async function loadCards() {
-  if (!activeMenu.value) return;
-  
-  // 完全禁用骨架屏，直接加载
-  cardsLoading.value = false;
-  
+// 分类卡片缓存
+const cardsCache = ref({});
+const CARDS_CACHE_KEY = 'nav_cards_cache';
+const CARDS_CACHE_TTL = 5 * 60 * 1000;
+
+// 获取缓存key
+function getCardsCacheKey(menuId, subMenuId) {
+  return `${menuId}_${subMenuId || 'null'}`;
+}
+
+// 保存卡片缓存到localStorage
+function saveCardsCache() {
   try {
-    const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
-    cards.value = res.data;
-  } catch (error) {
-    console.error('加载卡片失败:', error);
-    cards.value = [];
+    localStorage.setItem(CARDS_CACHE_KEY, JSON.stringify({
+      data: cardsCache.value,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    // 存储失败忽略
   }
 }
 
-// 加载所有卡片用于搜索（优化版：并行加载）
-async function loadAllCardsForSearch() {
-  const promises = [];
+async function loadCards() {
+  if (!activeMenu.value) return;
   
-  for (const menu of menus.value) {
-    // 并行加载主菜单的卡片
-    promises.push(
-      getCards(menu.id, null)
-        .then(res => res.data)
-        .catch(error => {
-          console.error(`加载菜单 ${menu.name} 的卡片失败:`, error);
-          return [];
-        })
-    );
-    
-    // 并行加载子菜单的卡片
-    if (menu.subMenus && menu.subMenus.length) {
-      for (const subMenu of menu.subMenus) {
-        promises.push(
-          getCards(menu.id, subMenu.id)
-            .then(res => res.data)
-            .catch(error => {
-              console.error(`加载子菜单 ${subMenu.name} 的卡片失败:`, error);
-              return [];
-            })
-        );
-      }
-    }
+  const cacheKey = getCardsCacheKey(activeMenu.value.id, activeSubMenu.value?.id);
+  
+  // 优先使用内存缓存，实现秒切换
+  if (cardsCache.value[cacheKey]) {
+    cards.value = cardsCache.value[cacheKey];
   }
   
-  // 等待所有请求完成，合并结果
-  const results = await Promise.all(promises);
-  allCards.value = results.flat();
+  // 后台静默更新
+  try {
+    const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
+    cards.value = res.data;
+    cardsCache.value[cacheKey] = res.data;
+    saveCardsCache();
+  } catch (error) {
+    console.error('加载卡片失败:', error);
+    if (!cardsCache.value[cacheKey]) {
+      cards.value = [];
+    }
+  }
+}
+
+// 加载所有卡片用于搜索（优化版：单次请求获取所有数据）
+async function loadAllCardsForSearch() {
+  try {
+    const res = await getAllCards();
+    const { cardsByCategory } = res.data;
+    
+    // 更新缓存
+    Object.assign(cardsCache.value, cardsByCategory);
+    saveCardsCache();
+    
+    // 合并所有卡片用于搜索
+    allCards.value = Object.values(cardsByCategory).flat();
+  } catch (error) {
+    console.error('批量加载卡片失败，回退到逐个加载:', error);
+    // 回退到逐个加载
+    const promises = [];
+    const keys = [];
+    
+    for (const menu of menus.value) {
+      const key = getCardsCacheKey(menu.id, null);
+      keys.push(key);
+      promises.push(
+        getCards(menu.id, null)
+          .then(res => res.data)
+          .catch(() => cardsCache.value[key] || [])
+      );
+      
+      if (menu.subMenus && menu.subMenus.length) {
+        for (const subMenu of menu.subMenus) {
+          const subKey = getCardsCacheKey(menu.id, subMenu.id);
+          keys.push(subKey);
+          promises.push(
+            getCards(menu.id, subMenu.id)
+              .then(res => res.data)
+              .catch(() => cardsCache.value[subKey] || [])
+          );
+        }
+      }
+    }
+    
+    const results = await Promise.all(promises);
+    results.forEach((data, index) => {
+      if (data && data.length > 0) {
+        cardsCache.value[keys[index]] = data;
+      }
+    });
+    saveCardsCache();
+    allCards.value = results.flat();
+  }
 }
 
 // 加载所有分类的卡片（优化版：并行加载）

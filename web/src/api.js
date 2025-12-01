@@ -26,6 +26,8 @@ export const getCards = (menuId, subMenuId = null) => {
   const params = subMenuId ? { subMenuId } : {};
   return axios.get(`${BASE}/cards/${menuId}`, { params });
 };
+// 批量获取所有卡片（按分类分组）
+export const getAllCards = () => axios.get(`${BASE}/cards`);
 export const addCard = (data) => axios.post(`${BASE}/cards`, data, { headers: authHeaders() });
 export const updateCard = (id, data) => axios.put(`${BASE}/cards/${id}`, data, { headers: authHeaders() });
 export const deleteCard = (id) => axios.delete(`${BASE}/cards/${id}`, { headers: authHeaders() });

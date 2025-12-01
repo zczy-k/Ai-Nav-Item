@@ -5,6 +5,64 @@ const { triggerDebouncedBackup } = require('../utils/autoBackup');
 const { detectDuplicates, isDuplicateCard } = require('../utils/urlNormalizer');
 const router = express.Router();
 
+// 获取所有卡片（按分类分组，用于首屏加载优化）
+router.get('/', (req, res) => {
+  // 设置缓存头
+  res.set('Cache-Control', 'public, max-age=60');
+  
+  db.all('SELECT * FROM cards ORDER BY menu_id, sub_menu_id, "order"', [], (err, cards) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    if (cards.length === 0) {
+      return res.json({ cards: [], cardsByCategory: {} });
+    }
+    
+    // 获取所有标签关联
+    const cardIds = cards.map(c => c.id);
+    const placeholders = cardIds.map(() => '?').join(',');
+    
+    db.all(
+      `SELECT ct.card_id, t.id, t.name, t.color 
+       FROM card_tags ct 
+       JOIN tags t ON ct.tag_id = t.id 
+       WHERE ct.card_id IN (${placeholders})
+       ORDER BY t."order", t.name`,
+      cardIds,
+      (err, tagRows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        // 将标签按 card_id 分组
+        const tagsByCard = {};
+        tagRows.forEach(tag => {
+          if (!tagsByCard[tag.card_id]) {
+            tagsByCard[tag.card_id] = [];
+          }
+          tagsByCard[tag.card_id].push({
+            id: tag.id,
+            name: tag.name,
+            color: tag.color
+          });
+        });
+        
+        // 按分类分组卡片
+        const cardsByCategory = {};
+        cards.forEach(card => {
+          const key = `${card.menu_id}_${card.sub_menu_id || 'null'}`;
+          if (!cardsByCategory[key]) {
+            cardsByCategory[key] = [];
+          }
+          cardsByCategory[key].push({
+            ...card,
+            tags: tagsByCard[card.id] || []
+          });
+        });
+        
+        res.json({ cardsByCategory });
+      }
+    );
+  });
+});
+
 // 获取指定菜单的卡片（包含标签）
 router.get('/:menuId', (req, res) => {
   const { subMenuId } = req.query;
