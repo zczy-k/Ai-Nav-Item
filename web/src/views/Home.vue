@@ -1076,8 +1076,18 @@ const filteredCards = computed(() => {
   return result;
 });
 
+// 背景版本号 - 修改此值会清除用户保存的背景，显示新的默认背景
+const BG_VERSION = '2.0';
+
 // 在组件渲染前应用保存的背景，避免闪烁
 onBeforeMount(() => {
+  // 检查背景版本，如果版本不匹配则清除旧背景
+  const savedBgVersion = localStorage.getItem('nav_background_version');
+  if (savedBgVersion !== BG_VERSION) {
+    localStorage.removeItem('nav_background');
+    localStorage.setItem('nav_background_version', BG_VERSION);
+  }
+  
   const savedBg = localStorage.getItem('nav_background');
   if (savedBg) {
     // 在 nextTick 中应用，确保 DOM 元素存在
