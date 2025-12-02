@@ -1077,7 +1077,7 @@ const filteredCards = computed(() => {
 });
 
 // 背景版本号 - 修改此值会清除用户保存的背景，显示新的默认背景
-const BG_VERSION = '2.0';
+const BG_VERSION = '3.0';
 
 // 在组件渲染前应用保存的背景，避免闪烁
 onBeforeMount(() => {
