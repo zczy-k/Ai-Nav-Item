@@ -4,7 +4,8 @@
 // 缓存的菜单数据
 let cachedMenus = [];
 let lastMenuFetchTime = 0;
-const MENU_CACHE_MS = 60 * 1000; // 1分钟缓存（减少延迟感）
+const MENU_CACHE_MS = 5 * 60 * 1000; // 5分钟缓存
+let isLoadingMenus = false; // 防止并发请求
 
 // 扩展安装/更新时注册右键菜单
 chrome.runtime.onInstalled.addListener(async () => {
@@ -61,7 +62,10 @@ async function registerContextMenus() {
 async function loadAndCreateCategoryMenus() {
     try {
         const config = await chrome.storage.sync.get(['navUrl']);
-        if (!config.navUrl) return;
+        if (!config.navUrl) {
+            console.warn('未配置导航站地址，跳过加载分类菜单');
+            return;
+        }
         
         const navServerUrl = config.navUrl.replace(/\/$/, '');
         
@@ -71,44 +75,104 @@ async function loadAndCreateCategoryMenus() {
             return;
         }
         
-        // 获取菜单数据
-        const response = await fetch(`${navServerUrl}/api/menus`);
-        if (!response.ok) return;
+        // 防止并发请求
+        if (isLoadingMenus) {
+            console.log('正在加载菜单，跳过重复请求');
+            return;
+        }
         
-        const menus = await response.json();
-        cachedMenus = menus;
-        lastMenuFetchTime = Date.now();
+        isLoadingMenus = true;
         
-        createCategorySubMenus(menus);
+        // 获取菜单数据（带超时）
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+        
+        try {
+            const response = await fetch(`${navServerUrl}/api/menus`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const menus = await response.json();
+            
+            // 验证数据格式
+            if (!Array.isArray(menus)) {
+                throw new Error('菜单数据格式错误');
+            }
+            
+            cachedMenus = menus;
+            lastMenuFetchTime = Date.now();
+            
+            // 持久化缓存到storage（离线可用）
+            await chrome.storage.local.set({ 
+                cachedMenus: menus,
+                lastMenuFetchTime: Date.now()
+            });
+            
+            createCategorySubMenus(menus);
+            console.log(`成功加载 ${menus.length} 个分类菜单`);
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            
+            // 如果网络失败，尝试从storage加载缓存
+            if (cachedMenus.length === 0) {
+                const stored = await chrome.storage.local.get(['cachedMenus', 'lastMenuFetchTime']);
+                if (stored.cachedMenus && Array.isArray(stored.cachedMenus)) {
+                    cachedMenus = stored.cachedMenus;
+                    lastMenuFetchTime = stored.lastMenuFetchTime || 0;
+                    createCategorySubMenus(cachedMenus);
+                    console.log('从本地缓存加载菜单');
+                    return;
+                }
+            }
+            
+            throw fetchError;
+        }
     } catch (e) {
-        console.error('加载分类菜单失败:', e);
+        console.error('加载分类菜单失败:', e.message);
+        // 即使失败也创建基础菜单，保证功能可用
+    } finally {
+        isLoadingMenus = false;
     }
 }
 
 // 创建分类子菜单
 function createCategorySubMenus(menus) {
-    // 最多显示10个常用分类
-    const topMenus = menus.slice(0, 10);
+    if (!menus || menus.length === 0) {
+        console.warn('没有可用的分类菜单');
+        return;
+    }
+    
+    // 最多显示12个常用分类
+    const topMenus = menus.slice(0, 12);
     
     topMenus.forEach((menu) => {
-        // 创建主分类
-        chrome.contextMenus.create({
-            id: `nav_menu_${menu.id}`,
-            parentId: 'nav_category_parent',
-            title: menu.name,
-            contexts: ['page', 'link']
-        });
-        
-        // 如果有子分类，创建子菜单
-        if (menu.subMenus && menu.subMenus.length > 0) {
-            menu.subMenus.forEach(subMenu => {
-                chrome.contextMenus.create({
-                    id: `nav_submenu_${menu.id}_${subMenu.id}`,
-                    parentId: `nav_menu_${menu.id}`,
-                    title: subMenu.name,
-                    contexts: ['page', 'link']
-                });
+        try {
+            // 创建主分类
+            chrome.contextMenus.create({
+                id: `nav_menu_${menu.id}`,
+                parentId: 'nav_category_parent',
+                title: menu.name || '未命名分类',
+                contexts: ['page', 'link']
             });
+            
+            // 如果有子分类，创建子菜单（最多显示8个）
+            if (menu.subMenus && Array.isArray(menu.subMenus) && menu.subMenus.length > 0) {
+                menu.subMenus.slice(0, 8).forEach(subMenu => {
+                    chrome.contextMenus.create({
+                        id: `nav_submenu_${menu.id}_${subMenu.id}`,
+                        parentId: `nav_menu_${menu.id}`,
+                        title: subMenu.name || '未命名子分类',
+                        contexts: ['page', 'link']
+                    });
+                });
+            }
+        } catch (e) {
+            console.error(`创建菜单项失败 (${menu.name}):`, e.message);
         }
     });
 }
@@ -135,7 +199,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         let url = info.linkUrl || tab?.url || info.pageUrl;
         let title = info.linkText || tab?.title || '';
         
-        if (!url) return;
+        if (!url) {
+            console.warn('无法获取URL');
+            return;
+        }
+        
+        // 过滤特殊协议
+        if (url.startsWith('chrome://') || url.startsWith('edge://') || 
+            url.startsWith('about:') || url.startsWith('chrome-extension://')) {
+            showNotification('无法添加', '不支持添加浏览器内部页面');
+            return;
+        }
         
         // 快速添加（使用上次分类）
         if (info.menuItemId === 'nav_quick_add') {
@@ -158,6 +232,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
     } catch (e) {
         console.error('处理右键菜单失败:', e);
+        showNotification('操作失败', e.message || '请稍后重试');
     }
 });
 
@@ -297,12 +372,21 @@ async function quickAddToNav(url, title) {
 
 // 显示通知
 function showNotification(title, message) {
+    // 检查通知权限
+    if (!chrome.notifications) {
+        console.warn('通知API不可用');
+        return;
+    }
+    
     chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icons/icon128.png',
         title: title,
-        message: message
-    }).catch(e => console.warn('创建通知失败:', e));
+        message: message,
+        priority: 1
+    }).catch(e => {
+        console.warn('创建通知失败:', e.message);
+    });
 }
 
 // ==================== 自动生成标签和描述 ====================

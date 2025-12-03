@@ -11,10 +11,18 @@
     // 检查是否应该显示浮动按钮
     async function shouldShowFloatBtn() {
         try {
+            // 检查是否在特殊页面（不支持content script的页面）
+            const url = window.location.href;
+            if (url.startsWith('chrome://') || url.startsWith('edge://') || 
+                url.startsWith('about:') || url.startsWith('chrome-extension://')) {
+                return false;
+            }
+            
             const result = await chrome.storage.sync.get(['floatBtnEnabled', 'navUrl']);
             // 默认启用，且需要配置了导航站
             return result.floatBtnEnabled !== false && !!result.navUrl;
         } catch (e) {
+            console.warn('检查浮动按钮配置失败:', e);
             return false;
         }
     }
@@ -271,19 +279,24 @@
                 });
                 
                 btn.classList.remove('loading');
-                btn.classList.add('success');
-                btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="white" stroke-width="2" fill="none"/></svg>';
                 
-                showToast('已添加到导航页', 'success');
-                
-                setTimeout(() => {
-                    btn.classList.remove('success');
-                    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke="white"/></svg>';
-                }, 2000);
+                if (response && response.success !== false) {
+                    btn.classList.add('success');
+                    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="white" stroke-width="2" fill="none"/></svg>';
+                    showToast('已添加到导航页', 'success');
+                    
+                    setTimeout(() => {
+                        btn.classList.remove('success');
+                        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke="white"/></svg>';
+                    }, 2000);
+                } else {
+                    throw new Error(response?.error || '添加失败');
+                }
             } catch (e) {
+                console.error('快速添加失败:', e);
                 btn.classList.remove('loading');
                 btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke="white"/></svg>';
-                showToast('添加失败', 'error');
+                showToast(e.message || '添加失败，请稍后重试', 'error');
             }
         }
         
@@ -405,9 +418,18 @@
     }
     
     // 页面加载完成后创建按钮
+    function initFloatButton() {
+        // 延迟创建，避免与页面脚本冲突
+        setTimeout(() => {
+            createFloatButton().catch(e => {
+                console.warn('创建浮动按钮失败:', e);
+            });
+        }, 500);
+    }
+    
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', createFloatButton);
+        document.addEventListener('DOMContentLoaded', initFloatButton);
     } else {
-        createFloatButton();
+        initFloatButton();
     }
 })();
