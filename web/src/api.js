@@ -81,7 +81,7 @@ export const deleteTag = (id) => axios.delete(`${BASE}/tags/${id}`, { headers: a
 export const getTagCardCount = (id) => axios.get(`${BASE}/tags/${id}/cards/count`);
 
 // 卡片去重API
-export const detectDuplicates = () => axios.get(`${BASE}/cards/detect-duplicates/all`, { headers: authHeaders() });
+export const detectDuplicates = () => axios.get(`${BASE}/cards/detect-duplicates/all?_t=${Date.now()}`, { headers: authHeaders() });
 export const removeDuplicates = (cardIds) => axios.post(`${BASE}/cards/remove-duplicates`, { cardIds }, { headers: authHeaders() });
 
 // 备份API
