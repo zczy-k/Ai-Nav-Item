@@ -132,7 +132,7 @@
                 color: isTagSelected(tag.id) ? 'white' : tag.color,
                 borderColor: tag.color
               }"
-              @click="selectTag(tag.id)"
+              @click="toggleTagFilter(tag.id)"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
@@ -953,15 +953,6 @@ function toggleTagFilter(tagId) {
 
 function clearTagFilter() {
   selectedTagIds.value = [];
-}
-
-function selectTag(tagId) {
-  const index = selectedTagIds.value.indexOf(tagId);
-  if (index > -1) {
-    selectedTagIds.value.splice(index, 1);
-  } else {
-    selectedTagIds.value.push(tagId);
-  }
 }
 
 // 检查标签是否被选中
