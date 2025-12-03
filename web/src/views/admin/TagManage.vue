@@ -199,7 +199,7 @@ async function deleteTag(id) {
 }
 
 .tag-header {
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
   border-radius: 16px;
   padding: 32px;
   margin-bottom: 20px;
@@ -275,7 +275,7 @@ async function deleteTag(id) {
 
 .btn-primary {
   background: white;
-  color: #52c41a;
+  color: #1890ff;
 }
 
 .btn-primary:hover {
@@ -402,7 +402,7 @@ async function deleteTag(id) {
 }
 
 .color-picker:hover {
-  border-color: #52c41a;
+  border-color: #1890ff;
 }
 
 .tag-order {
@@ -431,7 +431,7 @@ async function deleteTag(id) {
 
 .order-input:focus {
   outline: none;
-  border-color: #52c41a;
+  border-color: #1890ff;
 }
 
 .tag-actions {

@@ -434,7 +434,7 @@ function editAndAdd() {
 }
 
 .card-header {
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 20px;
@@ -632,7 +632,7 @@ function editAndAdd() {
 }
 
 .tag-selector:hover {
-  border-color: #52c41a;
+  border-color: #1890ff;
   background: #f9fafb;
 }
 
@@ -775,7 +775,7 @@ function editAndAdd() {
 }
 
 .btn-primary {
-  background: #52c41a;
+  background: #1890ff;
   color: white;
 }
 

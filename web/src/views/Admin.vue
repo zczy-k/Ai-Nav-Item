@@ -214,7 +214,7 @@ function closeSider() {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg,#52c41a,#73d13d);
+  background: linear-gradient(135deg,#1890ff,#69c0ff);
   font-family: 'Segoe UI', Arial, sans-serif;
 }
 

@@ -2633,7 +2633,7 @@ async function saveCardEdit() {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
   color: white;
   font-weight: 600;
   font-size: 14px;
@@ -2694,7 +2694,7 @@ async function saveCardEdit() {
 
 .engine-menu-item.active {
   background: rgba(102, 126, 234, 0.15);
-  color: #52c41a;
+  color: #1890ff;
   font-weight: 600;
 }
 
@@ -2728,7 +2728,7 @@ async function saveCardEdit() {
   border-radius: 4px;
   background: rgba(102, 126, 234, 0.1);
   border: none;
-  color: #52c41a;
+  color: #1890ff;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2737,7 +2737,7 @@ async function saveCardEdit() {
 }
 
 .engine-sort-btn:hover {
-  background: #52c41a;
+  background: #1890ff;
   color: white;
 }
 
@@ -2823,7 +2823,7 @@ async function saveCardEdit() {
 }
 
 .search-btn {
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
   color: #ffffff;
   border: none;
   border-radius: 50%;
@@ -2945,16 +2945,16 @@ async function saveCardEdit() {
   border: 1.5px solid rgba(102, 126, 234, 0.3);
   border-radius: 16px;
   font-size: 12px;
-  color: #52c41a;
+  color: #1890ff;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .mini-tag-btn:hover {
-  background: #52c41a;
+  background: #1890ff;
   color: white;
-  border-color: #52c41a;
+  border-color: #1890ff;
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(102, 126, 234, 0.3);
 }
@@ -3005,7 +3005,7 @@ async function saveCardEdit() {
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
 }
 
 .tag-panel-header h4 {
@@ -3459,7 +3459,7 @@ async function saveCardEdit() {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #52c41a, #73d13d);
+  background: linear-gradient(135deg, #1890ff, #69c0ff);
   border: none;
   color: white;
   cursor: pointer;
@@ -3583,7 +3583,7 @@ async function saveCardEdit() {
 .batch-input:focus,
 .batch-textarea:focus {
   outline: none;
-  border-color: #52c41a;
+  border-color: #1890ff;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
@@ -3713,7 +3713,7 @@ async function saveCardEdit() {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #52c41a, #73d13d);
+  background: linear-gradient(135deg, #1890ff, #69c0ff);
   color: white;
 }
 
@@ -3774,7 +3774,7 @@ async function saveCardEdit() {
 
 .batch-card-preview:hover {
   background: #f3f4f6;
-  border-color: #52c41a;
+  border-color: #1890ff;
 }
 
 /* 重复徽章 */
@@ -3887,7 +3887,7 @@ async function saveCardEdit() {
 .batch-edit-input:focus,
 .batch-edit-textarea:focus {
   outline: none;
-  border-color: #52c41a;
+  border-color: #1890ff;
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
@@ -3989,7 +3989,7 @@ async function saveCardEdit() {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #52c41a;
+  accent-color: #1890ff;
 }
 
 .batch-tag-label {
@@ -4046,7 +4046,7 @@ async function saveCardEdit() {
   height: 33px;
   border-radius: 50%;
   border: none;
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
   color: white;
   display: flex;
   align-items: center;
@@ -4144,7 +4144,7 @@ async function saveCardEdit() {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
   color: white;
 }
 
@@ -4203,14 +4203,14 @@ async function saveCardEdit() {
 .target-menu-btn:hover,
 .target-submenu-btn:hover {
   background: #e5e7eb;
-  border-color: #52c41a;
+  border-color: #1890ff;
 }
 
 .target-menu-btn.active,
 .target-submenu-btn.active {
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%);
   color: white;
-  border-color: #52c41a;
+  border-color: #1890ff;
 }
 
 .target-submenu-list {
