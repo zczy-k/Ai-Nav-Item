@@ -101,8 +101,19 @@ const upload = multer({
 // 创建备份
 router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
   try {
+    const { name, description } = req.body;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const backupName = `backup-${timestamp}`;
+    
+    // 支持自定义名称，如果提供则使用，否则使用时间戳
+    let backupName;
+    if (name && name.trim()) {
+      // 清理文件名，只保留安全字符
+      const safeName = name.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').slice(0, 50);
+      backupName = `${safeName}-${timestamp}`;
+    } else {
+      backupName = `backup-${timestamp}`;
+    }
+    
     const backupDir = path.join(__dirname, '..', 'backups');
     
     // 确保备份目录存在
@@ -193,7 +204,8 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
     const backupInfo = {
       timestamp: new Date().toISOString(),
       version: require('../package.json').version || '1.0.0',
-      description: '数据库、配置文件和 WebDAV 配置备份'
+      name: name || null,
+      description: description || '数据库、配置文件和 WebDAV 配置备份'
     };
     archive.append(JSON.stringify(backupInfo, null, 2), { name: 'backup-info.json' });
     
@@ -297,6 +309,56 @@ router.delete('/delete/:filename', authMiddleware, (req, res) => {
     res.status(500).json({
       success: false,
       message: '删除备份失败',
+      error: error.message
+    });
+  }
+});
+
+// 重命名备份
+router.put('/rename/:filename', authMiddleware, (req, res) => {
+  try {
+    const { filename } = req.params;
+    const { newName } = req.body;
+    
+    if (!newName || !newName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供新的备份名称'
+      });
+    }
+    
+    const filePath = validateBackupFile(filename, res);
+    if (!filePath) return;
+    
+    const backupDir = path.join(__dirname, '..', 'backups');
+    
+    // 清理新文件名，只保留安全字符
+    const safeName = newName.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').slice(0, 50);
+    const newFilename = safeName.endsWith('.zip') ? safeName : `${safeName}.zip`;
+    const newFilePath = path.join(backupDir, newFilename);
+    
+    // 检查新文件名是否已存在
+    if (fs.existsSync(newFilePath) && newFilePath !== filePath) {
+      return res.status(400).json({
+        success: false,
+        message: '该名称已存在，请使用其他名称'
+      });
+    }
+    
+    // 重命名文件
+    fs.renameSync(filePath, newFilePath);
+    
+    res.json({
+      success: true,
+      message: '备份重命名成功',
+      newName: newFilename
+    });
+    
+  } catch (error) {
+    console.error('重命名备份失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '重命名备份失败',
       error: error.message
     });
   }
