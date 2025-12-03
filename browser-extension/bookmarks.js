@@ -454,36 +454,6 @@ function renderTagCloud() {
         
         content.appendChild(tagEl);
     }
-    
-    // 如果有选中的标签，显示清除按钮
-    if (currentTagFilters.length > 0) {
-        const clearBtn = document.createElement('span');
-        clearBtn.style.cssText = `
-            display: inline-block;
-            padding: 4px 10px;
-            background: #ff4d4f;
-            color: white;
-            border-radius: 16px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-left: 8px;
-        `;
-        clearBtn.textContent = `清除全部 (${currentTagFilters.length})`;
-        clearBtn.title = '清除所有标签筛选';
-        clearBtn.addEventListener('click', () => {
-            currentTagFilters = [];
-            renderTagCloud();
-            renderBookmarkList();
-        });
-        clearBtn.addEventListener('mouseenter', () => {
-            clearBtn.style.background = '#ff7875';
-        });
-        clearBtn.addEventListener('mouseleave', () => {
-            clearBtn.style.background = '#ff4d4f';
-        });
-        content.appendChild(clearBtn);
-    }
 }
 
 // 获取书签使用频率
