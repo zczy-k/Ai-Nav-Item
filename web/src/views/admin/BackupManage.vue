@@ -105,7 +105,7 @@
     <!-- WebDAV Backup Tab -->
     <div v-show="activeTab === 'webdav'" class="tab-content">
       <div class="toolbar">
-        <button class="btn btn-primary" @click="showWebdavConfig = true">
+        <button class="btn btn-primary" @click="openWebdavConfig">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
             <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
@@ -359,8 +359,9 @@
         </div>
         <div class="form-group">
           <label>密码 <span class="required">*</span></label>
-          <input type="password" v-model="webdavConfigForm.password" placeholder="应用密码或访问令牌" class="form-input" />
-          <small>注意：某些服务需要使用应用专用密码，而不是登录密码</small>
+          <input type="password" v-model="webdavConfigForm.password" :placeholder="webdavConfig.configured ? '留空则保持原密码不变' : '应用密码或访问令牌'" class="form-input" />
+          <small v-if="!webdavConfig.configured">注意：某些服务需要使用应用专用密码，而不是登录密码</small>
+          <small v-else>如需修改密码请输入新密码，留空则保持原密码不变</small>
         </div>
         <div class="modal-actions">
           <button class="btn btn-secondary" @click="showWebdavConfig = false">取消</button>
@@ -720,11 +721,27 @@ const loadWebdavConfig = async () => {
   }
 };
 
+const openWebdavConfig = async () => {
+  // 打开对话框前，加载已保存的配置
+  await loadWebdavConfig();
+  webdavConfigForm.url = webdavConfig.url;
+  webdavConfigForm.username = webdavConfig.username;
+  webdavConfigForm.password = ''; // 密码不回显，需要重新输入
+  showWebdavConfig.value = true;
+};
+
 const saveWebdavConfig = async () => {
-  if (!webdavConfigForm.url || !webdavConfigForm.username || !webdavConfigForm.password) {
-    showMessage('请填写完整的WebDAV配置信息', 'error');
+  if (!webdavConfigForm.url || !webdavConfigForm.username) {
+    showMessage('请填写URL和用户名', 'error');
     return;
   }
+  
+  // 首次配置时密码必填
+  if (!webdavConfig.configured && !webdavConfigForm.password) {
+    showMessage('首次配置时密码不能为空', 'error');
+    return;
+  }
+  
   loading.webdavConfig = true;
   const data = await apiRequest('/api/backup/webdav/config', {
     method: 'POST',
@@ -733,10 +750,11 @@ const saveWebdavConfig = async () => {
   if (data.success) {
     showMessage('WebDAV配置保存成功！');
     showWebdavConfig.value = false;
-    webdavConfigForm.url = '';
-    webdavConfigForm.username = '';
-    webdavConfigForm.password = '';
     await loadWebdavConfig();
+    // 如果已配置，自动加载WebDAV备份列表
+    if (webdavConfig.configured) {
+      await loadWebdavBackupList();
+    }
   } else {
     showMessage(data.message || 'WebDAV配置保存失败', 'error');
   }

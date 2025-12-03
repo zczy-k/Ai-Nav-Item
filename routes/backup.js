@@ -584,10 +584,10 @@ router.post('/webdav/config', authMiddleware, async (req, res) => {
   try {
     const { url, username, password } = req.body;
     
-    if (!url || !username || !password) {
+    if (!url || !username) {
       return res.status(400).json({ 
         success: false, 
-        message: 'URL、用户名和密码不能为空' 
+        message: 'URL和用户名不能为空' 
       });
     }
     
@@ -600,9 +600,38 @@ router.post('/webdav/config', authMiddleware, async (req, res) => {
       });
     }
     
+    const configPath = getWebDAVConfigPath();
+    let finalPassword = password;
+    
+    // 如果密码为空且已有配置，保持原密码
+    if (!password && fs.existsSync(configPath)) {
+      try {
+        const existingEncryptedConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        const existingConfig = decryptWebDAVConfig(existingEncryptedConfig);
+        if (existingConfig && existingConfig.password) {
+          finalPassword = existingConfig.password;
+        } else {
+          return res.status(400).json({ 
+            success: false, 
+            message: '密码不能为空' 
+          });
+        }
+      } catch (e) {
+        return res.status(400).json({ 
+          success: false, 
+          message: '密码不能为空' 
+        });
+      }
+    } else if (!password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '密码不能为空' 
+      });
+    }
+    
     // 测试WebDAV连接
     try {
-      const client = createClient(url, { username, password });
+      const client = createClient(url, { username, password: finalPassword });
       await client.getDirectoryContents('/');
     } catch (error) {
       return res.status(400).json({ 
@@ -612,8 +641,7 @@ router.post('/webdav/config', authMiddleware, async (req, res) => {
     }
     
     // 加密并保存配置
-    const encryptedConfig = encryptWebDAVConfig({ url, username, password });
-    const configPath = getWebDAVConfigPath();
+    const encryptedConfig = encryptWebDAVConfig({ url, username, password: finalPassword });
     
     fs.writeFileSync(
       configPath, 
