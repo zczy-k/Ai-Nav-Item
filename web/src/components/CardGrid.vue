@@ -473,7 +473,7 @@ const gradients = [
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #667eea;
+  accent-color: #52c41a;
   z-index: 11;
   pointer-events: auto;
 }

@@ -214,7 +214,7 @@ function toggleSubMenu(menuId) {
 
 
 .menu-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
   border-radius: 16px;
   padding: 32px;
   margin-bottom: 20px;
@@ -289,7 +289,7 @@ function toggleSubMenu(menuId) {
 .menu-icon {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -312,7 +312,7 @@ function toggleSubMenu(menuId) {
 
 .menu-name-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #52c41a;
   background: #f8fafc;
 }
 
@@ -339,7 +339,7 @@ function toggleSubMenu(menuId) {
 
 .order-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #52c41a;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
@@ -503,7 +503,7 @@ function toggleSubMenu(menuId) {
 }
 
 .btn-primary {
-  background: linear-gradient(82deg, #667eea, #2f025d);
+  background: linear-gradient(82deg, #52c41a, #2f025d);
   color: white;
 }
 
@@ -514,12 +514,12 @@ function toggleSubMenu(menuId) {
 
 .btn-outline {
   background: transparent;
-  color: #667eea;
-  border: 2px solid #667eea;
+  color: #52c41a;
+  border: 2px solid #52c41a;
 }
 
 .btn-outline:hover {
-  background: #667eea;
+  background: #52c41a;
   color: white;
 }
 
@@ -570,7 +570,7 @@ function toggleSubMenu(menuId) {
 
 .input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #52c41a;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 

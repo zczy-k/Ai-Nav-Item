@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="welcome-page">
     <h2 class="welcome-title">欢迎您，{{ currentUsername || 'admin' }}！</h2>
     <div class="welcome-cards">

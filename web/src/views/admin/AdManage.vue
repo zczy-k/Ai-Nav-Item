@@ -235,7 +235,7 @@ async function deleteAd(id) {
   gap: 16px;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg,#667eea,#764ba2);
+  background: linear-gradient(135deg,#52c41a,#73d13d);
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
   padding: 24px 32px 16px 32px;

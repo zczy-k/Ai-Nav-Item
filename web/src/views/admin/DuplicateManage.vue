@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="duplicate-manage">
     <div class="section-header">
       <h3>卡片去重管理</h3>

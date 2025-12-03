@@ -194,7 +194,7 @@ function showMessage(text, type) {
 .user-card {
   width: 50%;
   margin: 0 auto;
-  background: linear-gradient(135deg,#667eea,#764ba2);
+  background: linear-gradient(135deg,#52c41a,#73d13d);
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
   padding: 10px 24px;

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="tag-manage">
     <div class="tag-header">
       <div class="header-content">
@@ -199,7 +199,7 @@ async function deleteTag(id) {
 }
 
 .tag-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
   border-radius: 16px;
   padding: 32px;
   margin-bottom: 20px;
@@ -275,7 +275,7 @@ async function deleteTag(id) {
 
 .btn-primary {
   background: white;
-  color: #667eea;
+  color: #52c41a;
 }
 
 .btn-primary:hover {
@@ -402,7 +402,7 @@ async function deleteTag(id) {
 }
 
 .color-picker:hover {
-  border-color: #667eea;
+  border-color: #52c41a;
 }
 
 .tag-order {
@@ -431,7 +431,7 @@ async function deleteTag(id) {
 
 .order-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #52c41a;
 }
 
 .tag-actions {
