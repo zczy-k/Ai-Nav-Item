@@ -486,13 +486,21 @@ async function seedTags() {
 // 执行初始化并导出 Promise
 const dbInitPromise = initializeDatabase();
 
-// 导出数据库实例（使用 getter 确保始终返回最新的连接）
-module.exports = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'reconnect') return reconnectDatabase;
-    if (prop === 'initPromise') return dbInitPromise;
-    return db[prop];
-  }
-});
-module.exports.initPromise = dbInitPromise;
-module.exports.reconnect = reconnectDatabase;
+// 创建一个包装对象，确保始终使用最新的数据库连接
+const dbWrapper = {
+  // 代理所有 sqlite3 数据库方法
+  run: (...args) => db.run(...args),
+  get: (...args) => db.get(...args),
+  all: (...args) => db.all(...args),
+  each: (...args) => db.each(...args),
+  exec: (...args) => db.exec(...args),
+  prepare: (...args) => db.prepare(...args),
+  close: (...args) => db.close(...args),
+  serialize: (...args) => db.serialize(...args),
+  parallelize: (...args) => db.parallelize(...args),
+  // 自定义方法
+  reconnect: reconnectDatabase,
+  initPromise: dbInitPromise
+};
+
+module.exports = dbWrapper;
