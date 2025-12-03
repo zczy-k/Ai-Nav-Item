@@ -59,11 +59,19 @@ onMounted(loadAds);
 async function loadAds() {
   try {
     const res = await getAds();
-    const ads = Array.isArray(res.data) ? res.data : [];
+    // 兼容不同的返回格式
+    let ads = [];
+    if (Array.isArray(res.data)) {
+      ads = res.data;
+    } else if (res.data && Array.isArray(res.data.data)) {
+      ads = res.data.data;
+    }
     leftAds.value = ads.filter(ad => ad.position === 'left');
     rightAds.value = ads.filter(ad => ad.position === 'right');
   } catch (err) {
     console.error('加载广告失败:', err);
+    leftAds.value = [];
+    rightAds.value = [];
   }
 }
 async function handleAddAd() {
@@ -135,8 +143,7 @@ async function deleteAd(id) {
   color: #2566d8;
 }
 .ad-header {
-  height: 32px;
-  margin-bottom: 64px;
+  margin-bottom: 32px;
 }
 .ad-section {
   margin-bottom: 32px;
