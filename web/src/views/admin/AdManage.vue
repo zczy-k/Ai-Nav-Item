@@ -261,8 +261,10 @@ async function deleteAd(id) {
   background: linear-gradient(135deg,#1890ff,#69c0ff);
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  padding: 24px 32px 16px 32px;
-  min-width: 600px;
+  padding: 24px 32px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 .select-input {
   min-width: 120px;
@@ -291,8 +293,7 @@ async function deleteAd(id) {
   }
   .ad-section {
     width: 92%;
-    padding-top: 10rem;
-    margin-bottom: -8rem;
+    margin: 0 auto 32px auto;
   }
   .ad-card {
     width: 100%;
