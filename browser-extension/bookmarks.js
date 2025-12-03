@@ -248,47 +248,145 @@ function autoGenerateTags(bookmark) {
     try {
         const url = new URL(bookmark.url);
         const domain = url.hostname.replace(/^www\./, '');
+        const pathname = url.pathname.toLowerCase();
+        const fullUrl = bookmark.url.toLowerCase();
         
-        // 常见网站分类
+        // 常见网站分类（扩展版）
         const categoryMap = {
+            // 开发相关
             'github.com': ['开发', '代码'],
+            'gitlab.com': ['开发', '代码'],
+            'gitee.com': ['开发', '代码'],
             'stackoverflow.com': ['开发', '问答'],
-            'youtube.com': ['视频', '娱乐'],
-            'bilibili.com': ['视频', '娱乐'],
-            'zhihu.com': ['问答', '社区'],
             'juejin.cn': ['开发', '技术'],
             'csdn.net': ['开发', '技术'],
-            'baidu.com': ['搜索'],
-            'google.com': ['搜索'],
-            'taobao.com': ['购物'],
-            'jd.com': ['购物'],
+            'segmentfault.com': ['开发', '技术'],
+            'cnblogs.com': ['开发', '博客'],
+            'npmjs.com': ['开发', '工具'],
+            'pypi.org': ['开发', '工具'],
+            'developer.mozilla.org': ['开发', '文档'],
+            'w3schools.com': ['开发', '教程'],
+            'runoob.com': ['开发', '教程'],
+            'leetcode.com': ['开发', '算法'],
+            'codepen.io': ['开发', '代码'],
+            'codesandbox.io': ['开发', '代码'],
+            // 视频娱乐
+            'youtube.com': ['视频', '娱乐'],
+            'bilibili.com': ['视频', '娱乐'],
+            'youku.com': ['视频', '娱乐'],
+            'iqiyi.com': ['视频', '娱乐'],
+            'netflix.com': ['视频', '娱乐'],
+            'twitch.tv': ['视频', '直播'],
+            'douyu.com': ['视频', '直播'],
+            'huya.com': ['视频', '直播'],
+            // 社交社区
+            'zhihu.com': ['问答', '社区'],
             'weibo.com': ['社交'],
             'twitter.com': ['社交'],
+            'x.com': ['社交'],
             'facebook.com': ['社交'],
+            'instagram.com': ['社交', '图片'],
             'linkedin.com': ['社交', '职场'],
-            'medium.com': ['博客', '阅读'],
             'reddit.com': ['社区', '论坛'],
-            'netflix.com': ['视频', '娱乐'],
+            'v2ex.com': ['社区', '技术'],
+            'tieba.baidu.com': ['社区', '论坛'],
+            'douban.com': ['社区', '影评'],
+            // 搜索引擎
+            'baidu.com': ['搜索'],
+            'google.com': ['搜索'],
+            'bing.com': ['搜索'],
+            'sogou.com': ['搜索'],
+            // 购物
+            'taobao.com': ['购物'],
+            'tmall.com': ['购物'],
+            'jd.com': ['购物'],
+            'pinduoduo.com': ['购物'],
             'amazon.com': ['购物'],
-            'wikipedia.org': ['百科', '学习']
+            'amazon.cn': ['购物'],
+            // 学习教育
+            'wikipedia.org': ['百科', '学习'],
+            'baike.baidu.com': ['百科', '学习'],
+            'coursera.org': ['学习', '课程'],
+            'udemy.com': ['学习', '课程'],
+            'mooc.cn': ['学习', '课程'],
+            'icourse163.org': ['学习', '课程'],
+            // 新闻资讯
+            'news.qq.com': ['新闻'],
+            'news.163.com': ['新闻'],
+            'sina.com.cn': ['新闻'],
+            'toutiao.com': ['新闻'],
+            'thepaper.cn': ['新闻'],
+            // 设计资源
+            'dribbble.com': ['设计', '灵感'],
+            'behance.net': ['设计', '灵感'],
+            'figma.com': ['设计', '工具'],
+            'canva.com': ['设计', '工具'],
+            'unsplash.com': ['设计', '图片'],
+            'pexels.com': ['设计', '图片'],
+            // 云服务
+            'console.cloud.google.com': ['云服务'],
+            'console.aws.amazon.com': ['云服务'],
+            'portal.azure.com': ['云服务'],
+            'cloud.tencent.com': ['云服务'],
+            'aliyun.com': ['云服务'],
+            // 博客平台
+            'medium.com': ['博客', '阅读'],
+            'wordpress.com': ['博客'],
+            'substack.com': ['博客', '订阅'],
+            // AI工具
+            'chat.openai.com': ['AI', '工具'],
+            'claude.ai': ['AI', '工具'],
+            'bard.google.com': ['AI', '工具'],
+            'midjourney.com': ['AI', '设计'],
+            // 音乐
+            'music.163.com': ['音乐'],
+            'y.qq.com': ['音乐'],
+            'spotify.com': ['音乐'],
+            'kugou.com': ['音乐']
         };
         
         // 检查域名
         for (const [site, siteTags] of Object.entries(categoryMap)) {
-            if (domain.includes(site)) {
+            if (domain.includes(site) || domain.endsWith('.' + site)) {
                 tags.push(...siteTags);
                 break;
             }
         }
         
-        // 根据标题关键词
+        // 根据URL路径分析
+        if (pathname.includes('/doc') || pathname.includes('/docs')) tags.push('文档');
+        if (pathname.includes('/api')) tags.push('API');
+        if (pathname.includes('/blog')) tags.push('博客');
+        if (pathname.includes('/tutorial')) tags.push('教程');
+        if (pathname.includes('/download')) tags.push('下载');
+        if (pathname.includes('/video') || pathname.includes('/watch')) tags.push('视频');
+        
+        // 根据标题关键词（扩展版）
         const title = (bookmark.title || '').toLowerCase();
-        if (title.includes('doc') || title.includes('文档')) tags.push('文档');
-        if (title.includes('api')) tags.push('API');
-        if (title.includes('tutorial') || title.includes('教程')) tags.push('教程');
-        if (title.includes('blog') || title.includes('博客')) tags.push('博客');
-        if (title.includes('news') || title.includes('新闻')) tags.push('新闻');
-        if (title.includes('tool') || title.includes('工具')) tags.push('工具');
+        const titleKeywords = {
+            '文档': ['doc', '文档', 'documentation', '手册', 'manual', 'guide', '指南'],
+            'API': ['api', '接口'],
+            '教程': ['tutorial', '教程', '入门', 'getting started', '学习', 'learn', 'course', '课程'],
+            '博客': ['blog', '博客', '随笔', '日志'],
+            '新闻': ['news', '新闻', '资讯', '快讯', '头条'],
+            '工具': ['tool', '工具', 'utility', '在线', 'online'],
+            '下载': ['download', '下载', '安装', 'install'],
+            '视频': ['video', '视频', '播放', 'watch', '观看'],
+            '开源': ['开源', 'open source', 'opensource', 'github'],
+            '免费': ['free', '免费', '白嫖'],
+            '官网': ['官网', 'official', '官方']
+        };
+        
+        for (const [tag, keywords] of Object.entries(titleKeywords)) {
+            if (keywords.some(kw => title.includes(kw))) {
+                tags.push(tag);
+            }
+        }
+        
+        // 根据域名后缀推断
+        if (domain.endsWith('.gov') || domain.endsWith('.gov.cn')) tags.push('政府');
+        if (domain.endsWith('.edu') || domain.endsWith('.edu.cn')) tags.push('教育');
+        if (domain.endsWith('.org')) tags.push('组织');
         
     } catch (e) {}
     
