@@ -83,3 +83,19 @@ export const getTagCardCount = (id) => axios.get(`${BASE}/tags/${id}/cards/count
 // 卡片去重API
 export const detectDuplicates = () => axios.get(`${BASE}/cards/detect-duplicates/all`, { headers: authHeaders() });
 export const removeDuplicates = (cardIds) => axios.post(`${BASE}/cards/remove-duplicates`, { cardIds }, { headers: authHeaders() });
+
+// 备份API
+export const createBackup = (name, description) => axios.post(`${BASE}/backup/create`, { name, description }, { headers: authHeaders() });
+export const getBackupList = () => axios.get(`${BASE}/backup/list`, { headers: authHeaders() });
+export const downloadBackup = (filename) => {
+  const token = localStorage.getItem('token');
+  return `${BASE}/backup/download/${filename}?token=${token}`;
+};
+export const deleteBackup = (filename) => axios.delete(`${BASE}/backup/delete/${filename}`, { headers: authHeaders() });
+export const renameBackup = (filename, newName) => axios.put(`${BASE}/backup/rename/${filename}`, { newName }, { headers: authHeaders() });
+export const uploadBackup = (file) => {
+  const formData = new FormData();
+  formData.append('backup', file);
+  return axios.post(`${BASE}/backup/upload`, formData, { headers: { ...authHeaders(), 'Content-Type': 'multipart/form-data' } });
+};
+export const restoreBackup = (filename) => axios.post(`${BASE}/backup/restore/${filename}`, {}, { headers: authHeaders() });

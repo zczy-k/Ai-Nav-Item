@@ -16,7 +16,7 @@
     <!-- Local Backup Tab -->
     <div v-show="activeTab === 'local'" class="tab-content">
       <div class="toolbar">
-      <button class="btn btn-primary" @click="createBackup" :disabled="loading.create">
+      <button class="btn btn-primary" @click="showCreateBackupDialog" :disabled="loading.create">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
         </svg>
@@ -77,6 +77,12 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M1 4v6h6M23 20v-6h-6"/>
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+              </svg>
+            </button>
+            <button class="btn-icon btn-rename" @click="showRenameDialog(backup.name)" title="重命名">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
             </button>
             <button class="btn-icon" @click="downloadBackup(backup.name)" title="下载备份">
@@ -376,6 +382,46 @@
         </div>
       </div>
     </div>
+
+    <!-- 创建备份对话框 -->
+    <div v-if="showCreateDialog" class="modal-overlay">
+      <div class="modal-content config-modal">
+        <h3>创建备份</h3>
+        <div class="form-group">
+          <label>备份名称（可选）</label>
+          <input type="text" v-model="createBackupForm.name" placeholder="例如：添加书签后的备份" class="form-input" maxlength="50" />
+          <small>留空则使用默认名称（backup-时间戳）</small>
+        </div>
+        <div class="form-group">
+          <label>备份描述（可选）</label>
+          <textarea v-model="createBackupForm.description" placeholder="描述这次备份的内容或目的..." class="form-input" rows="3"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showCreateDialog = false">取消</button>
+          <button class="btn btn-primary" @click="createBackup" :disabled="loading.create">
+            {{ loading.create ? '备份中...' : '创建备份' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 重命名对话框 -->
+    <div v-if="showRenameModal" class="modal-overlay">
+      <div class="modal-content config-modal">
+        <h3>重命名备份</h3>
+        <div class="form-group">
+          <label>新名称 <span class="required">*</span></label>
+          <input type="text" v-model="renameForm.newName" placeholder="输入新的备份名称" class="form-input" maxlength="50" />
+          <small>原名称：{{ renameForm.oldName }}</small>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showRenameModal = false">取消</button>
+          <button class="btn btn-primary" @click="renameBackup" :disabled="loading.rename || !renameForm.newName.trim()">
+            {{ loading.rename ? '重命名中...' : '确认重命名' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -386,6 +432,8 @@ const activeTab = ref('local');
 const backups = ref([]);
 const webdavBackups = ref([]);
 const showWebdavConfig = ref(false);
+const showCreateDialog = ref(false);
+const showRenameModal = ref(false);
 const fileInput = ref(null);
 
 const loading = reactive({
@@ -394,12 +442,23 @@ const loading = reactive({
   delete: false,
   restore: false,
   upload: false,
+  rename: false,
   webdavConfig: false,
   webdavBackup: false,
   webdavList: false,
   webdavRestore: false,
   webdavDelete: false,
   autoBackupConfig: false
+});
+
+const createBackupForm = reactive({
+  name: '',
+  description: ''
+});
+
+const renameForm = reactive({
+  oldName: '',
+  newName: ''
 });
 
 const message = ref({ text: '', type: '' });
@@ -470,16 +529,55 @@ const showMessage = (text, type = 'success') => {
   }, 3000);
 };
 
+const showCreateBackupDialog = () => {
+  createBackupForm.name = '';
+  createBackupForm.description = '';
+  showCreateDialog.value = true;
+};
+
 const createBackup = async () => {
   loading.create = true;
-  const data = await apiRequest('/api/backup/create', { method: 'POST' });
+  const data = await apiRequest('/api/backup/create', { 
+    method: 'POST',
+    body: JSON.stringify({
+      name: createBackupForm.name || null,
+      description: createBackupForm.description || null
+    })
+  });
   if (data.success) {
     showMessage('备份创建成功！');
+    showCreateDialog.value = false;
     await loadBackupList();
   } else {
     showMessage(data.message || '备份创建失败', 'error');
   }
   loading.create = false;
+};
+
+const showRenameDialog = (filename) => {
+  renameForm.oldName = filename;
+  renameForm.newName = filename.replace('.zip', '');
+  showRenameModal.value = true;
+};
+
+const renameBackup = async () => {
+  if (!renameForm.newName.trim()) {
+    showMessage('请输入新名称', 'error');
+    return;
+  }
+  loading.rename = true;
+  const data = await apiRequest(`/api/backup/rename/${renameForm.oldName}`, {
+    method: 'PUT',
+    body: JSON.stringify({ newName: renameForm.newName })
+  });
+  if (data.success) {
+    showMessage('重命名成功！');
+    showRenameModal.value = false;
+    await loadBackupList();
+  } else {
+    showMessage(data.message || '重命名失败', 'error');
+  }
+  loading.rename = false;
 };
 
 const loadBackupList = async () => {
@@ -961,6 +1059,14 @@ onMounted(async () => {
 
 .btn-danger:hover {
   background: #fee;
+}
+
+.btn-rename {
+  color: #f59e0b;
+}
+
+.btn-rename:hover {
+  background: #fef3c7;
 }
 
 .modal-overlay {
