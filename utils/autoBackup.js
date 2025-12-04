@@ -162,51 +162,104 @@ async function createBackupFile(prefix = 'auto') {
 }
 
 /**
- * 同步备份�?WebDAV
+ * 获取WebDAV客户端
  */
-async function syncToWebDAV(backupPath, backupName) {
-  try {
-    // 检�?WebDAV 配置是否存在
-    const webdavConfigPath = getWebDAVConfigPath();
-    if (!fs.existsSync(webdavConfigPath)) {
-      return false;
-    }
-    
-    // 读取并解密配�?
-    const encryptedConfig = JSON.parse(fs.readFileSync(webdavConfigPath, 'utf-8'));
-    const webdavConfig = decryptWebDAVConfig(encryptedConfig);
-    
-    if (!webdavConfig) {
-      console.error('[\u81ea\u52a8\u5907\u4efd] WebDAV \u914d\u7f6e\u89e3\u5bc6\u5931\u8d25');
-      return false;
-    }
-    
-    // 创建 WebDAV 客\u6237\u7aef
-    const client = createClient(webdavConfig.url, {
-      username: webdavConfig.username,
-      password: webdavConfig.password
-    });
-    
-    // 确\u4fdd\u5907\u4efd\u76ee\u5f55\u5b58\u5728
-    const remotePath = '/Con-Nav-Item-Backups';
+async function getWebDAVClient() {
+  const webdavConfigPath = getWebDAVConfigPath();
+  if (!fs.existsSync(webdavConfigPath)) {
+    return null;
+  }
+  
+  const encryptedConfig = JSON.parse(fs.readFileSync(webdavConfigPath, 'utf-8'));
+  const webdavConfig = decryptWebDAVConfig(encryptedConfig);
+  
+  if (!webdavConfig) {
+    console.error('[自动备份] WebDAV配置解密失败');
+    return null;
+  }
+  
+  return createClient(webdavConfig.url, {
+    username: webdavConfig.username,
+    password: webdavConfig.password
+  });
+}
+
+/**
+ * 同步备份到WebDAV（带重试）
+ */
+async function syncToWebDAV(backupPath, backupName, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      await client.createDirectory(remotePath);
+      const client = await getWebDAVClient();
+      if (!client) return false;
+      
+      // 确保备份目录存在
+      const remotePath = '/Con-Nav-Item-Backups';
+      try {
+        await client.createDirectory(remotePath);
+      } catch (e) {
+        // 目录可能已存在，忽略错误
+      }
+      
+      // 上传文件
+      const fileBuffer = fs.readFileSync(backupPath);
+      const remoteFilePath = `${remotePath}/${backupName}`;
+      await client.putFileContents(remoteFilePath, fileBuffer);
+      
+      return true;
+    } catch (error) {
+      if (attempt < retries) {
+        console.warn(`[自动备份] WebDAV同步失败，重试 ${attempt + 1}/${retries}...`);
+        await new Promise(r => setTimeout(r, 2000)); // 等待2秒后重试
+      } else {
+        console.error('[自动备份] WebDAV同步失败:', error.message);
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * 清理WebDAV上的过期备份
+ */
+async function cleanWebDAVBackups(prefix, keepCount) {
+  try {
+    const client = await getWebDAVClient();
+    if (!client) return;
+    
+    const remotePath = '/Con-Nav-Item-Backups';
+    
+    // 获取远程备份列表
+    let contents;
+    try {
+      contents = await client.getDirectoryContents(remotePath);
     } catch (e) {
-      // \u76ee\u5f55\u53ef\u80fd\u5df2\u5b58\u5728\uff0c\u5ffd\u7565\u9519\u8bef
+      // 目录不存在
+      return;
     }
     
-    // \u4e0a\u4f20\u6587\u4ef6
-    const fileBuffer = fs.readFileSync(backupPath);
-    const remoteFilePath = `${remotePath}/${backupName}`;
-    await client.putFileContents(remoteFilePath, fileBuffer);
+    // 过滤并排序
+    const backups = contents
+      .filter(item => item.type === 'file' && item.filename.includes(prefix) && item.filename.endsWith('.zip'))
+      .sort((a, b) => new Date(b.lastmod) - new Date(a.lastmod));
     
-    const stats = fs.statSync(backupPath);
-    const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
+    // 删除超出保留数量的备份
+    let deletedCount = 0;
+    for (let i = keepCount; i < backups.length; i++) {
+      try {
+        await client.deleteFile(backups[i].filename);
+        deletedCount++;
+      } catch (e) {
+        console.error(`[自动备份] 删除WebDAV备份失败: ${backups[i].filename}`);
+      }
+    }
     
-    return true;
+    if (deletedCount > 0) {
+      console.log(`[自动备份] 已清理 ${deletedCount} 个WebDAV过期备份`);
+    }
   } catch (error) {
-    console.error('[\u81ea\u52a8\u5907\u4efd] WebDAV \u540c\u6b65\u5931\u8d25:', error.message);
-    return false;
+    console.error('[自动备份] WebDAV清理失败:', error.message);
   }
 }
 
@@ -277,12 +330,19 @@ function triggerDebouncedBackup() {
       dailyBackupCount++;
       console.log(`[自动备份] 增量备份完成: ${result.name} (${result.size} MB)`);
       
-      // 同步�?WebDAV（如果启用）
+      // 同步到WebDAV（如果启用）
       if (config.webdav && config.webdav.enabled && config.webdav.syncIncremental) {
-        await syncToWebDAV(result.path, result.name);
+        const synced = await syncToWebDAV(result.path, result.name);
+        if (synced) {
+          console.log(`[自动备份] 已同步到WebDAV: ${result.name}`);
+          // 清理WebDAV上的过期备份
+          if (config.autoClean) {
+            await cleanWebDAVBackups('incremental', config.debounce.keep);
+          }
+        }
       }
       
-      // 自动清理
+      // 自动清理本地备份
       if (config.autoClean) {
         cleanOldBackups('incremental', config.debounce.keep);
       }
@@ -319,10 +379,14 @@ function startScheduledBackup() {
         const synced = await syncToWebDAV(result.path, result.name);
         if (synced) {
           console.log(`[自动备份] 已同步到WebDAV: ${result.name}`);
+          // 清理WebDAV上的过期备份
+          if (config.autoClean) {
+            await cleanWebDAVBackups('daily', config.scheduled.keep);
+          }
         }
       }
       
-      // 自动清理
+      // 自动清理本地备份
       if (config.autoClean) {
         cleanOldBackups('daily', config.scheduled.keep);
       }
