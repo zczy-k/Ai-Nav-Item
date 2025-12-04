@@ -245,10 +245,10 @@
               <small>格式：24小时制，如 02:00</small>
             </div>
             <div class="field-row">
-              <label>保留天数</label>
+              <label>保留备份数量</label>
               <input type="number" v-model.number="autoBackupConfig.scheduled.keep" 
                      min="1" max="30" class="form-input" />
-              <small>范围：1-30天</small>
+              <small>自动清理时保留最新的N个备份，范围：1-30个</small>
             </div>
           </div>
         </div>
@@ -291,7 +291,7 @@
               <span class="slider"></span>
             </label>
           </div>
-          <p class="config-info">自动删除超出保留数量/天数的旧备份文件。</p>
+          <p class="config-info">自动删除超出保留数量的旧备份文件（按时间排序，保留最新的）。</p>
         </div>
 
         <!-- Backup Statistics -->
