@@ -1,19 +1,62 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 // 加密算法
 const ALGORITHM = 'aes-256-gcm';
 const SALT = 'Con-Nav-Item-WebDAV-Salt';
 
+// 密钥文件路径
+const CRYPTO_SECRET_PATH = path.join(__dirname, '..', 'config', '.crypto-secret');
+
+/**
+ * 获取或生成 CRYPTO_SECRET
+ */
+function getCryptoSecret() {
+  // 1. 优先使用环境变量
+  if (process.env.CRYPTO_SECRET) {
+    return process.env.CRYPTO_SECRET;
+  }
+  
+  // 2. 尝试从文件读取
+  try {
+    if (fs.existsSync(CRYPTO_SECRET_PATH)) {
+      const secret = fs.readFileSync(CRYPTO_SECRET_PATH, 'utf-8').trim();
+      if (secret && secret.length >= 32) {
+        return secret;
+      }
+    }
+  } catch (e) {
+    console.warn('读取密钥文件失败:', e.message);
+  }
+  
+  // 3. 自动生成新密钥并保存
+  const newSecret = crypto.randomBytes(32).toString('hex');
+  try {
+    const configDir = path.dirname(CRYPTO_SECRET_PATH);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    fs.writeFileSync(CRYPTO_SECRET_PATH, newSecret, { mode: 0o600 });
+    console.log('✓ 已自动生成加密密钥并保存到:', CRYPTO_SECRET_PATH);
+  } catch (e) {
+    console.error('保存密钥文件失败:', e.message);
+  }
+  
+  return newSecret;
+}
+
+// 缓存密钥，避免重复读取文件
+let cachedSecret = null;
+
 /**
  * 获取加密密钥
  */
 function getKey() {
-  const secret = process.env.CRYPTO_SECRET;
-  if (!secret) {
-    console.error('⚠️ 警告: CRYPTO_SECRET未设置，签名验证安全性降低！');
-    throw new Error('CRYPTO_SECRET未配置，无法进行安全加密');
+  if (!cachedSecret) {
+    cachedSecret = getCryptoSecret();
   }
-  return crypto.scryptSync(secret, SALT, 32);
+  return crypto.scryptSync(cachedSecret, SALT, 32);
 }
 
 /**
@@ -110,12 +153,10 @@ function decryptWebDAVConfig(encryptedConfig) {
  * @returns {string} - HMAC-SHA256 签名
  */
 function generateBackupSignature(data) {
-  const secret = process.env.CRYPTO_SECRET;
-  if (!secret) {
-    console.error('⚠️ 警告: CRYPTO_SECRET未设置，无法生成安全签名！');
-    return null;
+  if (!cachedSecret) {
+    cachedSecret = getCryptoSecret();
   }
-  const hmac = crypto.createHmac('sha256', secret + SALT);
+  const hmac = crypto.createHmac('sha256', cachedSecret + SALT);
   hmac.update(data);
   return hmac.digest('hex');
 }
