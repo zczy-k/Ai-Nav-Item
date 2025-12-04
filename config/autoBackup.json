@@ -2,7 +2,6 @@
   "debounce": {
     "enabled": true,
     "delay": 30,
-    "maxPerDay": 3,
     "keep": 5
   },
   "scheduled": {

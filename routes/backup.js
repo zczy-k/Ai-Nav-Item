@@ -1112,12 +1112,6 @@ router.post('/auto/config', authMiddleware, (req, res) => {
           message: '防抖延迟必须在5-1440分钟之间'
         });
       }
-      if (newConfig.debounce.maxPerDay < 1 || newConfig.debounce.maxPerDay > 10) {
-        return res.status(400).json({
-          success: false,
-          message: '每日最大次数必须在1-10之间'
-        });
-      }
       if (newConfig.debounce.keep < 1 || newConfig.debounce.keep > 30) {
         return res.status(400).json({
           success: false,

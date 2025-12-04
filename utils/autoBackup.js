@@ -19,8 +19,7 @@ const DEFAULT_CONFIG = {
   debounce: {
     enabled: true,
     delay: 30,                     // 30分钟防抖延迟
-    maxPerDay: 3,                  // 每天最多触�?�?
-    keep: 5                        // 保留5个增量备�?
+    keep: 5                        // 保留5个增量备份
   },
   scheduled: {
     enabled: true,
@@ -80,8 +79,6 @@ let config = loadConfig();
 let debounceTimer = null;
 let lastDebounceBackupTime = 0;
 let lastScheduledBackupTime = 0;
-let dailyBackupCount = 0;
-let lastBackupDate = new Date().toDateString();
 let scheduledJob = null;
 
 /**
@@ -295,24 +292,10 @@ function cleanOldBackups(prefix, keepCount) {
 }
 
 /**
- * 防抖备份 - 数据修改后触�?
+ * 防抖备份 - 数据修改后触发
  */
 function triggerDebouncedBackup() {
   if (!config.debounce.enabled) {
-    return;
-  }
-  
-  const now = Date.now();
-  const currentDate = new Date().toDateString();
-  
-  // 重置每日计数�?
-  if (currentDate !== lastBackupDate) {
-    dailyBackupCount = 0;
-    lastBackupDate = currentDate;
-  }
-  
-  // 检查每日限�?
-  if (dailyBackupCount >= config.debounce.maxPerDay) {
     return;
   }
   
@@ -321,13 +304,11 @@ function triggerDebouncedBackup() {
     clearTimeout(debounceTimer);
   }
   
-  
-  // 设置新的定时�?
+  // 设置新的定时器
   debounceTimer = setTimeout(async () => {
     try {
       const result = await createBackupFile('incremental');
       lastDebounceBackupTime = Date.now();
-      dailyBackupCount++;
       console.log(`[自动备份] 增量备份完成: ${result.name} (${result.size} MB)`);
       
       // 同步到WebDAV（如果启用）
@@ -446,8 +427,6 @@ function getBackupStats() {
         count: files.length,
         size: (files.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024)).toFixed(2)
       },
-      debounceToday: dailyBackupCount,
-      maxPerDay: config.debounce.maxPerDay,
       lastDebounce: lastDebounceBackupTime ? new Date(lastDebounceBackupTime).toISOString() : null,
       lastScheduled: lastScheduledBackupTime ? new Date(lastScheduledBackupTime).toISOString() : null,
       nextScheduled: scheduledJob ? scheduledJob.nextInvocation()?.toISOString() : null

@@ -210,19 +210,13 @@
               <label>延迟时间（分钟）</label>
               <input type="number" v-model.number="autoBackupConfig.debounce.delay" 
                      min="5" max="1440" class="form-input" />
-              <small>范围：5-1440分钟</small>
-            </div>
-            <div class="field-row">
-              <label>每天最多备份次数</label>
-              <input type="number" v-model.number="autoBackupConfig.debounce.maxPerDay" 
-                     min="1" max="10" class="form-input" />
-              <small>范围：1-10次</small>
+              <small>数据修改后延迟多久触发备份，范围：5-1440分钟</small>
             </div>
             <div class="field-row">
               <label>保留备份数量</label>
               <input type="number" v-model.number="autoBackupConfig.debounce.keep" 
                      min="1" max="30" class="form-input" />
-              <small>范围：1-30个</small>
+              <small>自动清理时保留最新的N个备份，范围：1-30个</small>
             </div>
           </div>
         </div>
@@ -305,8 +299,8 @@
           <h4>📊 备份统计</h4>
           <div class="stats-grid">
             <div class="stat-item">
-              <span class="stat-label">增量备份（今日）</span>
-              <span class="stat-value">{{ autoBackupStats.debounceToday || 0 }} 次</span>
+              <span class="stat-label">增量备份数量</span>
+              <span class="stat-value">{{ autoBackupStats.incremental?.count || 0 }} 个</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">最后增量备份</span>
@@ -489,7 +483,6 @@ const autoBackupConfig = reactive({
   debounce: {
     enabled: true,
     delay: 30,
-    maxPerDay: 3,
     keep: 5
   },
   scheduled: {
