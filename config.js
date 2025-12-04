@@ -51,6 +51,11 @@ if (!process.env.ADMIN_PASSWORD || adminPassword === '123456') {
   securityWarnings.push('⚠️  警告: 正在使用默认管理员密码，请设置环境变量 ADMIN_PASSWORD');
 }
 
+// 检查加密密钥
+if (!process.env.CRYPTO_SECRET) {
+  securityWarnings.push('⚠️  警告: 未设置加密密钥，WebDAV密码使用默认密钥加密，请设置环境变量 CRYPTO_SECRET');
+}
+
 // 获取JWT密钥（自动生成或从环境变量/文件读取）
 const jwtSecret = getOrCreateJwtSecret();
 
@@ -61,7 +66,9 @@ if (securityWarnings.length > 0) {
   console.log('='.repeat(60));
   securityWarnings.forEach(warning => console.log(warning));
   console.log('='.repeat(60));
-  console.log('提示: 在 .env 文件中设置 ADMIN_PASSWORD=你的强密码');
+  console.log('提示: 在 .env 文件中设置:');
+  console.log('  ADMIN_PASSWORD=你的强密码');
+  console.log('  CRYPTO_SECRET=随机字符串（用于加密WebDAV密码）');
   console.log('='.repeat(60) + '\n');
 }
 
