@@ -138,19 +138,17 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
           
           let signed = false;
           
-          // 基于原始ZIP内容计算签名，然后嵌入签名
-          const AdmZip = require('adm-zip');
-          const zip = new AdmZip(backupPath);
-          
-          // 计算ZIP内所有文件内容的哈希（不包含签名文件本身）
-          const entries = zip.getEntries();
+          // 使用unzipper读取ZIP内容计算哈希
+          const directory = await unzipper.Open.file(backupPath);
           const contentHash = require('crypto').createHash('sha256');
-          entries.sort((a, b) => a.entryName.localeCompare(b.entryName));
-          for (const entry of entries) {
-            if (entry.entryName !== '.backup-signature') {
-              contentHash.update(entry.entryName);
-              contentHash.update(entry.getData());
-            }
+          const sortedFiles = directory.files
+            .filter(f => f.path !== '.backup-signature' && f.type === 'File')
+            .sort((a, b) => a.path.localeCompare(b.path));
+          
+          for (const file of sortedFiles) {
+            contentHash.update(file.path);
+            const fileData = await file.buffer();
+            contentHash.update(fileData);
           }
           const contentDigest = contentHash.digest();
           
@@ -158,7 +156,9 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
           const signature = generateBackupSignature(contentDigest);
           
           if (signature) {
-            // 将签名嵌入ZIP
+            // 使用archiver追加签名文件到ZIP
+            const AdmZip = require('adm-zip');
+            const zip = new AdmZip(backupPath);
             zip.addFile('.backup-signature', Buffer.from(signature, 'utf-8'));
             zip.writeZip(backupPath);
             signed = true;
@@ -250,7 +250,7 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
 });
 
 // 获取备份列表
-router.get('/list', authMiddleware, (req, res) => {
+router.get('/list', authMiddleware, async (req, res) => {
   try {
     const backupDir = path.join(__dirname, '..', 'backups');
     
@@ -261,18 +261,18 @@ router.get('/list', authMiddleware, (req, res) => {
       });
     }
     
-    const files = fs.readdirSync(backupDir)
+    // 异步检查签名状态
+    const filesPromises = fs.readdirSync(backupDir)
       .filter(file => file.endsWith('.zip'))
-      .map(file => {
+      .map(async file => {
         const filePath = path.join(backupDir, file);
         const stats = fs.statSync(filePath);
         
         // 检查签名：优先检查ZIP内部，其次检查外部.sig文件
         let signed = false;
         try {
-          const AdmZip = require('adm-zip');
-          const zip = new AdmZip(filePath);
-          signed = zip.getEntry('.backup-signature') !== null;
+          const directory = await unzipper.Open.file(filePath);
+          signed = directory.files.some(f => f.path === '.backup-signature');
         } catch (e) {
           // ZIP读取失败，检查外部签名文件
           const sigPath = filePath.replace('.zip', '.sig');
@@ -286,7 +286,9 @@ router.get('/list', authMiddleware, (req, res) => {
           modified: stats.mtime.toISOString(),
           signed
         };
-      })
+      });
+    
+    const files = (await Promise.all(filesPromises))
       .sort((a, b) => new Date(b.created) - new Date(a.created));
     
     res.json({
@@ -420,7 +422,7 @@ router.put('/rename/:filename', authMiddleware, (req, res) => {
 });
 
 // 上传备份文件
-router.post('/upload', authMiddleware, backupLimiter, upload.single('backup'), (req, res) => {
+router.post('/upload', authMiddleware, backupLimiter, upload.single('backup'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -458,24 +460,26 @@ router.post('/upload', authMiddleware, backupLimiter, upload.single('backup'), (
         });
       }
       
-      // 检查ZIP内部是否有签名
-      const AdmZip = require('adm-zip');
-      const zip = new AdmZip(req.file.path);
-      const sigEntry = zip.getEntry('.backup-signature');
+      // 使用unzipper读取ZIP内容并验证签名
+      const directory = await unzipper.Open.file(req.file.path);
+      const sigFile = directory.files.find(f => f.path === '.backup-signature');
       
-      if (sigEntry) {
+      if (sigFile) {
         signed = true;
-        const signature = zip.readAsText(sigEntry).trim();
+        const signatureBuffer = await sigFile.buffer();
+        const signature = signatureBuffer.toString('utf-8').trim();
+        
         try {
           // 计算ZIP内所有文件内容的哈希（不包含签名文件本身）
-          const entries = zip.getEntries();
           const contentHash = require('crypto').createHash('sha256');
-          entries.sort((a, b) => a.entryName.localeCompare(b.entryName));
-          for (const entry of entries) {
-            if (entry.entryName !== '.backup-signature') {
-              contentHash.update(entry.entryName);
-              contentHash.update(entry.getData());
-            }
+          const sortedFiles = directory.files
+            .filter(f => f.path !== '.backup-signature' && f.type === 'File')
+            .sort((a, b) => a.path.localeCompare(b.path));
+          
+          for (const file of sortedFiles) {
+            contentHash.update(file.path);
+            const fileData = await file.buffer();
+            contentHash.update(fileData);
           }
           const contentDigest = contentHash.digest();
           
@@ -559,23 +563,25 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
     let signature = null;
     let contentDigest = null;
     
-    // 1. 优先从ZIP内部读取签名
+    // 1. 优先从ZIP内部读取签名（使用unzipper）
     try {
-      const AdmZip = require('adm-zip');
-      const zip = new AdmZip(filePath);
-      const sigEntry = zip.getEntry('.backup-signature');
-      if (sigEntry) {
-        signature = zip.readAsText(sigEntry).trim();
+      const directory = await unzipper.Open.file(filePath);
+      const sigFile = directory.files.find(f => f.path === '.backup-signature');
+      
+      if (sigFile) {
+        const signatureBuffer = await sigFile.buffer();
+        signature = signatureBuffer.toString('utf-8').trim();
         
         // 计算ZIP内所有文件内容的哈希（不包含签名文件本身）
-        const entries = zip.getEntries();
         const contentHash = require('crypto').createHash('sha256');
-        entries.sort((a, b) => a.entryName.localeCompare(b.entryName));
-        for (const entry of entries) {
-          if (entry.entryName !== '.backup-signature') {
-            contentHash.update(entry.entryName);
-            contentHash.update(entry.getData());
-          }
+        const sortedFiles = directory.files
+          .filter(f => f.path !== '.backup-signature' && f.type === 'File')
+          .sort((a, b) => a.path.localeCompare(b.path));
+        
+        for (const file of sortedFiles) {
+          contentHash.update(file.path);
+          const fileData = await file.buffer();
+          contentHash.update(fileData);
         }
         contentDigest = contentHash.digest();
       }
@@ -1003,30 +1009,30 @@ router.post('/webdav/backup', authMiddleware, async (req, res) => {
     await new Promise((resolve, reject) => {
       output.on('close', () => {
         // 确保文件完全写入
-        setImmediate(() => {
+        setImmediate(async () => {
           try {
             const fd = fs.openSync(backupPath, 'r');
             fs.fsyncSync(fd);
             fs.closeSync(fd);
             
-            // 基于ZIP内容计算签名并嵌入
-            const AdmZip = require('adm-zip');
-            const zip = new AdmZip(backupPath);
-            
-            // 计算ZIP内所有文件内容的哈希
-            const entries = zip.getEntries();
+            // 使用unzipper读取ZIP内容计算哈希
+            const directory = await unzipper.Open.file(backupPath);
             const contentHash = require('crypto').createHash('sha256');
-            entries.sort((a, b) => a.entryName.localeCompare(b.entryName));
-            for (const entry of entries) {
-              if (entry.entryName !== '.backup-signature') {
-                contentHash.update(entry.entryName);
-                contentHash.update(entry.getData());
-              }
+            const sortedFiles = directory.files
+              .filter(f => f.path !== '.backup-signature' && f.type === 'File')
+              .sort((a, b) => a.path.localeCompare(b.path));
+            
+            for (const file of sortedFiles) {
+              contentHash.update(file.path);
+              const fileData = await file.buffer();
+              contentHash.update(fileData);
             }
             const contentDigest = contentHash.digest();
             
             const signature = generateBackupSignature(contentDigest);
             if (signature) {
+              const AdmZip = require('adm-zip');
+              const zip = new AdmZip(backupPath);
               zip.addFile('.backup-signature', Buffer.from(signature, 'utf-8'));
               zip.writeZip(backupPath);
               

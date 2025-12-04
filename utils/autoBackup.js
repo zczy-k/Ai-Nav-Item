@@ -100,27 +100,30 @@ async function createBackupFile(prefix = 'auto') {
       const output = fs.createWriteStream(backupPath);
       const archive = archiver('zip', { zlib: { level: 9 } });
       
-      output.on('close', () => {
+      output.on('close', async () => {
         // 生成签名并嵌入ZIP
         try {
-          const AdmZip = require('adm-zip');
-          const zip = new AdmZip(backupPath);
-          
-          // 计算ZIP内所有文件内容的哈希
-          const entries = zip.getEntries();
+          const unzipper = require('unzipper');
           const crypto = require('crypto');
+          
+          // 使用unzipper读取ZIP内容计算哈希
+          const directory = await unzipper.Open.file(backupPath);
           const contentHash = crypto.createHash('sha256');
-          entries.sort((a, b) => a.entryName.localeCompare(b.entryName));
-          for (const entry of entries) {
-            if (entry.entryName !== '.backup-signature') {
-              contentHash.update(entry.entryName);
-              contentHash.update(entry.getData());
-            }
+          const sortedFiles = directory.files
+            .filter(f => f.path !== '.backup-signature' && f.type === 'File')
+            .sort((a, b) => a.path.localeCompare(b.path));
+          
+          for (const file of sortedFiles) {
+            contentHash.update(file.path);
+            const fileData = await file.buffer();
+            contentHash.update(fileData);
           }
           const contentDigest = contentHash.digest();
           
           const signature = generateBackupSignature(contentDigest);
           if (signature) {
+            const AdmZip = require('adm-zip');
+            const zip = new AdmZip(backupPath);
             zip.addFile('.backup-signature', Buffer.from(signature, 'utf-8'));
             zip.writeZip(backupPath);
           }
