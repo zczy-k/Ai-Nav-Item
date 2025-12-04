@@ -28,10 +28,11 @@ const loginLimiter = rateLimit({
 // 备份操作限流器
 const backupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1小时
-  max: 10, // 限制10次备份操作
+  max: 30, // 限制30次备份操作（放宽限制）
   message: { error: '备份操作过于频繁，请稍后再试' },
   standardHeaders: true,
   legacyHeaders: false,
+  skipFailedRequests: true, // 失败的请求不计入限制
 });
 
 // 文件上传限流器

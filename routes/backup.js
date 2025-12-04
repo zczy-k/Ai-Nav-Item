@@ -173,33 +173,43 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
           const stats = fs.statSync(backupPath);
           const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
           
-          res.json({
-            success: true,
-            message: '备份创建成功',
-            backup: {
-              name: `${backupName}.zip`,
-              path: backupPath,
-              size: `${sizeInMB} MB`,
-              timestamp: new Date().toISOString(),
-              signed
-            }
-          });
+          if (!res.headersSent) {
+            res.json({
+              success: true,
+              message: '备份创建成功',
+              backup: {
+                name: `${backupName}.zip`,
+                path: backupPath,
+                size: `${sizeInMB} MB`,
+                timestamp: new Date().toISOString(),
+                signed
+              }
+            });
+          }
         } catch (err) {
           console.error('备份后处理失败:', err);
-          const stats = fs.statSync(backupPath);
-          const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
-          
-          res.json({
-            success: true,
-            message: '备份创建成功（签名生成失败）',
-            backup: {
-              name: `${backupName}.zip`,
-              path: backupPath,
-              size: `${sizeInMB} MB`,
-              timestamp: new Date().toISOString(),
-              signed: false
+          if (!res.headersSent) {
+            try {
+              const stats = fs.statSync(backupPath);
+              const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
+              res.json({
+                success: true,
+                message: '备份创建成功（签名生成失败）',
+                backup: {
+                  name: `${backupName}.zip`,
+                  path: backupPath,
+                  size: `${sizeInMB} MB`,
+                  timestamp: new Date().toISOString(),
+                  signed: false
+                }
+              });
+            } catch (e) {
+              res.status(500).json({
+                success: false,
+                message: '备份创建失败: ' + err.message
+              });
             }
-          });
+          }
         }
       });
     });
@@ -237,15 +247,17 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
     };
     archive.append(JSON.stringify(backupInfo, null, 2), { name: 'backup-info.json' });
     
-    await archive.finalize();
+    archive.finalize();
     
   } catch (error) {
     console.error('备份创建失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '备份创建失败',
-      error: error.message
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: '备份创建失败',
+        error: error.message
+      });
+    }
   }
 });
 
