@@ -8,7 +8,11 @@ const SALT = 'Con-Nav-Item-WebDAV-Salt';
  * 获取加密密钥
  */
 function getKey() {
-  const secret = process.env.CRYPTO_SECRET || 'default-secret-key-please-change-in-production';
+  const secret = process.env.CRYPTO_SECRET;
+  if (!secret) {
+    console.error('⚠️ 警告: CRYPTO_SECRET未设置，签名验证安全性降低！');
+    throw new Error('CRYPTO_SECRET未配置，无法进行安全加密');
+  }
   return crypto.scryptSync(secret, SALT, 32);
 }
 
@@ -106,7 +110,11 @@ function decryptWebDAVConfig(encryptedConfig) {
  * @returns {string} - HMAC-SHA256 签名
  */
 function generateBackupSignature(data) {
-  const secret = process.env.CRYPTO_SECRET || 'default-secret-key-please-change-in-production';
+  const secret = process.env.CRYPTO_SECRET;
+  if (!secret) {
+    console.error('⚠️ 警告: CRYPTO_SECRET未设置，无法生成安全签名！');
+    return null;
+  }
   const hmac = crypto.createHmac('sha256', secret + SALT);
   hmac.update(data);
   return hmac.digest('hex');

@@ -661,8 +661,8 @@ const executeAction = async () => {
       }
     } else if (action === 'restore') {
       showMessage('正在恢复备份，请稍候...');
-      // 如果备份未签名，跳过签名检查
-      const body = signed ? {} : { skipSignatureCheck: true };
+      // 如果备份未签名，需要用户强制确认
+      const body = signed ? {} : { forceRestore: true };
       const data = await apiRequest(`/api/backup/restore/${filename}`, { 
         method: 'POST',
         body: JSON.stringify(body)
@@ -679,8 +679,28 @@ const executeAction = async () => {
           loadAutoBackupConfig()
         ]);
         showMessage('✓ 恢复完成！数据已更新', 'success', 5000);
-      } else if (data.requireConfirm) {
-        showMessage('✗ ' + data.message, 'error');
+      } else if (data.requireConfirm && data.code === 'NO_SIGNATURE') {
+        // 未签名的备份，需要二次确认
+        if (confirm(data.message + '\n\n点击"确定"继续恢复，点击"取消"放弃操作。')) {
+          // 用户确认后，使用forceRestore参数重新请求
+          const retryData = await apiRequest(`/api/backup/restore/${filename}`, { 
+            method: 'POST',
+            body: JSON.stringify({ forceRestore: true })
+          });
+          if (retryData.success) {
+            showMessage('✓ 备份已恢复，正在重新加载数据...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await Promise.all([
+              loadBackupList(),
+              loadWebdavConfig(),
+              loadWebdavBackupList(),
+              loadAutoBackupConfig()
+            ]);
+            showMessage('✓ 恢复完成！数据已更新', 'success', 5000);
+          } else {
+            showMessage('✗ ' + (retryData.message || '恢复失败'), 'error');
+          }
+        }
       } else {
         showMessage('✗ ' + (data.message || '恢复失败'), 'error');
       }

@@ -127,20 +127,34 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
       zlib: { level: 9 }
     });
     
-    output.on('close', () => {
+    output.on('close', async () => {
       // 确保文件完全写入并刷新文件系统缓存
-      setImmediate(() => {
+      setImmediate(async () => {
         try {
           // 强制同步文件系统
           const fd = fs.openSync(backupPath, 'r');
           fs.fsyncSync(fd);
           fs.closeSync(fd);
           
-          // 生成备份签名
+          // 生成备份签名并嵌入ZIP内部
           const backupData = fs.readFileSync(backupPath);
           const signature = generateBackupSignature(backupData);
-          const sigPath = backupPath.replace('.zip', '.sig');
-          fs.writeFileSync(sigPath, signature);
+          let signed = false;
+          
+          if (signature) {
+            // 将签名追加到ZIP文件内部
+            const AdmZip = require('adm-zip');
+            const zip = new AdmZip(backupPath);
+            zip.addFile('.backup-signature', Buffer.from(signature, 'utf-8'));
+            zip.writeZip(backupPath);
+            signed = true;
+            
+            // 同时保存外部签名文件（兼容旧版本）
+            const sigPath = backupPath.replace('.zip', '.sig');
+            fs.writeFileSync(sigPath, signature);
+          } else {
+            console.warn('⚠️ 无法生成签名: CRYPTO_SECRET未配置');
+          }
           
           const stats = fs.statSync(backupPath);
           const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
@@ -153,7 +167,7 @@ router.post('/create', authMiddleware, backupLimiter, async (req, res) => {
               path: backupPath,
               size: `${sizeInMB} MB`,
               timestamp: new Date().toISOString(),
-              signed: true
+              signed
             }
           });
         } catch (err) {
@@ -237,14 +251,26 @@ router.get('/list', authMiddleware, (req, res) => {
       .filter(file => file.endsWith('.zip'))
       .map(file => {
         const filePath = path.join(backupDir, file);
-        const sigPath = filePath.replace('.zip', '.sig');
         const stats = fs.statSync(filePath);
+        
+        // 检查签名：优先检查ZIP内部，其次检查外部.sig文件
+        let signed = false;
+        try {
+          const AdmZip = require('adm-zip');
+          const zip = new AdmZip(filePath);
+          signed = zip.getEntry('.backup-signature') !== null;
+        } catch (e) {
+          // ZIP读取失败，检查外部签名文件
+          const sigPath = filePath.replace('.zip', '.sig');
+          signed = fs.existsSync(sigPath);
+        }
+        
         return {
           name: file,
           size: `${(stats.size / (1024 * 1024)).toFixed(2)} MB`,
           created: stats.birthtime.toISOString(),
           modified: stats.mtime.toISOString(),
-          signed: fs.existsSync(sigPath)
+          signed
         };
       })
       .sort((a, b) => new Date(b.created) - new Date(a.created));
@@ -391,6 +417,68 @@ router.post('/upload', authMiddleware, backupLimiter, upload.single('backup'), (
 
     const stats = fs.statSync(req.file.path);
     const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
+    
+    // 验证上传的备份文件
+    let signed = false;
+    let signatureValid = false;
+    let warning = null;
+    
+    try {
+      const backupData = fs.readFileSync(req.file.path);
+      
+      // 检查是否是ZIP文件
+      if (!backupData.slice(0, 4).equals(Buffer.from([0x50, 0x4B, 0x03, 0x04]))) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({
+          success: false,
+          message: '上传的文件不是有效的ZIP格式'
+        });
+      }
+      
+      // 检查文件大小限制（防止ZIP炸弹）
+      if (stats.size > 500 * 1024 * 1024) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({
+          success: false,
+          message: '备份文件过大（超过500MB）'
+        });
+      }
+      
+      // 检查ZIP内部是否有签名
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(req.file.path);
+      const sigEntry = zip.getEntry('.backup-signature');
+      
+      if (sigEntry) {
+        signed = true;
+        const signature = zip.readAsText(sigEntry).trim();
+        try {
+          signatureValid = verifyBackupSignature(backupData, signature);
+          if (signatureValid) {
+            warning = null; // 签名有效，无警告
+          } else {
+            // 签名验证失败，直接拒绝上传
+            fs.unlinkSync(req.file.path);
+            return res.status(403).json({
+              success: false,
+              message: '🚫 备份文件签名验证失败！\n\n此备份文件包含签名，但签名验证未通过。可能原因：\n1. 文件在下载后被修改或损坏\n2. 文件来自其他服务器（使用不同的密钥）\n3. 文件被恶意篡改\n\n为了数据安全，系统拒绝上传此文件。'
+            });
+          }
+        } catch (e) {
+          // 签名验证异常，直接拒绝上传
+          fs.unlinkSync(req.file.path);
+          return res.status(403).json({
+            success: false,
+            message: '🚫 备份文件签名验证失败\n\n错误详情: ' + e.message + '\n\n可能原因：\n1. 签名格式损坏\n2. 加密密钥不匹配\n3. 文件结构异常\n\n为了数据安全，系统拒绝上传此文件。'
+          });
+        }
+      } else {
+        warning = '⚠️ 上传的备份文件没有签名，恢复时需要手动确认';
+      }
+    } catch (err) {
+      console.error('验证上传文件失败:', err);
+      warning = '⚠️ 无法验证备份文件完整性';
+    }
 
     res.json({
       success: true,
@@ -398,11 +486,24 @@ router.post('/upload', authMiddleware, backupLimiter, upload.single('backup'), (
       backup: {
         name: req.file.filename,
         size: `${sizeInMB} MB`,
-        path: req.file.path
+        path: req.file.path,
+        signed,
+        signatureValid,
+        warning
       }
     });
   } catch (error) {
     console.error('上传备份失败:', error);
+    
+    // 清理上传的文件
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (e) {
+        // 忽略清理失败
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: '上传备份失败',
@@ -415,28 +516,64 @@ router.post('/upload', authMiddleware, backupLimiter, upload.single('backup'), (
 router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res) => {
   try {
     const { filename } = req.params;
-    const { skipEnv = true, skipSignatureCheck = false } = req.body; // 默认跳过.env文件
+    const { skipEnv = true, forceRestore = false } = req.body; // 默认跳过.env文件
     const filePath = validateBackupFile(filename, res);
     if (!filePath) return;
 
-    // 验证备份签名（如果存在签名文件）
-    const sigPath = filePath.replace('.zip', '.sig');
-    if (fs.existsSync(sigPath) && !skipSignatureCheck) {
-      const backupData = fs.readFileSync(filePath);
-      const signature = fs.readFileSync(sigPath, 'utf-8').trim();
-      try {
-        if (!verifyBackupSignature(backupData, signature)) {
-          return res.status(400).json({
-            success: false,
-            message: '备份文件签名验证失败，文件可能已被篡改',
-            requireConfirm: true
-          });
-        }
-      } catch (sigError) {
+    // 强制验证备份签名
+    const backupData = fs.readFileSync(filePath);
+    let signature = null;
+    
+    // 1. 优先从ZIP内部读取签名
+    try {
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(filePath);
+      const sigEntry = zip.getEntry('.backup-signature');
+      if (sigEntry) {
+        signature = zip.readAsText(sigEntry).trim();
+      }
+    } catch (e) {
+      console.warn('无法从ZIP内部读取签名:', e.message);
+    }
+    
+    // 2. 如果ZIP内部没有，尝试读取外部.sig文件（兼容旧版本）
+    if (!signature) {
+      const sigPath = filePath.replace('.zip', '.sig');
+      if (fs.existsSync(sigPath)) {
+        signature = fs.readFileSync(sigPath, 'utf-8').trim();
+      }
+    }
+    
+    // 3. 验证签名
+    if (!signature) {
+      // 没有签名，需要用户确认
+      if (!forceRestore) {
         return res.status(400).json({
           success: false,
-          message: '备份文件签名验证失败: ' + sigError.message,
+          message: '⚠️ 此备份文件没有签名，可能不是由本系统创建或已被篡改。是否仍要恢复？',
+          code: 'NO_SIGNATURE',
           requireConfirm: true
+        });
+      }
+      console.warn(`⚠️ 用户强制恢复未签名的备份: ${filename}`);
+    } else {
+      // 有签名，必须验证通过
+      try {
+        if (!verifyBackupSignature(backupData, signature)) {
+          return res.status(403).json({
+            success: false,
+            message: '🚫 备份文件签名验证失败！文件已被篡改，拒绝恢复。',
+            code: 'SIGNATURE_INVALID',
+            requireConfirm: false
+          });
+        }
+        console.log(`✓ 备份签名验证通过: ${filename}`);
+      } catch (sigError) {
+        return res.status(403).json({
+          success: false,
+          message: '🚫 备份文件签名验证失败: ' + sigError.message,
+          code: 'SIGNATURE_ERROR',
+          requireConfirm: false
         });
       }
     }
@@ -493,8 +630,32 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
         });
     });
 
-    // 2. 覆盖文件（保护关键配置）
+    // 2. 安全验证：检查备份内容
     const backupContents = fs.readdirSync(tempDir);
+    
+    // 验证备份结构：只允许特定的目录和文件
+    const allowedItems = ['database', 'config', '.env', 'backup-info.json'];
+    for (const item of backupContents) {
+      if (!allowedItems.includes(item)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        return res.status(400).json({
+          success: false,
+          message: `备份文件包含非法内容: ${item}，恢复已取消`
+        });
+      }
+      
+      // 检查路径遍历攻击
+      const sourcePath = path.join(tempDir, item);
+      if (!isPathSafe(tempDir, sourcePath)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        return res.status(400).json({
+          success: false,
+          message: '检测到路径遍历攻击，恢复已取消'
+        });
+      }
+    }
+
+    // 3. 覆盖文件（保护关键配置）
     const skippedFiles = [];
     const restoredFiles = [];
 
@@ -799,11 +960,21 @@ router.post('/webdav/backup', authMiddleware, async (req, res) => {
             fs.fsyncSync(fd);
             fs.closeSync(fd);
             
-            // 生成备份签名
+            // 生成备份签名并嵌入ZIP内部
             const backupData = fs.readFileSync(backupPath);
             const signature = generateBackupSignature(backupData);
-            const sigPath = backupPath.replace('.zip', '.sig');
-            fs.writeFileSync(sigPath, signature);
+            if (signature) {
+              const AdmZip = require('adm-zip');
+              const zip = new AdmZip(backupPath);
+              zip.addFile('.backup-signature', Buffer.from(signature, 'utf-8'));
+              zip.writeZip(backupPath);
+              
+              // 同时保存外部签名文件（兼容旧版本）
+              const sigPath = backupPath.replace('.zip', '.sig');
+              fs.writeFileSync(sigPath, signature);
+            } else {
+              console.warn('⚠️ WebDAV备份无法生成签名: CRYPTO_SECRET未配置');
+            }
             
             resolve();
           } catch (err) {
@@ -1011,6 +1182,35 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
     // 保存到临时文件
     const tempPath = path.join(__dirname, '..', `temp-webdav-${Date.now()}.zip`);
     fs.writeFileSync(tempPath, fileBuffer);
+    
+    // 验证WebDAV下载的备份文件
+    try {
+      // 检查是否是ZIP文件
+      if (!fileBuffer.slice(0, 4).equals(Buffer.from([0x50, 0x4B, 0x03, 0x04]))) {
+        fs.unlinkSync(tempPath);
+        return res.status(400).json({
+          success: false,
+          message: 'WebDAV上的文件不是有效的ZIP格式'
+        });
+      }
+      
+      // 检查文件大小
+      if (fileBuffer.length > 500 * 1024 * 1024) {
+        fs.unlinkSync(tempPath);
+        return res.status(400).json({
+          success: false,
+          message: '备份文件过大（超过500MB）'
+        });
+      }
+      
+      console.log(`⚠️ WebDAV备份恢复: ${filename} (无法验证签名，WebDAV不存储签名文件)`);
+    } catch (err) {
+      fs.unlinkSync(tempPath);
+      return res.status(400).json({
+        success: false,
+        message: '备份文件验证失败: ' + err.message
+      });
+    }
     
     // 解压并恢复
     const tempDir = path.join(__dirname, '..', `temp-restore-${Date.now()}`);
