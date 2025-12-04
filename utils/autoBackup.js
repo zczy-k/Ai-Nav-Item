@@ -3,7 +3,7 @@ const path = require('path');
 const archiver = require('archiver');
 const schedule = require('node-schedule');
 const { createClient } = require('webdav');
-const { decryptWebDAVConfig } = require('./crypto');
+const { decryptWebDAVConfig, generateBackupSignature } = require('./crypto');
 
 // 配置文件路径
 const CONFIG_PATH = path.join(__dirname, '..', 'config', 'autoBackup.json');
@@ -101,6 +101,33 @@ async function createBackupFile(prefix = 'auto') {
       const archive = archiver('zip', { zlib: { level: 9 } });
       
       output.on('close', () => {
+        // 生成签名并嵌入ZIP
+        try {
+          const AdmZip = require('adm-zip');
+          const zip = new AdmZip(backupPath);
+          
+          // 计算ZIP内所有文件内容的哈希
+          const entries = zip.getEntries();
+          const crypto = require('crypto');
+          const contentHash = crypto.createHash('sha256');
+          entries.sort((a, b) => a.entryName.localeCompare(b.entryName));
+          for (const entry of entries) {
+            if (entry.entryName !== '.backup-signature') {
+              contentHash.update(entry.entryName);
+              contentHash.update(entry.getData());
+            }
+          }
+          const contentDigest = contentHash.digest();
+          
+          const signature = generateBackupSignature(contentDigest);
+          if (signature) {
+            zip.addFile('.backup-signature', Buffer.from(signature, 'utf-8'));
+            zip.writeZip(backupPath);
+          }
+        } catch (sigErr) {
+          console.warn('[自动备份] 签名生成失败:', sigErr.message);
+        }
+        
         const stats = fs.statSync(backupPath);
         const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
         resolve({
