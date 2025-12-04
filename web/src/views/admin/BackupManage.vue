@@ -384,9 +384,9 @@
         <h3>确认{{ dialog.title }}</h3>
         <p style="white-space: pre-line;">{{ dialog.message }}</p>
         <div class="modal-actions">
-          <button class="btn btn-secondary" @click="dialog.show = false" :disabled="loading.restore || loading.delete">取消</button>
-          <button :class="['btn', dialog.confirmClass]" @click="executeAction" :disabled="loading.restore || loading.delete">
-            {{ (loading.restore || loading.delete) ? '处理中...' : '确认' }}
+          <button class="btn btn-secondary" @click="dialog.show = false" :disabled="dialog.processing">取消</button>
+          <button :class="['btn', dialog.confirmClass]" @click="executeAction" :disabled="dialog.processing">
+            {{ dialog.processing ? '处理中...' : '确认' }}
           </button>
         </div>
       </div>
@@ -479,7 +479,8 @@ const dialog = reactive({
   title: '',
   message: '',
   confirmClass: '',
-  signed: true
+  signed: true,
+  processing: false
 });
 
 const webdavConfig = reactive({
@@ -616,6 +617,7 @@ const confirmAction = (action, backupOrFilename) => {
   dialog.filename = filename;
   dialog.action = action;
   dialog.signed = backup.signed;
+  dialog.processing = false; // 重置处理状态
   
   if (action === 'delete') {
     dialog.title = '删除';
@@ -642,52 +644,52 @@ const confirmAction = (action, backupOrFilename) => {
 
 const executeAction = async () => {
   const { action, filename, signed } = dialog;
+  dialog.processing = true;
 
-  if (action === 'delete') {
-    loading.delete = true;
-    dialog.show = false;
-    const data = await apiRequest(`/api/backup/delete/${filename}`, { method: 'DELETE' });
-    if (data.success) {
-      showMessage('✓ 删除成功！');
-      await loadBackupList();
-    } else {
-      showMessage(data.message || '删除失败', 'error');
+  try {
+    if (action === 'delete') {
+      const data = await apiRequest(`/api/backup/delete/${filename}`, { method: 'DELETE' });
+      dialog.show = false;
+      if (data.success) {
+        showMessage('✓ 删除成功！');
+        await loadBackupList();
+      } else {
+        showMessage(data.message || '删除失败', 'error');
+      }
+    } else if (action === 'restore') {
+      // 如果备份未签名，跳过签名检查
+      const body = signed ? {} : { skipSignatureCheck: true };
+      const data = await apiRequest(`/api/backup/restore/${filename}`, { 
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      dialog.show = false;
+      if (data.success) {
+        showMessage('✓ 恢复成功！正在刷新数据...');
+        // 等待一小段时间让服务器文件系统同步
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // 恢复成功后刷新所有相关数据
+        await Promise.all([
+          loadBackupList(),
+          loadWebdavConfig(),
+          loadWebdavBackupList(),
+          loadAutoBackupConfig()
+        ]);
+        showMessage('✓ 恢复成功！所有数据已更新', 'success', 5000);
+      } else if (data.requireConfirm) {
+        showMessage(data.message, 'error');
+      } else {
+        showMessage(data.message || '恢复失败', 'error');
+      }
+    } else if (action === 'webdav-restore') {
+      dialog.show = false;
+      await restoreFromWebdav(filename);
+    } else if (action === 'webdav-delete') {
+      dialog.show = false;
+      await deleteWebdavBackup(filename);
     }
-    loading.delete = false;
-  } else if (action === 'restore') {
-    loading.restore = true;
-    // 如果备份未签名，跳过签名检查
-    const body = signed ? {} : { skipSignatureCheck: true };
-    const data = await apiRequest(`/api/backup/restore/${filename}`, { 
-      method: 'POST',
-      body: JSON.stringify(body)
-    });
-    dialog.show = false;
-    if (data.success) {
-      showMessage('✓ 恢复成功！正在刷新数据...');
-      // 等待一小段时间让服务器文件系统同步
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // 恢复成功后刷新所有相关数据
-      await Promise.all([
-        loadBackupList(),
-        loadWebdavConfig(),
-        loadWebdavBackupList(),
-        loadAutoBackupConfig()
-      ]);
-      showMessage('✓ 恢复成功！所有数据已更新', 'success', 5000);
-    } else if (data.requireConfirm) {
-      // 签名验证失败，需要用户确认
-      showMessage(data.message, 'error');
-    } else {
-      showMessage(data.message || '恢复失败', 'error');
-    }
-    loading.restore = false;
-  } else if (action === 'webdav-restore') {
-    dialog.show = false;
-    await restoreFromWebdav(filename);
-  } else if (action === 'webdav-delete') {
-    dialog.show = false;
-    await deleteWebdavBackup(filename);
+  } finally {
+    dialog.processing = false;
   }
 };
 
