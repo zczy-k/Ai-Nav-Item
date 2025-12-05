@@ -288,7 +288,11 @@ async function addToSpecificCategory(menuItemId, url, title) {
         if (!response.ok) {
             if (response.status === 401) {
                 await chrome.storage.local.remove(['navAuthToken']);
-                showNotification('登录已过期', '请重新登录');
+                showNotification('登录已过期', '正在打开登录页面...');
+                // 打开登录页面并传递当前要添加的URL
+                const bookmarksUrl = chrome.runtime.getURL('bookmarks.html') + 
+                    `?addToNav=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`;
+                chrome.tabs.create({ url: bookmarksUrl });
                 return;
             }
             throw new Error('添加失败');
@@ -351,7 +355,11 @@ async function quickAddToNav(url, title) {
         if (!response.ok) {
             if (response.status === 401) {
                 await chrome.storage.local.remove(['navAuthToken']);
-                showNotification('登录已过期', '请重新登录');
+                showNotification('登录已过期', '正在打开登录页面...');
+                // 打开登录页面并传递当前要添加的URL
+                const bookmarksUrl = chrome.runtime.getURL('bookmarks.html') + 
+                    `?addToNav=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`;
+                chrome.tabs.create({ url: bookmarksUrl });
                 return;
             }
             throw new Error('添加失败');
