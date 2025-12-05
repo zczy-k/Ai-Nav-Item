@@ -40,22 +40,24 @@
                     position: fixed;
                     z-index: 2147483647;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                    transition: opacity 0.3s ease, transform 0.3s ease;
+                    transition: transform 0.3s ease;
                 }
                 
-                #nav-float-container.auto-hide {
-                    opacity: 0.3;
-                    transform: scale(0.8);
+                #nav-float-container.collapsed-right {
+                    transform: translateX(36px);
                 }
                 
-                #nav-float-container.auto-hide:hover {
-                    opacity: 1;
-                    transform: scale(1);
+                #nav-float-container.collapsed-left {
+                    transform: translateX(-36px);
+                }
+                
+                #nav-float-container.collapsed-right:hover,
+                #nav-float-container.collapsed-left:hover {
+                    transform: translateX(0);
                 }
                 
                 #nav-float-container.dragging {
                     transition: none;
-                    opacity: 0.8;
                 }
                 
                 #nav-float-btn {
@@ -273,25 +275,37 @@
             }
         });
         
-        // 自动隐藏功能
+        // 判断按钮在屏幕左侧还是右侧
+        function isOnRightSide() {
+            const rect = container.getBoundingClientRect();
+            return rect.left > window.innerWidth / 2;
+        }
+        
+        // 自动折叠功能
         function startAutoHideTimer() {
             clearTimeout(autoHideTimer);
             autoHideTimer = setTimeout(() => {
                 if (!menuVisible && !isDragging) {
-                    container.classList.add('auto-hide');
+                    // 根据位置决定折叠方向
+                    container.classList.remove('collapsed-left', 'collapsed-right');
+                    if (isOnRightSide()) {
+                        container.classList.add('collapsed-right');
+                    } else {
+                        container.classList.add('collapsed-left');
+                    }
                 }
-            }, 3000); // 3秒后自动隐藏
+            }, 3000); // 3秒后自动折叠
         }
         
         function cancelAutoHide() {
             clearTimeout(autoHideTimer);
-            container.classList.remove('auto-hide');
+            container.classList.remove('collapsed-left', 'collapsed-right');
         }
         
         container.addEventListener('mouseenter', cancelAutoHide);
         container.addEventListener('mouseleave', startAutoHideTimer);
         
-        // 初始启动自动隐藏计时器
+        // 初始启动自动折叠计时器
         startAutoHideTimer();
         
         // 拖动功能
