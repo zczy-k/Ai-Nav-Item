@@ -40,20 +40,6 @@
                     position: fixed;
                     z-index: 2147483647;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                    transition: transform 0.3s ease;
-                }
-                
-                #nav-float-container.collapsed-right {
-                    transform: translateX(36px);
-                }
-                
-                #nav-float-container.collapsed-left {
-                    transform: translateX(-36px);
-                }
-                
-                #nav-float-container.collapsed-right:hover,
-                #nav-float-container.collapsed-left:hover {
-                    transform: translateX(0);
                 }
                 
                 #nav-float-container.dragging {
@@ -83,6 +69,36 @@
                 #nav-float-btn:hover {
                     transform: scale(1.1);
                     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+                }
+                
+                /* 折叠状态 - 变成贴边小条 */
+                #nav-float-container.collapsed #nav-float-btn {
+                    width: 8px;
+                    height: 60px;
+                    border-radius: 4px 0 0 4px;
+                    box-shadow: -2px 0 8px rgba(102, 126, 234, 0.3);
+                    opacity: 0.6;
+                }
+                
+                #nav-float-container.collapsed-left #nav-float-btn {
+                    border-radius: 0 4px 4px 0;
+                    box-shadow: 2px 0 8px rgba(102, 126, 234, 0.3);
+                }
+                
+                #nav-float-container.collapsed #nav-float-btn svg {
+                    display: none;
+                }
+                
+                #nav-float-container.collapsed #nav-float-btn:hover {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
+                    opacity: 1;
+                    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+                }
+                
+                #nav-float-container.collapsed #nav-float-btn:hover svg {
+                    display: block;
                 }
                 
                 #nav-float-btn:active {
@@ -287,10 +303,9 @@
             autoHideTimer = setTimeout(() => {
                 if (!menuVisible && !isDragging) {
                     // 根据位置决定折叠方向
-                    container.classList.remove('collapsed-left', 'collapsed-right');
-                    if (isOnRightSide()) {
-                        container.classList.add('collapsed-right');
-                    } else {
+                    container.classList.remove('collapsed', 'collapsed-left');
+                    container.classList.add('collapsed');
+                    if (!isOnRightSide()) {
                         container.classList.add('collapsed-left');
                     }
                 }
@@ -299,7 +314,7 @@
         
         function cancelAutoHide() {
             clearTimeout(autoHideTimer);
-            container.classList.remove('collapsed-left', 'collapsed-right');
+            container.classList.remove('collapsed', 'collapsed-left');
         }
         
         container.addEventListener('mouseenter', cancelAutoHide);
