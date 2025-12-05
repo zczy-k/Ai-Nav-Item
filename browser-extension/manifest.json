@@ -10,7 +10,8 @@
     "history",
     "contextMenus",
     "notifications",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "http://*/",

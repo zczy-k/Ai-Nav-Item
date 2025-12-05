@@ -198,6 +198,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     try {
         let url = info.linkUrl || tab?.url || info.pageUrl;
         let title = info.linkText || tab?.title || '';
+        const tabId = tab?.id;
         
         if (!url) {
             console.warn('无法获取URL');
@@ -213,7 +214,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         
         // 快速添加（使用上次分类）
         if (info.menuItemId === 'nav_quick_add') {
-            await quickAddToNav(url, title);
+            await quickAddToNav(url, title, tabId);
             return;
         }
         
@@ -227,7 +228,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         
         // 添加到指定分类
         if (info.menuItemId.startsWith('nav_menu_') || info.menuItemId.startsWith('nav_submenu_')) {
-            await addToSpecificCategory(info.menuItemId, url, title);
+            await addToSpecificCategory(info.menuItemId, url, title, tabId);
             return;
         }
     } catch (e) {
@@ -237,7 +238,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // 添加到指定分类
-async function addToSpecificCategory(menuItemId, url, title) {
+async function addToSpecificCategory(menuItemId, url, title, tabId = null) {
     try {
         let menuId, subMenuId = null;
         
@@ -270,7 +271,7 @@ async function addToSpecificCategory(menuItemId, url, title) {
         const navServerUrl = config.navUrl.replace(/\/$/, '');
         
         // 构建卡片数据（包含自动生成的标签和描述）
-        const card = await buildCardData(url, title, navServerUrl, token);
+        const card = await buildCardData(url, title, navServerUrl, token, tabId);
         
         const response = await fetch(`${navServerUrl}/api/batch/add`, {
             method: 'POST',
@@ -315,7 +316,7 @@ async function addToSpecificCategory(menuItemId, url, title) {
 }
 
 // 快速添加（使用上次分类）
-async function quickAddToNav(url, title) {
+async function quickAddToNav(url, title, tabId = null) {
     try {
         const config = await chrome.storage.sync.get(['navUrl', 'lastMenuId', 'lastSubMenuId']);
         const token = (await chrome.storage.local.get(['navAuthToken'])).navAuthToken;
@@ -337,7 +338,7 @@ async function quickAddToNav(url, title) {
         const navServerUrl = config.navUrl.replace(/\/$/, '');
         
         // 构建卡片数据（包含自动生成的标签和描述）
-        const card = await buildCardData(url, title, navServerUrl, token);
+        const card = await buildCardData(url, title, navServerUrl, token, tabId);
         
         const response = await fetch(`${navServerUrl}/api/batch/add`, {
             method: 'POST',
@@ -423,64 +424,208 @@ function generateDescription(title, domain) {
     return truncateText(desc, 100);
 }
 
-// 自动生成标签名称
-function generateTagNames(url, title) {
-    const tags = [];
+// 智能标签分析 - 扩展的域名映射
+const DOMAIN_TAG_MAP = {
+    // 开发技术
+    'github.com': '开发', 'gitlab.com': '开发', 'bitbucket.org': '开发',
+    'stackoverflow.com': '技术', 'stackexchange.com': '技术',
+    'npmjs.com': '开发', 'pypi.org': '开发', 'maven.org': '开发',
+    'docker.com': '开发', 'kubernetes.io': '开发',
+    'juejin.cn': '技术', 'csdn.net': '技术', 'cnblogs.com': '技术',
+    'segmentfault.com': '技术', 'oschina.net': '技术', 'gitee.com': '开发',
+    'dev.to': '技术', 'hashnode.com': '技术', 'hackernews.com': '技术',
+    'codepen.io': '开发', 'jsfiddle.net': '开发', 'codesandbox.io': '开发',
+    
+    // 视频娱乐
+    'youtube.com': '视频', 'bilibili.com': '视频', 'youku.com': '视频',
+    'iqiyi.com': '视频', 'v.qq.com': '视频', 'twitch.tv': '直播',
+    'douyu.com': '直播', 'huya.com': '直播', 'netflix.com': '影视',
+    'disneyplus.com': '影视', 'hbomax.com': '影视', 'primevideo.com': '影视',
+    
+    // 社交媒体
+    'twitter.com': '社交', 'x.com': '社交', 'facebook.com': '社交',
+    'instagram.com': '社交', 'linkedin.com': '职场', 'weibo.com': '社交',
+    'douban.com': '社区', 'xiaohongshu.com': '社交', 'tiktok.com': '短视频',
+    'reddit.com': '社区', 'v2ex.com': '社区', 'discord.com': '社区',
+    'telegram.org': '通讯', 'slack.com': '协作',
+    
+    // 购物电商
+    'taobao.com': '购物', 'tmall.com': '购物', 'jd.com': '购物',
+    'amazon.com': '购物', 'amazon.cn': '购物', 'ebay.com': '购物',
+    'pinduoduo.com': '购物', 'suning.com': '购物', 'dangdang.com': '购物',
+    
+    // 知识学习
+    'zhihu.com': '问答', 'quora.com': '问答', 'wikipedia.org': '百科',
+    'baike.baidu.com': '百科', 'coursera.org': '学习', 'udemy.com': '学习',
+    'edx.org': '学习', 'mooc.cn': '学习', 'icourse163.org': '学习',
+    'khan.academy': '学习', 'leetcode.com': '刷题', 'hackerrank.com': '刷题',
+    
+    // 设计创意
+    'figma.com': '设计', 'sketch.com': '设计', 'canva.com': '设计',
+    'dribbble.com': '设计', 'behance.net': '设计', 'pinterest.com': '灵感',
+    'unsplash.com': '图片', 'pexels.com': '图片', 'pixabay.com': '图片',
+    
+    // 工具效率
+    'notion.so': '笔记', 'evernote.com': '笔记', 'onenote.com': '笔记',
+    'trello.com': '项目', 'asana.com': '项目', 'jira.atlassian.com': '项目',
+    'google.com': '搜索', 'baidu.com': '搜索', 'bing.com': '搜索',
+    'translate.google.com': '翻译', 'deepl.com': '翻译',
+    
+    // 音乐音频
+    'spotify.com': '音乐', 'music.163.com': '音乐', 'music.qq.com': '音乐',
+    'kugou.com': '音乐', 'kuwo.cn': '音乐', 'soundcloud.com': '音乐',
+    
+    // 新闻资讯
+    'news.qq.com': '新闻', 'news.sina.com.cn': '新闻', 'thepaper.cn': '新闻',
+    'bbc.com': '新闻', 'cnn.com': '新闻', 'reuters.com': '新闻',
+    '36kr.com': '科技', 'techcrunch.com': '科技', 'wired.com': '科技',
+    
+    // 云服务
+    'aws.amazon.com': '云服务', 'cloud.google.com': '云服务',
+    'azure.microsoft.com': '云服务', 'aliyun.com': '云服务',
+    'cloud.tencent.com': '云服务', 'huaweicloud.com': '云服务',
+    
+    // AI工具
+    'openai.com': 'AI', 'chat.openai.com': 'AI', 'claude.ai': 'AI',
+    'bard.google.com': 'AI', 'midjourney.com': 'AI', 'stability.ai': 'AI',
+    'huggingface.co': 'AI', 'replicate.com': 'AI'
+};
+
+// 路径关键词映射
+const PATH_KEYWORDS = {
+    '/doc': '文档', '/docs': '文档', '/documentation': '文档',
+    '/api': 'API', '/reference': '参考',
+    '/blog': '博客', '/article': '文章', '/post': '文章',
+    '/news': '新闻', '/press': '新闻',
+    '/tool': '工具', '/tools': '工具', '/utility': '工具',
+    '/download': '下载', '/release': '下载',
+    '/learn': '学习', '/tutorial': '教程', '/guide': '指南', '/course': '课程',
+    '/video': '视频', '/watch': '视频',
+    '/shop': '购物', '/store': '商店', '/product': '产品',
+    '/forum': '论坛', '/community': '社区', '/discuss': '讨论',
+    '/dashboard': '控制台', '/admin': '管理', '/console': '控制台',
+    '/pricing': '定价', '/plan': '方案',
+    '/about': '关于', '/contact': '联系',
+    '/login': '登录', '/signup': '注册', '/auth': '认证'
+};
+
+// 标题/内容关键词映射（中英文）
+const CONTENT_KEYWORDS = {
+    // 技术开发
+    '文档': '文档', 'documentation': '文档', 'docs': '文档',
+    'api': 'API', '接口': 'API',
+    '教程': '教程', 'tutorial': '教程', 'guide': '指南',
+    '工具': '工具', 'tool': '工具', 'utility': '工具',
+    '官网': '官网', 'official': '官网', 'home': '首页',
+    '开源': '开源', 'open source': '开源', 'opensource': '开源',
+    '框架': '框架', 'framework': '框架',
+    '库': '库', 'library': '库',
+    '插件': '插件', 'plugin': '插件', 'extension': '扩展',
+    
+    // 内容类型
+    '视频': '视频', 'video': '视频', 'watch': '视频',
+    '音乐': '音乐', 'music': '音乐', 'song': '音乐',
+    '图片': '图片', 'image': '图片', 'photo': '图片', 'gallery': '图库',
+    '新闻': '新闻', 'news': '新闻', '资讯': '资讯',
+    '博客': '博客', 'blog': '博客',
+    '论坛': '论坛', 'forum': '论坛', 'bbs': '论坛',
+    
+    // 功能类型
+    '下载': '下载', 'download': '下载',
+    '在线': '在线', 'online': '在线',
+    '免费': '免费', 'free': '免费',
+    '登录': '登录', 'login': '登录', 'signin': '登录',
+    '注册': '注册', 'register': '注册', 'signup': '注册',
+    
+    // AI相关
+    'ai': 'AI', '人工智能': 'AI', 'artificial intelligence': 'AI',
+    'chatgpt': 'AI', 'gpt': 'AI', 'llm': 'AI',
+    '机器学习': 'AI', 'machine learning': 'AI', 'ml': 'AI',
+    '深度学习': 'AI', 'deep learning': 'AI',
+    
+    // 其他
+    '游戏': '游戏', 'game': '游戏', 'gaming': '游戏',
+    '电影': '影视', 'movie': '影视', 'film': '影视',
+    '购物': '购物', 'shop': '购物', 'store': '商店', 'buy': '购物',
+    '学习': '学习', 'learn': '学习', 'course': '课程', 'education': '教育'
+};
+
+// 智能生成标签名称
+function generateTagNames(url, title, description = '', keywords = '') {
+    const tags = new Set();
     
     try {
         const urlObj = new URL(url);
         const domain = urlObj.hostname.replace(/^www\./, '');
         const pathname = urlObj.pathname.toLowerCase();
+        const fullText = `${title} ${description} ${keywords}`.toLowerCase();
         
-        const domainTagMap = {
-            'github.com': '开发', 'gitlab.com': '开发', 'stackoverflow.com': '技术',
-            'youtube.com': '视频', 'bilibili.com': '视频', 'zhihu.com': '问答',
-            'juejin.cn': '技术', 'csdn.net': '技术', 'cnblogs.com': '技术',
-            'medium.com': '博客', 'dev.to': '技术', 'twitter.com': '社交',
-            'x.com': '社交', 'facebook.com': '社交', 'linkedin.com': '职场',
-            'reddit.com': '社区', 'v2ex.com': '社区', 'taobao.com': '购物',
-            'jd.com': '购物', 'amazon.com': '购物', 'douban.com': '影视',
-            'netflix.com': '影视', 'spotify.com': '音乐', 'wikipedia.org': '百科',
-            'notion.so': '工具', 'figma.com': '设计', 'dribbble.com': '设计',
-            'google.com': '搜索', 'baidu.com': '搜索', 'bing.com': '搜索'
-        };
-        
-        for (const [site, tag] of Object.entries(domainTagMap)) {
-            if (domain.includes(site)) {
-                tags.push(tag);
+        // 1. 域名匹配（精确匹配）
+        for (const [site, tag] of Object.entries(DOMAIN_TAG_MAP)) {
+            if (domain === site || domain.endsWith('.' + site)) {
+                tags.add(tag);
                 break;
             }
         }
         
-        const pathKeywords = {
-            '/doc': '文档', '/docs': '文档', '/api': 'API', '/blog': '博客',
-            '/news': '新闻', '/tool': '工具', '/download': '下载', '/learn': '学习'
-        };
-        
-        for (const [path, tag] of Object.entries(pathKeywords)) {
-            if (pathname.includes(path) && !tags.includes(tag)) {
-                tags.push(tag);
-                break;
-            }
-        }
-        
-        if (title) {
-            const titleLower = title.toLowerCase();
-            const titleKeywords = {
-                '文档': '文档', 'doc': '文档', 'api': 'API', '教程': '教程',
-                '工具': '工具', 'tool': '工具', '官网': '官网'
-            };
-            
-            for (const [keyword, tag] of Object.entries(titleKeywords)) {
-                if (titleLower.includes(keyword) && !tags.includes(tag)) {
-                    tags.push(tag);
+        // 2. 域名包含匹配（模糊匹配）
+        if (tags.size === 0) {
+            for (const [site, tag] of Object.entries(DOMAIN_TAG_MAP)) {
+                if (domain.includes(site.split('.')[0])) {
+                    tags.add(tag);
                     break;
                 }
             }
         }
-    } catch (e) {}
+        
+        // 3. 子域名分析
+        const subdomains = domain.split('.');
+        if (subdomains.length > 2) {
+            const subdomain = subdomains[0];
+            const subdomainTags = {
+                'docs': '文档', 'doc': '文档', 'api': 'API',
+                'blog': '博客', 'news': '新闻', 'shop': '购物',
+                'store': '商店', 'app': '应用', 'dev': '开发',
+                'admin': '管理', 'dashboard': '控制台',
+                'learn': '学习', 'edu': '教育', 'help': '帮助',
+                'support': '支持', 'community': '社区', 'forum': '论坛'
+            };
+            if (subdomainTags[subdomain]) {
+                tags.add(subdomainTags[subdomain]);
+            }
+        }
+        
+        // 4. 路径关键词匹配
+        for (const [path, tag] of Object.entries(PATH_KEYWORDS)) {
+            if (pathname.includes(path)) {
+                tags.add(tag);
+                if (tags.size >= 3) break;
+            }
+        }
+        
+        // 5. 标题/描述/关键词内容分析
+        for (const [keyword, tag] of Object.entries(CONTENT_KEYWORDS)) {
+            if (fullText.includes(keyword.toLowerCase())) {
+                tags.add(tag);
+                if (tags.size >= 3) break;
+            }
+        }
+        
+        // 6. 特殊域名后缀分析
+        if (domain.endsWith('.edu') || domain.endsWith('.edu.cn')) {
+            tags.add('教育');
+        } else if (domain.endsWith('.gov') || domain.endsWith('.gov.cn')) {
+            tags.add('政府');
+        } else if (domain.endsWith('.org')) {
+            tags.add('组织');
+        }
+        
+    } catch (e) {
+        console.warn('标签生成失败:', e);
+    }
     
-    return tags.slice(0, 2).map(tag => truncateText(tag, 8));
+    // 返回最多3个标签
+    return Array.from(tags).slice(0, 3).map(tag => truncateText(tag, 8));
 }
 
 // 获取或创建标签ID
@@ -527,19 +672,54 @@ async function getOrCreateTagIds(tagNames, navServerUrl, token) {
     return tagIds;
 }
 
+// 从当前标签页获取网页meta信息
+async function getPageMetaInfo(tabId) {
+    try {
+        const results = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+                const getMeta = (name) => {
+                    const el = document.querySelector(`meta[name="${name}"], meta[property="${name}"]`);
+                    return el ? el.getAttribute('content') : '';
+                };
+                return {
+                    description: getMeta('description') || getMeta('og:description') || '',
+                    keywords: getMeta('keywords') || '',
+                    ogTitle: getMeta('og:title') || '',
+                    ogType: getMeta('og:type') || '',
+                    category: getMeta('category') || getMeta('article:section') || ''
+                };
+            }
+        });
+        return results[0]?.result || {};
+    } catch (e) {
+        console.warn('获取页面meta失败:', e);
+        return {};
+    }
+}
+
 // 构建卡片数据（包含自动生成的标签和描述）
-async function buildCardData(url, title, navServerUrl, token) {
+async function buildCardData(url, title, navServerUrl, token, tabId = null) {
     let logo = '';
     let domain = '';
+    let metaInfo = {};
+    
     try {
         const urlObj = new URL(url);
         logo = `https://api.xinac.net/icon/?url=${urlObj.origin}&sz=128`;
         domain = urlObj.hostname.replace(/^www\./, '');
     } catch (e) {}
     
-    const cardTitle = truncateText(title || domain || '无标题', 20);
-    const description = generateDescription(title, domain);
-    const tagNames = generateTagNames(url, title);
+    // 尝试获取页面meta信息
+    if (tabId) {
+        metaInfo = await getPageMetaInfo(tabId);
+    }
+    
+    const cardTitle = truncateText(title || metaInfo.ogTitle || domain || '无标题', 20);
+    const description = truncateText(metaInfo.description || generateDescription(title, domain), 100);
+    
+    // 使用增强的标签生成，传入更多信息
+    const tagNames = generateTagNames(url, title, metaInfo.description, metaInfo.keywords);
     const tagIds = await getOrCreateTagIds(tagNames, navServerUrl, token);
     
     return {
