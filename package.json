@@ -26,7 +26,7 @@
     "express-validator": "^7.3.0",
     "file-type": "^21.0.0",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "node-schedule": "^2.1.1",
     "sanitize-html": "^2.17.0",
