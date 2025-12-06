@@ -1216,6 +1216,28 @@ function getBookmarksForCurrentFolder() {
     return bookmarks;
 }
 
+// 获取当前筛选后的书签列表（用于全选等操作）
+function getFilteredBookmarks() {
+    let bookmarks = getBookmarksForCurrentFolder();
+    
+    // 无标签筛选
+    if (filterNoTag) {
+        bookmarks = bookmarks.filter(b => {
+            const tags = getBookmarkTags(b.id);
+            return !tags || tags.length === 0;
+        });
+    }
+    // 标签筛选
+    else if (currentTagFilters.length > 0) {
+        bookmarks = bookmarks.filter(b => {
+            const tags = getBookmarkTags(b.id);
+            return currentTagFilters.every(filter => tags.includes(filter));
+        });
+    }
+    
+    return bookmarks;
+}
+
 function collectAllBookmarks(nodes, bookmarks) {
     for (const node of nodes) {
         if (node.children) {
@@ -1374,7 +1396,7 @@ function updateSelectionUI() {
     const addToNavBtn = document.getElementById('btnAddToNav');
     const quickAddBtn = document.getElementById('btnQuickAddToNav');
     const selectAllCheckbox = document.getElementById('selectAllBookmarks');
-    const bookmarks = getBookmarksForCurrentFolder();
+    const bookmarks = getFilteredBookmarks();
     
     if (selectedBookmarks.size > 0) {
         deleteBtn.style.display = 'block';
@@ -1420,7 +1442,7 @@ function bindEvents() {
     
     // 全选
     document.getElementById('selectAllBookmarks').addEventListener('change', (e) => {
-        const bookmarks = getBookmarksForCurrentFolder();
+        const bookmarks = getFilteredBookmarks();
         if (e.target.checked) {
             bookmarks.forEach(b => selectedBookmarks.add(b.id));
         } else {
@@ -1640,7 +1662,7 @@ function bindKeyboardShortcuts() {
         // Ctrl/Cmd + A: 全选
         if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
             e.preventDefault();
-            const bookmarks = getBookmarksForCurrentFolder();
+            const bookmarks = getFilteredBookmarks();
             bookmarks.forEach(b => selectedBookmarks.add(b.id));
             renderBookmarkList();
             updateSelectionUI();
