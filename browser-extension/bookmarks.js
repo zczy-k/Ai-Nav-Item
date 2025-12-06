@@ -1820,6 +1820,8 @@ function bindEvents() {
     
     // 按文件夹标签
     document.getElementById('btnTagByFolder').addEventListener('click', tagBookmarksByFolder);
+    document.getElementById('btnRegenerateTags').addEventListener('click', regenerateAllTags);
+    document.getElementById('btnClearAllTags').addEventListener('click', clearAllTags);
     
     // 快捷键帮助
     document.getElementById('btnShowShortcuts').addEventListener('click', showShortcutsHelp);
@@ -6767,4 +6769,137 @@ async function tagBookmarksByFolder() {
         `⏭️ 跳过: ${skippedCount} 个书签\n\n` +
         (taggedCount > 0 ? '标签已更新，可在标签云中查看。' : '没有新标签添加。')
     );
+}
+
+
+// 重新生成所有标签（清除现有标签后根据文件夹重新生成）
+async function regenerateAllTags() {
+    const allBookmarksList = [];
+    collectAllBookmarks(allBookmarks, allBookmarksList);
+    
+    if (allBookmarksList.length === 0) {
+        alert('没有找到书签');
+        return;
+    }
+    
+    // 显示确认弹窗
+    const confirmed = confirm(
+        `🔄 重新生成标签\n\n` +
+        `此操作将：\n` +
+        `1. 清除所有书签的现有标签\n` +
+        `2. 根据文件夹名称重新生成标签\n\n` +
+        `共 ${allBookmarksList.length} 个书签，是否继续？`
+    );
+    
+    if (!confirmed) return;
+    
+    // 二次确认
+    const doubleConfirmed = confirm('⚠️ 确定要清除所有现有标签并重新生成吗？此操作不可撤销！');
+    if (!doubleConfirmed) return;
+    
+    // 显示进度
+    const progressDiv = document.createElement('div');
+    progressDiv.id = 'regenerateTagProgress';
+    progressDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px 32px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); z-index: 10000; text-align: center; min-width: 300px;';
+    progressDiv.innerHTML = `
+        <div style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">🔄 正在重新生成标签...</div>
+        <div style="background: #e0e0e0; border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 12px;">
+            <div id="regenerateProgressBar" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); height: 100%; width: 0%; transition: width 0.3s;"></div>
+        </div>
+        <div id="regenerateProgressText" style="font-size: 14px; color: #666;">0 / ${allBookmarksList.length}</div>
+    `;
+    document.body.appendChild(progressDiv);
+    
+    const progressBar = document.getElementById('regenerateProgressBar');
+    const progressText = document.getElementById('regenerateProgressText');
+    
+    // 清除所有标签
+    bookmarkTags.clear();
+    allTags.clear();
+    
+    let taggedCount = 0;
+    
+    for (let i = 0; i < allBookmarksList.length; i++) {
+        const bookmark = allBookmarksList[i];
+        
+        // 更新进度
+        const percent = Math.round((i + 1) / allBookmarksList.length * 100);
+        progressBar.style.width = percent + '%';
+        progressText.textContent = `${i + 1} / ${allBookmarksList.length}`;
+        
+        // 获取文件夹路径
+        const folderPath = getBookmarkFolderPath(bookmark.id);
+        
+        // 从文件夹路径提取标签
+        const folderTags = [];
+        for (const folderName of folderPath) {
+            const tag = extractTagFromFolderName(folderName);
+            if (tag && !folderTags.includes(tag)) {
+                folderTags.push(tag);
+            }
+        }
+        
+        if (folderTags.length > 0) {
+            bookmarkTags.set(bookmark.id, folderTags);
+            folderTags.forEach(tag => allTags.add(tag));
+            taggedCount++;
+        }
+        
+        // 每处理50个书签，让UI有机会更新
+        if (i % 50 === 0) {
+            await new Promise(r => setTimeout(r, 10));
+        }
+    }
+    
+    // 移除进度条
+    progressDiv.remove();
+    
+    // 保存标签
+    await saveTags();
+    renderTagCloud();
+    renderBookmarkList();
+    
+    // 显示结果
+    alert(
+        `🔄 重新生成标签完成！\n\n` +
+        `✅ 已为 ${taggedCount} 个书签生成标签\n` +
+        `📊 共 ${allTags.size} 个不同标签`
+    );
+}
+
+// 清除所有标签
+async function clearAllTags() {
+    const tagCount = allTags.size;
+    const bookmarkCount = bookmarkTags.size;
+    
+    if (tagCount === 0) {
+        alert('当前没有任何标签');
+        return;
+    }
+    
+    // 显示确认弹窗
+    const confirmed = confirm(
+        `🗑️ 清除所有标签\n\n` +
+        `当前共有 ${tagCount} 个标签，${bookmarkCount} 个书签有标签。\n\n` +
+        `确定要清除所有书签的标签吗？`
+    );
+    
+    if (!confirmed) return;
+    
+    // 二次确认
+    const doubleConfirmed = confirm('⚠️ 再次确认：清除所有标签？此操作不可撤销！');
+    if (!doubleConfirmed) return;
+    
+    // 清除所有标签
+    bookmarkTags.clear();
+    allTags.clear();
+    currentTagFilters = [];
+    filterNoTag = false;
+    
+    // 保存
+    await saveTags();
+    renderTagCloud();
+    renderBookmarkList();
+    
+    alert('✅ 已清除所有标签');
 }
