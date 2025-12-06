@@ -428,72 +428,194 @@ const SUBDOMAIN_TAGS = {
     'mail': '邮箱', 'drive': '网盘', 'music': '音乐', 'video': '视频'
 };
 
-// 自动生成标签（基于URL和标题）- 增强版
+// 系统文件夹名称（不作为标签）
+const SYSTEM_FOLDER_NAMES = [
+    '书签栏', '其他书签', 'bookmarks bar', 'other bookmarks', 
+    'bookmarks', '收藏夹', 'favorites', '移动设备书签',
+    'mobile bookmarks', '根目录', ''
+];
+
+// 无意义的标题词（需要过滤）
+const NOISE_WORDS = [
+    '首页', '官网', '官方', '网站', '平台', '系统', '中心', '在线',
+    'home', 'index', 'welcome', 'official', 'website', 'platform',
+    '|', '-', '–', '—', '_', '·', '/', '\\', ':', '：',
+    'the', 'a', 'an', 'and', 'or', 'of', 'to', 'for', 'in', 'on', 'at', 'by', 'with'
+];
+
+// 从文件夹路径提取标签
+function extractTagsFromFolderPath(bookmark) {
+    const tags = [];
+    
+    // 递归查找书签所在的文件夹路径
+    function findPath(nodes, targetId, path = []) {
+        for (const node of nodes) {
+            if (node.id === targetId) {
+                return path;
+            }
+            if (node.children) {
+                const newPath = node.title ? [...path, node.title] : path;
+                const result = findPath(node.children, targetId, newPath);
+                if (result) return result;
+            }
+        }
+        return null;
+    }
+    
+    const folderPath = findPath(allBookmarks, bookmark.id) || [];
+    
+    // 过滤系统文件夹名称，提取有意义的文件夹名作为标签
+    for (const folderName of folderPath) {
+        const cleanName = folderName.trim();
+        if (cleanName && !SYSTEM_FOLDER_NAMES.some(sys => 
+            cleanName.toLowerCase() === sys.toLowerCase()
+        )) {
+            // 文件夹名称可能包含多个词，尝试拆分
+            const parts = cleanName.split(/[\s\-_\/\\|·]+/).filter(p => p.length > 0);
+            for (const part of parts) {
+                if (part.length >= 2 && part.length <= 10) {
+                    tags.push(part);
+                }
+            }
+            // 也保留完整的文件夹名（如果不太长）
+            if (cleanName.length >= 2 && cleanName.length <= 8) {
+                tags.push(cleanName);
+            }
+        }
+    }
+    
+    return [...new Set(tags)]; // 去重
+}
+
+// 从标题提取关键词
+function extractKeywordsFromTitle(title) {
+    if (!title) return [];
+    
+    const keywords = [];
+    
+    // 清理标题：移除常见分隔符两边的内容，保留核心部分
+    let cleanTitle = title
+        .replace(/[\|\-–—_·]+/g, ' ')  // 替换分隔符为空格
+        .replace(/\s+/g, ' ')           // 合并多个空格
+        .trim();
+    
+    // 移除无意义词
+    const lowerTitle = cleanTitle.toLowerCase();
+    for (const noise of NOISE_WORDS) {
+        if (typeof noise === 'string' && noise.length > 1) {
+            cleanTitle = cleanTitle.replace(new RegExp(`\\b${noise}\\b`, 'gi'), ' ');
+        }
+    }
+    cleanTitle = cleanTitle.replace(/\s+/g, ' ').trim();
+    
+    // 提取中文词汇（2-6个字的连续中文）
+    const chineseMatches = cleanTitle.match(/[\u4e00-\u9fa5]{2,6}/g) || [];
+    keywords.push(...chineseMatches);
+    
+    // 提取英文单词（首字母大写的词可能是品牌/产品名）
+    const englishMatches = cleanTitle.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [];
+    keywords.push(...englishMatches.filter(w => w.length >= 3 && w.length <= 15));
+    
+    // 提取全大写缩写（如 API, SDK, AI）
+    const acronyms = cleanTitle.match(/\b[A-Z]{2,5}\b/g) || [];
+    keywords.push(...acronyms);
+    
+    return [...new Set(keywords)];
+}
+
+// 自动生成标签（基于URL、标题和文件夹）- 增强版
 function autoGenerateTags(bookmark) {
     const tags = new Set();
     
     try {
+        // ========== 1. 文件夹名称（最高优先级） ==========
+        const folderTags = extractTagsFromFolderPath(bookmark);
+        folderTags.slice(0, 2).forEach(t => tags.add(t)); // 最多取2个文件夹标签
+        
+        // ========== 2. 标题关键词分析 ==========
+        const titleKeywords = extractKeywordsFromTitle(bookmark.title);
+        
+        // 检查标题关键词是否匹配已知分类
+        const title = (bookmark.title || '').toLowerCase();
+        for (const [keyword, tag] of Object.entries(CONTENT_KEYWORDS)) {
+            if (title.includes(keyword.toLowerCase())) {
+                tags.add(tag);
+                if (tags.size >= 4) break;
+            }
+        }
+        
+        // 如果标题中有有意义的关键词，添加为标签
+        for (const kw of titleKeywords) {
+            if (kw.length >= 2 && kw.length <= 8 && tags.size < 4) {
+                // 检查是否是无意义词
+                const isNoise = NOISE_WORDS.some(n => 
+                    kw.toLowerCase() === n.toLowerCase()
+                );
+                if (!isNoise) {
+                    tags.add(kw);
+                }
+            }
+        }
+        
+        // ========== 3. 域名匹配 ==========
         const url = new URL(bookmark.url);
         const domain = url.hostname.replace(/^www\./, '');
         const pathname = url.pathname.toLowerCase();
-        const title = (bookmark.title || '').toLowerCase();
-        const fullText = `${title} ${pathname}`;
         
-        // 1. 精确域名匹配
+        // 精确域名匹配
         for (const [site, siteTags] of Object.entries(DOMAIN_TAG_MAP)) {
             if (domain === site || domain.endsWith('.' + site)) {
-                siteTags.forEach(t => tags.add(t));
+                siteTags.forEach(t => {
+                    if (tags.size < 4) tags.add(t);
+                });
                 break;
             }
         }
         
-        // 2. 模糊域名匹配（如果精确匹配没有结果）
-        if (tags.size === 0) {
+        // 模糊域名匹配（如果还没有足够标签）
+        if (tags.size < 2) {
             for (const [site, siteTags] of Object.entries(DOMAIN_TAG_MAP)) {
                 const siteName = site.split('.')[0];
                 if (domain.includes(siteName) && siteName.length > 3) {
-                    siteTags.forEach(t => tags.add(t));
+                    siteTags.forEach(t => {
+                        if (tags.size < 4) tags.add(t);
+                    });
                     break;
                 }
             }
         }
         
-        // 3. 子域名分析
+        // ========== 4. 子域名分析 ==========
         const subdomains = domain.split('.');
-        if (subdomains.length > 2) {
+        if (subdomains.length > 2 && tags.size < 4) {
             const subdomain = subdomains[0];
             if (SUBDOMAIN_TAGS[subdomain]) {
                 tags.add(SUBDOMAIN_TAGS[subdomain]);
             }
         }
         
-        // 4. 路径关键词匹配
-        for (const [path, tag] of Object.entries(PATH_KEYWORDS)) {
-            if (pathname.includes(path)) {
-                tags.add(tag);
-                if (tags.size >= 4) break;
+        // ========== 5. 路径关键词匹配 ==========
+        if (tags.size < 4) {
+            for (const [path, tag] of Object.entries(PATH_KEYWORDS)) {
+                if (pathname.includes(path)) {
+                    tags.add(tag);
+                    if (tags.size >= 4) break;
+                }
             }
         }
         
-        // 5. 标题内容分析
-        for (const [keyword, tag] of Object.entries(CONTENT_KEYWORDS)) {
-            if (fullText.includes(keyword.toLowerCase())) {
-                tags.add(tag);
-                if (tags.size >= 4) break;
-            }
+        // ========== 6. 特殊域名后缀分析 ==========
+        if (tags.size < 4) {
+            if (domain.endsWith('.gov') || domain.endsWith('.gov.cn')) tags.add('政府');
+            else if (domain.endsWith('.edu') || domain.endsWith('.edu.cn')) tags.add('教育');
+            else if (domain.endsWith('.org')) tags.add('组织');
         }
         
-        // 6. 特殊域名后缀分析
-        if (domain.endsWith('.gov') || domain.endsWith('.gov.cn')) tags.add('政府');
-        if (domain.endsWith('.edu') || domain.endsWith('.edu.cn')) tags.add('教育');
-        if (domain.endsWith('.org')) tags.add('组织');
-        if (domain.endsWith('.io')) tags.add('开发');
-        if (domain.endsWith('.dev')) tags.add('开发');
-        if (domain.endsWith('.app')) tags.add('应用');
-        
-    } catch (e) {}
+    } catch (e) {
+        console.warn('标签生成失败:', e);
+    }
     
-    // 返回最多4个标签
+    // 返回最多4个标签，优先保留文件夹标签
     return Array.from(tags).slice(0, 4);
 }
 
