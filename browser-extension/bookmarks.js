@@ -443,6 +443,143 @@ const NOISE_WORDS = [
     'the', 'a', 'an', 'and', 'or', 'of', 'to', 'for', 'in', 'on', 'at', 'by', 'with'
 ];
 
+// 标签同义词映射（将各种变体统一为标准标签）
+const TAG_SYNONYMS = {
+    // 开发相关
+    '前端': ['frontend', 'front-end', 'front end', '前端开发', 'web前端', 'fe'],
+    '后端': ['backend', 'back-end', 'back end', '后端开发', '服务端', 'be'],
+    '全栈': ['fullstack', 'full-stack', 'full stack', '全栈开发'],
+    '开发': ['development', 'dev', 'develop', '软件开发', '程序开发', 'coding', 'programming'],
+    '代码': ['code', 'source', '源码', '源代码'],
+    '文档': ['docs', 'doc', 'documentation', '手册', 'manual', 'reference', '参考'],
+    '教程': ['tutorial', 'tutorials', 'guide', 'guides', '指南', '入门', 'getting started'],
+    'API': ['api', 'apis', '接口', 'interface'],
+    
+    // 技术栈
+    'JavaScript': ['js', 'javascript', 'ecmascript', 'es6', 'es2015'],
+    'TypeScript': ['ts', 'typescript'],
+    'Python': ['python', 'py', 'python3'],
+    'Java': ['java', 'jdk', 'jvm'],
+    'Vue': ['vue', 'vuejs', 'vue.js', 'vue3', 'vue2'],
+    'React': ['react', 'reactjs', 'react.js'],
+    'Node': ['node', 'nodejs', 'node.js'],
+    
+    // 内容类型
+    '视频': ['video', 'videos', '影片', '短片'],
+    '音乐': ['music', '歌曲', 'song', 'songs', '音频', 'audio'],
+    '图片': ['image', 'images', 'photo', 'photos', '照片', '图像', 'picture'],
+    '文章': ['article', 'articles', 'post', 'posts', '帖子'],
+    '博客': ['blog', 'blogs', '日志', '随笔'],
+    '新闻': ['news', '资讯', '快讯', '头条'],
+    
+    // 功能类型
+    '工具': ['tool', 'tools', 'utility', 'utilities', '实用工具'],
+    '下载': ['download', 'downloads', '安装', 'install'],
+    '搜索': ['search', '查找', '检索'],
+    '翻译': ['translate', 'translation', '翻译器'],
+    
+    // 平台类型
+    '购物': ['shopping', 'shop', 'store', '商城', '电商', 'ecommerce', 'e-commerce'],
+    '社交': ['social', '社交媒体', 'sns'],
+    '社区': ['community', 'forum', 'bbs', '论坛', '讨论区'],
+    '游戏': ['game', 'games', 'gaming', '电竞', 'esports'],
+    '影视': ['movie', 'movies', 'film', 'films', '电影', '电视剧', 'tv', '剧集'],
+    
+    // AI相关
+    'AI': ['ai', '人工智能', 'artificial intelligence', 'ml', 'machine learning', '机器学习', 'deep learning', '深度学习', 'chatgpt', 'gpt', 'llm', '大模型'],
+    
+    // 设计相关
+    '设计': ['design', 'ui', 'ux', 'ui/ux', '界面设计', '交互设计'],
+    '素材': ['resource', 'resources', 'asset', 'assets', '资源'],
+    '图标': ['icon', 'icons', '图标库'],
+    
+    // 学习相关
+    '学习': ['learn', 'learning', 'study', '教育', 'education', 'course', 'courses', '课程'],
+    '算法': ['algorithm', 'algorithms', '数据结构', 'leetcode', '刷题'],
+    
+    // 效率相关
+    '效率': ['productivity', '生产力', '提效'],
+    '笔记': ['note', 'notes', '记录', '备忘'],
+    '协作': ['collaboration', 'collaborate', '团队协作', '合作']
+};
+
+// 过于宽泛的标签（应该避免）
+const GENERIC_TAGS = [
+    '网页', '链接', '页面', '内容', '信息', '数据', '服务',
+    'web', 'page', 'link', 'content', 'info', 'data', 'service',
+    '其他', '杂项', '临时', '待分类', '未分类',
+    'other', 'misc', 'temp', 'uncategorized'
+];
+
+// 规范化标签（将同义词统一为标准形式）
+function normalizeTag(tag) {
+    if (!tag) return null;
+    
+    const lowerTag = tag.toLowerCase().trim();
+    
+    // 查找是否匹配某个同义词
+    for (const [standard, synonyms] of Object.entries(TAG_SYNONYMS)) {
+        if (lowerTag === standard.toLowerCase()) {
+            return standard;
+        }
+        for (const syn of synonyms) {
+            if (lowerTag === syn.toLowerCase()) {
+                return standard;
+            }
+        }
+    }
+    
+    // 没有匹配的同义词，返回原标签（首字母大写处理）
+    return tag.trim();
+}
+
+// 验证标签质量
+function isValidTag(tag) {
+    if (!tag) return false;
+    
+    const trimmed = tag.trim();
+    
+    // 长度检查：2-10个字符
+    if (trimmed.length < 2 || trimmed.length > 10) return false;
+    
+    // 纯数字检查
+    if (/^\d+$/.test(trimmed)) return false;
+    
+    // 纯特殊字符检查
+    if (/^[\s\-_\.\/\\|·:：,，;；!！?？@#$%^&*()（）\[\]【】{}]+$/.test(trimmed)) return false;
+    
+    // 版本号检查（如 v1.0, 2.3.4）
+    if (/^v?\d+(\.\d+)+$/i.test(trimmed)) return false;
+    
+    // 日期检查（如 2024, 2024-01）
+    if (/^(19|20)\d{2}(-\d{2})?(-\d{2})?$/.test(trimmed)) return false;
+    
+    // 过于宽泛的标签检查
+    if (GENERIC_TAGS.some(g => trimmed.toLowerCase() === g.toLowerCase())) return false;
+    
+    // 无意义词检查
+    if (NOISE_WORDS.some(n => trimmed.toLowerCase() === n.toLowerCase())) return false;
+    
+    return true;
+}
+
+// 处理标签列表：规范化 + 去重 + 质量过滤
+function processTagList(tags) {
+    const processed = new Set();
+    
+    for (const tag of tags) {
+        // 规范化
+        const normalized = normalizeTag(tag);
+        
+        // 质量验证
+        if (normalized && isValidTag(normalized)) {
+            processed.add(normalized);
+        }
+    }
+    
+    return Array.from(processed);
+}
+
 // 从文件夹路径提取标签
 function extractTagsFromFolderPath(bookmark) {
     const tags = [];
@@ -615,8 +752,10 @@ function autoGenerateTags(bookmark) {
         console.warn('标签生成失败:', e);
     }
     
-    // 返回最多4个标签，优先保留文件夹标签
-    return Array.from(tags).slice(0, 4);
+    // 规范化、去重、质量过滤，返回最多4个标签
+    const rawTags = Array.from(tags);
+    const processedTags = processTagList(rawTags);
+    return processedTags.slice(0, 4);
 }
 
 // 批量自动标签（增强版）
