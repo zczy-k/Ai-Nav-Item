@@ -2146,6 +2146,9 @@ function bindEvents() {
     // 合并文件夹
     document.getElementById('btnMergeFolders').addEventListener('click', showMergeFoldersModal);
     
+    // 合并热门文件夹
+    document.getElementById('btnMergeHotFolders').addEventListener('click', mergeHotFolders);
+    
     // 空文件夹检测
     document.getElementById('btnFindEmptyFolders').addEventListener('click', findEmptyFolders);
     
@@ -7255,5 +7258,145 @@ async function loadViewModeSetting() {
         }
     } catch (e) {
         console.error('加载视图模式设置失败:', e);
+    }
+}
+
+
+// ==================== 合并热门文件夹功能 ====================
+
+// 合并"最近使用"和"常用"文件夹为"热门书签"
+async function mergeHotFolders() {
+    // 查找"最近使用"和"常用"文件夹
+    const hotFolderNames = ['最近使用', '常用', '常用书签', '热门', '热门书签', 'Recent', 'Frequent', 'Favorites'];
+    const foundFolders = [];
+    
+    function findHotFolders(nodes) {
+        for (const node of nodes) {
+            if (node.children) {
+                const lowerTitle = (node.title || '').toLowerCase();
+                if (hotFolderNames.some(name => lowerTitle === name.toLowerCase() || lowerTitle.includes(name.toLowerCase()))) {
+                    foundFolders.push(node);
+                }
+                findHotFolders(node.children);
+            }
+        }
+    }
+    
+    findHotFolders(allBookmarks);
+    
+    if (foundFolders.length === 0) {
+        alert('未找到"最近使用"或"常用"相关的文件夹');
+        return;
+    }
+    
+    if (foundFolders.length === 1) {
+        const rename = confirm(
+            `只找到一个相关文件夹："${foundFolders[0].title}"\n\n` +
+            `是否将其重命名为"🔥 热门书签"？`
+        );
+        if (rename) {
+            await chrome.bookmarks.update(foundFolders[0].id, { title: '🔥 热门书签' });
+            await loadBookmarks();
+            alert('✅ 已重命名为"🔥 热门书签"');
+        }
+        return;
+    }
+    
+    // 显示找到的文件夹
+    const folderList = foundFolders.map(f => `• ${f.title} (${countFolderBookmarks(f)} 个书签)`).join('\n');
+    const confirmed = confirm(
+        `🔥 合并热门文件夹\n\n` +
+        `找到以下相关文件夹：\n${folderList}\n\n` +
+        `将执行以下操作：\n` +
+        `1. 创建"🔥 热门书签"文件夹\n` +
+        `2. 合并所有书签（自动去重）\n` +
+        `3. 删除原文件夹\n\n` +
+        `是否继续？`
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        // 收集所有书签（去重）
+        const urlSet = new Set();
+        const uniqueBookmarks = [];
+        
+        for (const folder of foundFolders) {
+            if (folder.children) {
+                for (const child of folder.children) {
+                    if (child.url && !isSeparatorBookmark(child.url)) {
+                        const normalizedUrl = normalizeUrl(child.url);
+                        if (!urlSet.has(normalizedUrl)) {
+                            urlSet.add(normalizedUrl);
+                            uniqueBookmarks.push({
+                                title: child.title,
+                                url: child.url
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 在书签栏创建"热门书签"文件夹
+        const bookmarkBar = allBookmarks[0]?.children?.[0]; // 书签栏
+        if (!bookmarkBar) {
+            alert('无法找到书签栏');
+            return;
+        }
+        
+        // 检查是否已存在"热门书签"文件夹
+        let hotFolder = bookmarkBar.children?.find(c => c.title === '🔥 热门书签');
+        
+        if (!hotFolder) {
+            hotFolder = await chrome.bookmarks.create({
+                parentId: bookmarkBar.id,
+                title: '🔥 热门书签',
+                index: 0 // 放在书签栏最前面
+            });
+        }
+        
+        // 添加书签到热门文件夹
+        for (const bookmark of uniqueBookmarks) {
+            // 检查是否已存在
+            const existing = await chrome.bookmarks.search({ url: bookmark.url });
+            const alreadyInHot = existing.some(e => e.parentId === hotFolder.id);
+            
+            if (!alreadyInHot) {
+                await chrome.bookmarks.create({
+                    parentId: hotFolder.id,
+                    title: bookmark.title,
+                    url: bookmark.url
+                });
+            }
+        }
+        
+        // 删除原文件夹
+        const deleteConfirmed = confirm(
+            `✅ 已合并 ${uniqueBookmarks.length} 个书签到"🔥 热门书签"\n\n` +
+            `是否删除原来的文件夹？\n${foundFolders.map(f => `• ${f.title}`).join('\n')}`
+        );
+        
+        if (deleteConfirmed) {
+            for (const folder of foundFolders) {
+                try {
+                    await chrome.bookmarks.removeTree(folder.id);
+                } catch (e) {
+                    console.error('删除文件夹失败:', folder.title, e);
+                }
+            }
+        }
+        
+        await loadBookmarks();
+        
+        alert(
+            `🔥 合并完成！\n\n` +
+            `• 合并了 ${foundFolders.length} 个文件夹\n` +
+            `• 共 ${uniqueBookmarks.length} 个不重复书签\n` +
+            `• 已创建"🔥 热门书签"文件夹`
+        );
+        
+    } catch (error) {
+        alert('合并失败: ' + error.message);
     }
 }
