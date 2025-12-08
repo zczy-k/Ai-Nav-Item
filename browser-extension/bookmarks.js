@@ -1280,7 +1280,7 @@ function createFolderItem(folder, level, isAll = false) {
     
     div.innerHTML = `
         <span class="folder-icon">${isAll ? '📚' : '📁'}</span>
-        <span class="folder-name">${escapeHtml(folder.title || '未命名')}</span>
+        <span class="folder-name" title="${escapeHtml(folder.title || '未命名')}">${escapeHtml(folder.title || '未命名')}</span>
         <span class="folder-count">${bookmarkCount}</span>
         ${!isAll && folder.id ? '<span class="folder-actions" style="display: none; margin-left: auto; gap: 4px;"><button class="btn-icon" title="编辑">✏️</button><button class="btn-icon" title="删除">🗑️</button></span>' : ''}
     `;
@@ -1690,9 +1690,16 @@ function updateActiveFolderOnScroll() {
 function scrollToFolderSection(folderId) {
     const section = document.getElementById(`folder-section-${folderId}`);
     if (section) {
-        const panel = document.querySelector('.bookmark-panel');
-        const sectionTop = section.offsetTop - 60; // 留出header空间
-        panel.scrollTo({ top: sectionTop, behavior: 'smooth' });
+        // 使用scrollIntoView更可靠
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // 稍微向上偏移，留出header空间
+        setTimeout(() => {
+            const panel = document.querySelector('.bookmark-panel');
+            if (panel) {
+                panel.scrollTop -= 70;
+            }
+        }, 300);
     }
 }
 
