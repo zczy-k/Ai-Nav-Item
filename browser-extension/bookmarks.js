@@ -14,6 +14,7 @@ let allTags = new Set(); // 所有标签集合
 let currentTagFilters = []; // 当前标签筛选（支持多标签）
 let filterNoTag = false; // 是否筛选无标签书签
 let bookmarkNotes = new Map(); // 书签笔记映射 {bookmarkId: note}
+let currentViewMode = 'grid'; // 当前视图模式: 'grid' 或 'list'
 
 // 分隔符书签URL（这些不是真实书签，不参与任何操作）
 const SEPARATOR_URLS = [
@@ -34,10 +35,12 @@ async function init() {
     await loadUsageData();
     await loadTags();
     await loadNotes();
+    await loadViewModeSetting();
     await loadBookmarks();
     bindEvents();
     loadAutoSortSetting();
     renderTagCloud();
+    updateViewModeButtons();
     // 预加载导航页配置
     await initNavConfig();
     // 检查URL参数，处理从右键菜单传递的添加请求
@@ -1576,6 +1579,7 @@ async function renderBookmarkListByFolder() {
         
         // 排序书签
         const sortedBookmarks = await sortBookmarks(group.bookmarks, currentSortOrder);
+        const bookmarkIds = sortedBookmarks.map(b => b.id);
         
         const section = document.createElement('div');
         section.className = 'folder-section';
@@ -1584,13 +1588,21 @@ async function renderBookmarkListByFolder() {
         
         section.innerHTML = `
             <div class="folder-section-header" data-folder-id="${group.id}">
-                <div class="folder-section-title">
-                    <span>📁</span>
-                    <span>${escapeHtml(group.title)}</span>
+                <div class="folder-section-left">
+                    <label class="folder-select-all" onclick="event.stopPropagation()">
+                        <input type="checkbox" data-folder-id="${group.id}">
+                        <span>全选</span>
+                    </label>
+                    <div class="folder-section-title">
+                        <span>📁</span>
+                        <span>${escapeHtml(group.title)}</span>
+                    </div>
                 </div>
-                <span class="folder-section-count">${sortedBookmarks.length} 个书签</span>
+                <div class="folder-section-actions">
+                    <span class="folder-section-count">${sortedBookmarks.length} 个书签</span>
+                </div>
             </div>
-            <div class="folder-section-bookmarks"></div>
+            <div class="folder-section-bookmarks ${currentViewMode === 'list' ? 'list-view' : ''}"></div>
         `;
         
         const bookmarksContainer = section.querySelector('.folder-section-bookmarks');
@@ -1599,16 +1611,40 @@ async function renderBookmarkListByFolder() {
             bookmarksContainer.appendChild(item);
         }
         
+        // 分组全选
+        const selectAllCheckbox = section.querySelector('.folder-select-all input');
+        selectAllCheckbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const isChecked = e.target.checked;
+            bookmarkIds.forEach(id => {
+                if (isChecked) {
+                    selectedBookmarks.add(id);
+                } else {
+                    selectedBookmarks.delete(id);
+                }
+            });
+            // 更新该分组内书签的选中状态
+            section.querySelectorAll('.bookmark-item').forEach(item => {
+                const checkbox = item.querySelector('.bookmark-checkbox');
+                if (checkbox) {
+                    checkbox.checked = isChecked;
+                    item.classList.toggle('selected', isChecked);
+                }
+            });
+            updateSelectionUI();
+        });
+        
         // 点击标题可以折叠/展开
-        const header = section.querySelector('.folder-section-header');
-        header.addEventListener('click', () => {
+        const titleDiv = section.querySelector('.folder-section-title');
+        titleDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
             const bookmarksDiv = section.querySelector('.folder-section-bookmarks');
             if (bookmarksDiv.style.display === 'none') {
-                bookmarksDiv.style.display = 'grid';
-                header.querySelector('.folder-section-title span:first-child').textContent = '📁';
+                bookmarksDiv.style.display = currentViewMode === 'list' ? 'flex' : 'grid';
+                titleDiv.querySelector('span:first-child').textContent = '📁';
             } else {
                 bookmarksDiv.style.display = 'none';
-                header.querySelector('.folder-section-title span:first-child').textContent = '📂';
+                titleDiv.querySelector('span:first-child').textContent = '📂';
             }
         });
         
@@ -1617,6 +1653,9 @@ async function renderBookmarkListByFolder() {
     
     // 绑定滚动监听
     bindScrollListener();
+    
+    // 更新视图按钮状态
+    updateViewModeButtons();
 }
 
 // 收集文件夹分组
@@ -2074,6 +2113,10 @@ function bindEvents() {
         currentSortOrder = e.target.value;
         renderBookmarkList();
     });
+    
+    // 视图切换
+    document.getElementById('btnGridView').addEventListener('click', () => switchViewMode('grid'));
+    document.getElementById('btnListView').addEventListener('click', () => switchViewMode('list'));
     
     // 自动排序开关
     document.getElementById('autoSortEnabled').addEventListener('change', (e) => {
@@ -7097,4 +7140,60 @@ async function clearAllTags() {
     renderBookmarkList();
     
     alert('✅ 已清除所有标签');
+}
+
+
+// ==================== 视图切换功能 ====================
+
+// 切换视图模式
+function switchViewMode(mode) {
+    if (currentViewMode === mode) return;
+    
+    currentViewMode = mode;
+    
+    // 更新所有分组的视图
+    document.querySelectorAll('.folder-section-bookmarks').forEach(container => {
+        if (mode === 'list') {
+            container.classList.add('list-view');
+            if (container.style.display !== 'none') {
+                container.style.display = 'flex';
+            }
+        } else {
+            container.classList.remove('list-view');
+            if (container.style.display !== 'none') {
+                container.style.display = 'grid';
+            }
+        }
+    });
+    
+    // 更新按钮状态
+    updateViewModeButtons();
+    
+    // 保存设置
+    chrome.storage.local.set({ bookmarkViewMode: mode });
+}
+
+// 更新视图按钮状态
+function updateViewModeButtons() {
+    const gridBtn = document.getElementById('btnGridView');
+    const listBtn = document.getElementById('btnListView');
+    
+    if (gridBtn && listBtn) {
+        gridBtn.classList.toggle('btn-primary', currentViewMode === 'grid');
+        gridBtn.classList.toggle('btn-secondary', currentViewMode !== 'grid');
+        listBtn.classList.toggle('btn-primary', currentViewMode === 'list');
+        listBtn.classList.toggle('btn-secondary', currentViewMode !== 'list');
+    }
+}
+
+// 加载视图模式设置
+async function loadViewModeSetting() {
+    try {
+        const result = await chrome.storage.local.get('bookmarkViewMode');
+        if (result.bookmarkViewMode) {
+            currentViewMode = result.bookmarkViewMode;
+        }
+    } catch (e) {
+        console.error('加载视图模式设置失败:', e);
+    }
 }
