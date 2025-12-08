@@ -1231,9 +1231,10 @@ function updateStats() {
 const FAVORITES_FOLDER_NAME = '⭐ 常用';
 const RECENT_FOLDER_NAME = '🕐 最近使用';
 const UNUSED_FOLDER_NAME = '📦 长期未使用';
+const HOT_FOLDER_NAME = '🔥 热门书签';
 
-// 特殊文件夹名称列表（用于判断是否为快捷方式文件夹）
-const SHORTCUT_FOLDER_NAMES = [FAVORITES_FOLDER_NAME, RECENT_FOLDER_NAME];
+// 特殊文件夹名称列表（用于判断是否为快捷方式文件夹，查找重复时会排除）
+const SHORTCUT_FOLDER_NAMES = [FAVORITES_FOLDER_NAME, RECENT_FOLDER_NAME, HOT_FOLDER_NAME];
 
 // ==================== 文件夹树渲染 ====================
 function renderFolderTree() {
@@ -2146,8 +2147,8 @@ function bindEvents() {
     // 合并文件夹
     document.getElementById('btnMergeFolders').addEventListener('click', showMergeFoldersModal);
     
-    // 合并热门文件夹
-    document.getElementById('btnMergeHotFolders').addEventListener('click', mergeHotFolders);
+    // 更新热门书签
+    document.getElementById('btnUpdateHotBookmarks').addEventListener('click', updateHotBookmarks);
     
     // 空文件夹检测
     document.getElementById('btnFindEmptyFolders').addEventListener('click', findEmptyFolders);
@@ -2728,16 +2729,18 @@ async function findDuplicates() {
     const allBookmarksList = [];
     collectAllBookmarks(allBookmarks, allBookmarksList);
     
-    // 为每个书签添加路径信息和是否为快捷方式
-    for (const bookmark of allBookmarksList) {
+    // 过滤掉快捷方式文件夹（热门、常用、最近使用）中的书签
+    const normalBookmarks = allBookmarksList.filter(b => !isInShortcutFolder(b));
+    
+    // 为每个书签添加路径信息
+    for (const bookmark of normalBookmarks) {
         const normalizedUrl = normalizeUrl(bookmark.url);
         const path = await getBookmarkPath(bookmark.id);
-        const isShortcut = isInShortcutFolder(bookmark);
         
         if (!urlMap.has(normalizedUrl)) {
             urlMap.set(normalizedUrl, []);
         }
-        urlMap.get(normalizedUrl).push({ ...bookmark, path, isShortcut });
+        urlMap.get(normalizedUrl).push({ ...bookmark, path, isShortcut: false });
     }
     
     const duplicates = [];
@@ -7287,141 +7290,119 @@ async function loadViewModeSetting() {
 }
 
 
-// ==================== 合并热门文件夹功能 ====================
+// ==================== 自动更新热门书签功能 ====================
 
-// 合并"最近使用"和"常用"文件夹为"热门书签"
-async function mergeHotFolders() {
-    // 查找"最近使用"和"常用"文件夹
-    const hotFolderNames = ['最近使用', '常用', '常用书签', '热门', '热门书签', 'Recent', 'Frequent', 'Favorites'];
-    const foundFolders = [];
+// 更新热门书签（根据智能排序选取TOP N，使用副本模式）
+async function updateHotBookmarks() {
+    const TOP_N = 20; // 热门书签数量
     
-    function findHotFolders(nodes) {
-        for (const node of nodes) {
-            if (node.children) {
-                const lowerTitle = (node.title || '').toLowerCase();
-                if (hotFolderNames.some(name => lowerTitle === name.toLowerCase() || lowerTitle.includes(name.toLowerCase()))) {
-                    foundFolders.push(node);
-                }
-                findHotFolders(node.children);
-            }
-        }
-    }
+    // 收集所有书签（排除快捷方式文件夹中的）
+    const allBookmarksList = [];
+    collectAllBookmarks(allBookmarks, allBookmarksList);
+    const normalBookmarks = allBookmarksList.filter(b => !isInShortcutFolder(b));
     
-    findHotFolders(allBookmarks);
-    
-    if (foundFolders.length === 0) {
-        alert('未找到"最近使用"或"常用"相关的文件夹');
+    if (normalBookmarks.length === 0) {
+        alert('没有找到书签');
         return;
     }
     
-    if (foundFolders.length === 1) {
-        const rename = confirm(
-            `只找到一个相关文件夹："${foundFolders[0].title}"\n\n` +
-            `是否将其重命名为"🔥 热门书签"？`
-        );
-        if (rename) {
-            await chrome.bookmarks.update(foundFolders[0].id, { title: '🔥 热门书签' });
-            await loadBookmarks();
-            alert('✅ 已重命名为"🔥 热门书签"');
-        }
-        return;
-    }
-    
-    // 显示找到的文件夹
-    const folderList = foundFolders.map(f => `• ${f.title} (${countFolderBookmarks(f)} 个书签)`).join('\n');
+    // 显示确认
     const confirmed = confirm(
-        `🔥 合并热门文件夹\n\n` +
-        `找到以下相关文件夹：\n${folderList}\n\n` +
-        `将执行以下操作：\n` +
-        `1. 创建"🔥 热门书签"文件夹\n` +
-        `2. 合并所有书签（自动去重）\n` +
-        `3. 删除原文件夹\n\n` +
+        `🔥 更新热门书签\n\n` +
+        `将根据使用频率和最近访问时间，自动选取 TOP ${TOP_N} 热门书签。\n\n` +
+        `• 热门书签是副本，不会影响原书签位置\n` +
+        `• 查找重复时会自动排除热门文件夹\n` +
+        `• 每次更新会清空旧的热门书签\n\n` +
         `是否继续？`
     );
     
     if (!confirmed) return;
     
     try {
-        // 收集所有书签（去重）
-        const urlSet = new Set();
-        const uniqueBookmarks = [];
+        // 计算每个书签的热度分数
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60 * 1000;
         
-        for (const folder of foundFolders) {
-            if (folder.children) {
-                for (const child of folder.children) {
-                    if (child.url && !isSeparatorBookmark(child.url)) {
-                        const normalizedUrl = normalizeUrl(child.url);
-                        if (!urlSet.has(normalizedUrl)) {
-                            urlSet.add(normalizedUrl);
-                            uniqueBookmarks.push({
-                                title: child.title,
-                                url: child.url
-                            });
-                        }
-                    }
-                }
+        const scorePromises = normalBookmarks.map(async (b) => {
+            const usage = await getBookmarkUsage(b.url);
+            const lastVisit = await getLastVisitTime(b.url);
+            
+            // 频率分数
+            const frequencyScore = Math.min(usage * 10, 100);
+            
+            // 时间分数
+            let recencyScore = 0;
+            if (lastVisit > 0) {
+                const daysAgo = (now - lastVisit) / dayMs;
+                if (daysAgo < 1) recencyScore = 100;
+                else if (daysAgo < 3) recencyScore = 80;
+                else if (daysAgo < 7) recencyScore = 60;
+                else if (daysAgo < 30) recencyScore = 40;
+                else if (daysAgo < 90) recencyScore = 20;
+                else recencyScore = 10;
             }
+            
+            const totalScore = frequencyScore * 0.6 + recencyScore * 0.4;
+            return { bookmark: b, score: totalScore };
+        });
+        
+        const withScores = await Promise.all(scorePromises);
+        
+        // 按分数排序，取TOP N
+        withScores.sort((a, b) => b.score - a.score);
+        const topBookmarks = withScores.slice(0, TOP_N).filter(item => item.score > 0);
+        
+        if (topBookmarks.length === 0) {
+            alert('没有找到有访问记录的书签，无法生成热门列表');
+            return;
         }
         
-        // 在书签栏创建"热门书签"文件夹
-        const bookmarkBar = allBookmarks[0]?.children?.[0]; // 书签栏
+        // 获取或创建热门书签文件夹
+        const bookmarkBar = allBookmarks[0]?.children?.[0];
         if (!bookmarkBar) {
             alert('无法找到书签栏');
             return;
         }
         
-        // 检查是否已存在"热门书签"文件夹
-        let hotFolder = bookmarkBar.children?.find(c => c.title === '🔥 热门书签');
+        let hotFolder = bookmarkBar.children?.find(c => c.title === HOT_FOLDER_NAME);
         
-        if (!hotFolder) {
+        if (hotFolder) {
+            // 清空现有热门书签
+            if (hotFolder.children) {
+                for (const child of hotFolder.children) {
+                    try {
+                        await chrome.bookmarks.remove(child.id);
+                    } catch (e) {}
+                }
+            }
+        } else {
+            // 创建热门书签文件夹
             hotFolder = await chrome.bookmarks.create({
                 parentId: bookmarkBar.id,
-                title: '🔥 热门书签',
-                index: 0 // 放在书签栏最前面
+                title: HOT_FOLDER_NAME,
+                index: 0
             });
         }
         
-        // 添加书签到热门文件夹
-        for (const bookmark of uniqueBookmarks) {
-            // 检查是否已存在
-            const existing = await chrome.bookmarks.search({ url: bookmark.url });
-            const alreadyInHot = existing.some(e => e.parentId === hotFolder.id);
-            
-            if (!alreadyInHot) {
-                await chrome.bookmarks.create({
-                    parentId: hotFolder.id,
-                    title: bookmark.title,
-                    url: bookmark.url
-                });
-            }
-        }
-        
-        // 删除原文件夹
-        const deleteConfirmed = confirm(
-            `✅ 已合并 ${uniqueBookmarks.length} 个书签到"🔥 热门书签"\n\n` +
-            `是否删除原来的文件夹？\n${foundFolders.map(f => `• ${f.title}`).join('\n')}`
-        );
-        
-        if (deleteConfirmed) {
-            for (const folder of foundFolders) {
-                try {
-                    await chrome.bookmarks.removeTree(folder.id);
-                } catch (e) {
-                    console.error('删除文件夹失败:', folder.title, e);
-                }
-            }
+        // 添加TOP N书签的副本
+        for (const item of topBookmarks) {
+            await chrome.bookmarks.create({
+                parentId: hotFolder.id,
+                title: item.bookmark.title,
+                url: item.bookmark.url
+            });
         }
         
         await loadBookmarks();
         
         alert(
-            `🔥 合并完成！\n\n` +
-            `• 合并了 ${foundFolders.length} 个文件夹\n` +
-            `• 共 ${uniqueBookmarks.length} 个不重复书签\n` +
-            `• 已创建"🔥 热门书签"文件夹`
+            `🔥 热门书签已更新！\n\n` +
+            `• 已添加 ${topBookmarks.length} 个热门书签\n` +
+            `• 这些是副本，原书签位置不变\n` +
+            `• 查找重复时会自动排除热门文件夹`
         );
         
     } catch (error) {
-        alert('合并失败: ' + error.message);
+        alert('更新失败: ' + error.message);
     }
 }
