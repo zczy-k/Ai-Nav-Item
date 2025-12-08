@@ -36,6 +36,7 @@ async function init() {
     await loadTags();
     await loadNotes();
     await loadViewModeSetting();
+    await loadAutoUpdateHotSetting();
     await loadBookmarks();
     bindEvents();
     loadAutoSortSetting();
@@ -2149,6 +2150,7 @@ function bindEvents() {
     
     // 更新热门书签
     document.getElementById('btnUpdateHotBookmarks').addEventListener('click', updateHotBookmarks);
+    document.getElementById('autoUpdateHotEnabled').addEventListener('change', toggleAutoUpdateHot);
     
     // 空文件夹检测
     document.getElementById('btnFindEmptyFolders').addEventListener('click', findEmptyFolders);
@@ -7406,5 +7408,31 @@ async function updateHotBookmarks() {
         
     } catch (error) {
         alert('更新失败: ' + error.message);
+    }
+}
+
+
+// ==================== 自动更新热门书签设置 ====================
+
+// 加载自动更新热门设置
+async function loadAutoUpdateHotSetting() {
+    try {
+        const result = await chrome.storage.local.get('autoUpdateHotBookmarks');
+        const enabled = result.autoUpdateHotBookmarks !== false; // 默认启用
+        document.getElementById('autoUpdateHotEnabled').checked = enabled;
+    } catch (e) {
+        console.error('加载自动更新热门设置失败:', e);
+    }
+}
+
+// 切换自动更新热门
+async function toggleAutoUpdateHot(e) {
+    const enabled = e.target.checked;
+    try {
+        await chrome.storage.local.set({ autoUpdateHotBookmarks: enabled });
+        // 通知background.js
+        chrome.runtime.sendMessage({ action: 'setAutoUpdateHotBookmarks', enabled });
+    } catch (e) {
+        console.error('保存自动更新热门设置失败:', e);
     }
 }
