@@ -7,7 +7,7 @@ let selectedBookmarks = new Set();
 let editingItem = null;
 let draggedBookmark = null;
 let bookmarkUsageCache = new Map(); // 使用频率缓存
-let currentSortOrder = 'frequency'; // 当前排序方式
+let currentSortOrder = 'smart'; // 当前排序方式
 let autoSortInterval = null; // 自动排序定时器
 let bookmarkTags = new Map(); // 书签标签映射 {bookmarkId: [tags]}
 let allTags = new Set(); // 所有标签集合
@@ -1748,8 +1748,43 @@ function scrollToFolderSection(folderId) {
 
 // 排序书签
 async function sortBookmarks(bookmarks, order) {
-    if (order === 'frequency') {
-        // 获取所有书签的使用频率
+    if (order === 'smart') {
+        // 智能排序：综合考虑使用频率和最近访问时间
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60 * 1000;
+        
+        const scorePromises = bookmarks.map(async (b) => {
+            const usage = await getBookmarkUsage(b.url);
+            const lastVisit = await getLastVisitTime(b.url);
+            
+            // 计算热度分数
+            // 频率分数：访问次数 * 10，最高100分
+            const frequencyScore = Math.min(usage * 10, 100);
+            
+            // 时间分数：最近访问越近分数越高
+            let recencyScore = 0;
+            if (lastVisit > 0) {
+                const daysAgo = (now - lastVisit) / dayMs;
+                if (daysAgo < 1) recencyScore = 100;      // 今天访问
+                else if (daysAgo < 3) recencyScore = 80;  // 3天内
+                else if (daysAgo < 7) recencyScore = 60;  // 一周内
+                else if (daysAgo < 30) recencyScore = 40; // 一个月内
+                else if (daysAgo < 90) recencyScore = 20; // 三个月内
+                else recencyScore = 10;
+            }
+            
+            // 综合分数：频率权重60%，时间权重40%
+            const totalScore = frequencyScore * 0.6 + recencyScore * 0.4;
+            
+            return { bookmark: b, score: totalScore, usage, lastVisit };
+        });
+        
+        const withScores = await Promise.all(scorePromises);
+        withScores.sort((a, b) => b.score - a.score);
+        return withScores.map(item => item.bookmark);
+        
+    } else if (order === 'frequency') {
+        // 按使用频率排序
         const usagePromises = bookmarks.map(async (b) => {
             const usage = await getBookmarkUsage(b.url);
             return { bookmark: b, usage };
@@ -1757,12 +1792,37 @@ async function sortBookmarks(bookmarks, order) {
         const withUsage = await Promise.all(usagePromises);
         withUsage.sort((a, b) => b.usage - a.usage);
         return withUsage.map(item => item.bookmark);
+        
+    } else if (order === 'recent') {
+        // 按最近访问时间排序
+        const visitPromises = bookmarks.map(async (b) => {
+            const lastVisit = await getLastVisitTime(b.url);
+            return { bookmark: b, lastVisit };
+        });
+        const withVisits = await Promise.all(visitPromises);
+        withVisits.sort((a, b) => b.lastVisit - a.lastVisit);
+        return withVisits.map(item => item.bookmark);
+        
     } else if (order === 'name') {
         return [...bookmarks].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     } else if (order === 'date') {
         return [...bookmarks].sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
     }
     return bookmarks;
+}
+
+// 获取书签最后访问时间
+async function getLastVisitTime(url) {
+    try {
+        const visits = await chrome.history.getVisits({ url });
+        if (visits.length > 0) {
+            // 返回最近一次访问的时间
+            return Math.max(...visits.map(v => v.visitTime || 0));
+        }
+        return 0;
+    } catch {
+        return 0;
+    }
 }
 
 function getBookmarksForCurrentFolder() {
