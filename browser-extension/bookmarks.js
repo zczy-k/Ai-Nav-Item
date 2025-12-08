@@ -4227,6 +4227,8 @@ async function confirmBatchMove() {
         return;
     }
     
+    const count = selectedBookmarks.size;
+    
     try {
         for (const id of selectedBookmarks) {
             await chrome.bookmarks.move(id, { parentId: targetId });
@@ -4235,7 +4237,7 @@ async function confirmBatchMove() {
         closeBatchMoveModal();
         selectedBookmarks.clear();
         await loadBookmarks();
-        alert(`成功移动 ${selectedBookmarks.size} 个书签`);
+        alert(`成功移动 ${count} 个书签`);
     } catch (error) {
         alert('移动失败: ' + error.message);
     }
