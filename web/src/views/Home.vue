@@ -1601,17 +1601,17 @@ function saveCardsCache() {
   }
 }
 
-async function loadCards() {
+async function loadCards(forceRefresh = false) {
   if (!activeMenu.value) return;
   
   const cacheKey = getCardsCacheKey(activeMenu.value.id, activeSubMenu.value?.id);
   
-  // 优先使用内存缓存，实现秒切换
-  if (cardsCache.value[cacheKey]) {
+  // 优先使用内存缓存，实现秒切换（除非强制刷新）
+  if (!forceRefresh && cardsCache.value[cacheKey]) {
     cards.value = cardsCache.value[cacheKey];
   }
   
-  // 后台静默更新
+  // 从服务器获取最新数据
   try {
     const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id);
     cards.value = res.data;
@@ -2099,9 +2099,9 @@ async function addSelectedCards() {
     
     alert(message);
     
-    // 关闭弹窗并刷新卡片列表
+    // 关闭弹窗并强制刷新卡片列表（不使用缓存）
     closeBatchAdd();
-    await loadCards();
+    await loadCards(true);
   } catch (error) {
     batchError.value = error.response?.data?.error || '添加失败，请重试';
   } finally {
@@ -2473,6 +2473,13 @@ async function handleDeleteCard(card) {
     const selectedIndex = selectedCards.value.findIndex(c => c.id === card.id);
     if (selectedIndex > -1) {
       selectedCards.value.splice(selectedIndex, 1);
+    }
+    
+    // 同步更新缓存
+    const cacheKey = getCardsCacheKey(activeMenu.value?.id, activeSubMenu.value?.id);
+    if (cardsCache.value[cacheKey]) {
+      cardsCache.value[cacheKey] = cards.value;
+      saveCardsCache();
     }
     
     showToastMessage('删除成功');
