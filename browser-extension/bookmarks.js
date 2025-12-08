@@ -2772,10 +2772,35 @@ async function getBookmarkPath(bookmarkId) {
 function normalizeUrl(url) {
     try {
         const urlObj = new URL(url);
-        let normalized = urlObj.hostname.replace(/^www\./, '') + urlObj.pathname.replace(/\/$/, '') + urlObj.search;
+        
+        // 移除www前缀
+        let hostname = urlObj.hostname.replace(/^www\./, '');
+        
+        // 移除末尾斜杠
+        let pathname = urlObj.pathname.replace(/\/+$/, '');
+        
+        // 处理查询参数：移除常见的追踪参数
+        const trackingParams = [
+            'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+            'fbclid', 'gclid', 'ref', 'source', 'from', 'spm', 'share_source',
+            '_ga', '_gl', 'mc_cid', 'mc_eid', 'mkt_tok'
+        ];
+        
+        const params = new URLSearchParams(urlObj.search);
+        trackingParams.forEach(p => params.delete(p));
+        
+        // 对参数排序以确保一致性
+        const sortedParams = new URLSearchParams([...params.entries()].sort());
+        const search = sortedParams.toString() ? '?' + sortedParams.toString() : '';
+        
+        // 忽略hash部分
+        // 忽略协议差异（http/https视为相同）
+        // 忽略默认端口
+        
+        let normalized = hostname + pathname + search;
         return normalized.toLowerCase();
     } catch {
-        return url.toLowerCase();
+        return url.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
     }
 }
 
