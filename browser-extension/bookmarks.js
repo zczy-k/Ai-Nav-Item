@@ -2139,6 +2139,7 @@ function bindEvents() {
     document.getElementById('cloudBackupClose').addEventListener('click', closeCloudBackupModal);
     document.getElementById('btnCloseCloudBackup').addEventListener('click', closeCloudBackupModal);
     document.getElementById('btnTestBackupServer').addEventListener('click', testBackupServerConnection);
+    document.getElementById('btnAuthLogin').addEventListener('click', showAuthLoginDialog);
     document.getElementById('btnUploadBackup').addEventListener('click', uploadBookmarkBackup);
     document.getElementById('btnRestoreBackup').addEventListener('click', restoreBookmarkBackup);
     document.getElementById('cloudBackupSelect').addEventListener('change', onBackupSelectChange);
@@ -7453,13 +7454,13 @@ async function toggleAutoUpdateHot(e) {
 // ==================== 云端书签备份功能 ====================
 
 let cloudBackupServerUrl = '';
-let cloudBackupPassword = '';
+let cloudBackupToken = ''; // 使用Token替代密码
 
 // 显示云备份弹窗
 async function showCloudBackupModal() {
-    // 加载保存的服务器地址和密码
+    // 加载保存的服务器地址和Token
     try {
-        const result = await chrome.storage.local.get(['cloudBackupServer', 'backupDeviceName', 'cloudBackupPassword', 'autoBookmarkBackupEnabled']);
+        const result = await chrome.storage.local.get(['cloudBackupServer', 'backupDeviceName', 'cloudBackupToken', 'autoBookmarkBackupEnabled']);
         if (result.cloudBackupServer) {
             cloudBackupServerUrl = result.cloudBackupServer;
             document.getElementById('cloudBackupServer').value = result.cloudBackupServer;
@@ -7467,9 +7468,8 @@ async function showCloudBackupModal() {
         if (result.backupDeviceName) {
             document.getElementById('backupDeviceName').value = result.backupDeviceName;
         }
-        if (result.cloudBackupPassword) {
-            cloudBackupPassword = result.cloudBackupPassword;
-            document.getElementById('cloudBackupPassword').value = result.cloudBackupPassword;
+        if (result.cloudBackupToken) {
+            cloudBackupToken = result.cloudBackupToken;
         }
         // 加载自动备份状态
         document.getElementById('autoBackupEnabled').checked = result.autoBookmarkBackupEnabled || false;
@@ -7483,6 +7483,9 @@ async function showCloudBackupModal() {
     document.getElementById('cloudBackupModal').classList.add('active');
     document.getElementById('cloudBackupStatus').textContent = '';
     
+    // 更新授权状态显示
+    await updateAuthStatusDisplay();
+    
     // 如果已有服务器地址，自动加载备份列表并检查WebDAV状态
     if (cloudBackupServerUrl) {
         await loadCloudBackupList();
@@ -7492,6 +7495,103 @@ async function showCloudBackupModal() {
         const banner = document.getElementById('webdavStatusBanner');
         if (banner) banner.style.display = 'none';
     }
+}
+
+// 更新授权状态显示
+async function updateAuthStatusDisplay() {
+    const statusEl = document.getElementById('authStatus');
+    const btnEl = document.getElementById('btnAuthLogin');
+    
+    if (!cloudBackupToken || !cloudBackupServerUrl) {
+        statusEl.innerHTML = '<span style="color: #ef4444;">❌ 未授权</span>';
+        statusEl.style.borderColor = '#fecaca';
+        statusEl.style.background = '#fef2f2';
+        btnEl.textContent = '授权';
+        btnEl.style.background = '#10b981';
+        return;
+    }
+    
+    // 验证Token是否有效
+    try {
+        const response = await fetch(`${cloudBackupServerUrl}/api/extension/verify`, {
+            headers: { 'Authorization': `Bearer ${cloudBackupToken}` }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.valid) {
+            statusEl.innerHTML = '<span style="color: #10b981;">✅ 已授权</span>';
+            statusEl.style.borderColor = '#a7f3d0';
+            statusEl.style.background = '#ecfdf5';
+            btnEl.textContent = '重新授权';
+            btnEl.style.background = '#6b7280';
+        } else {
+            // Token无效
+            cloudBackupToken = '';
+            await chrome.storage.local.remove('cloudBackupToken');
+            statusEl.innerHTML = `<span style="color: #f59e0b;">⚠️ ${data.message || '需要重新授权'}</span>`;
+            statusEl.style.borderColor = '#fde68a';
+            statusEl.style.background = '#fffbeb';
+            btnEl.textContent = '重新授权';
+            btnEl.style.background = '#f59e0b';
+        }
+    } catch (e) {
+        statusEl.innerHTML = '<span style="color: #6b7280;">⏳ 无法验证</span>';
+        statusEl.style.borderColor = '#e5e7eb';
+        statusEl.style.background = '#f9fafb';
+    }
+}
+
+// 显示授权登录弹窗
+async function showAuthLoginDialog() {
+    if (!cloudBackupServerUrl) {
+        alert('请先配置并测试服务器连接');
+        return;
+    }
+    
+    const password = prompt('请输入管理密码进行授权：');
+    if (!password) return;
+    
+    const statusEl = document.getElementById('cloudBackupStatus');
+    statusEl.textContent = '⏳ 正在授权...';
+    statusEl.style.color = '#666';
+    
+    try {
+        const response = await fetch(`${cloudBackupServerUrl}/api/extension/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.token) {
+            cloudBackupToken = data.token;
+            await chrome.storage.local.set({ cloudBackupToken: data.token });
+            statusEl.textContent = '✅ 授权成功';
+            statusEl.style.color = '#10b981';
+            await updateAuthStatusDisplay();
+        } else {
+            statusEl.textContent = `❌ 授权失败: ${data.message || '密码错误'}`;
+            statusEl.style.color = '#ef4444';
+        }
+    } catch (error) {
+        statusEl.textContent = `❌ 授权失败: ${error.message}`;
+        statusEl.style.color = '#ef4444';
+    }
+}
+
+// 获取认证头
+function getAuthHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (cloudBackupToken) {
+        headers['Authorization'] = `Bearer ${cloudBackupToken}`;
+    }
+    return headers;
+}
+
+// 检查是否已授权
+function isAuthorized() {
+    return !!cloudBackupToken;
 }
 
 // 检查WebDAV配置状态并显示提示横幅
@@ -7827,6 +7927,12 @@ async function uploadBookmarkBackup() {
         return;
     }
     
+    // 检查是否已授权
+    if (!isAuthorized()) {
+        alert('请先点击"授权"按钮进行身份验证');
+        return;
+    }
+    
     // 获取并清理设备名称（前端验证）
     let deviceName = document.getElementById('backupDeviceName').value.trim() || '未命名设备';
     // 只允许安全字符：字母、数字、中文、下划线、连字符、空格
@@ -7837,19 +7943,10 @@ async function uploadBookmarkBackup() {
         .trim()
         .slice(0, 30) || '未命名设备';
     
-    const password = document.getElementById('cloudBackupPassword').value;
     const statusEl = document.getElementById('cloudBackupStatus');
     
-    // 验证密码
-    const pwdValidation = validatePassword(password);
-    if (!pwdValidation.valid) {
-        alert(pwdValidation.error || '上传备份需要输入管理密码');
-        document.getElementById('cloudBackupPassword').focus();
-        return;
-    }
-    
-    // 保存设备名称和密码（已验证）
-    await chrome.storage.local.set({ backupDeviceName: deviceName, cloudBackupPassword: password });
+    // 保存设备名称
+    await chrome.storage.local.set({ backupDeviceName: deviceName });
     
     statusEl.textContent = '⏳ 正在备份...';
     
@@ -7859,17 +7956,26 @@ async function uploadBookmarkBackup() {
         
         const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/upload`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 bookmarks: tree,
                 deviceName: deviceName,
-                password: password,
                 type: 'manual',  // 手动备份
                 skipIfSame: false  // 手动备份不跳过
             })
         });
         
         const data = await response.json();
+        
+        // 检查是否Token失效
+        if (response.status === 401 && data.reason === 'token_invalid') {
+            cloudBackupToken = '';
+            await chrome.storage.local.remove('cloudBackupToken');
+            await updateAuthStatusDisplay();
+            statusEl.textContent = '❌ 授权已失效，请重新授权';
+            statusEl.style.color = '#ef4444';
+            return;
+        }
         
         if (data.success) {
             if (data.skipped) {
@@ -8048,11 +8154,8 @@ function showRestoreModeDialog() {
 
 // 删除云端备份
 async function deleteCloudBackup(filename) {
-    const password = document.getElementById('cloudBackupPassword').value;
-    
-    if (!password) {
-        alert('删除备份需要输入管理密码');
-        document.getElementById('cloudBackupPassword').focus();
+    if (!isAuthorized()) {
+        alert('请先点击"授权"按钮进行身份验证');
         return;
     }
     
@@ -8061,11 +8164,19 @@ async function deleteCloudBackup(filename) {
     try {
         const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/delete/${filename}`, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            headers: getAuthHeaders()
         });
         
         const data = await response.json();
+        
+        // 检查是否Token失效
+        if (response.status === 401 && data.reason === 'token_invalid') {
+            cloudBackupToken = '';
+            await chrome.storage.local.remove('cloudBackupToken');
+            await updateAuthStatusDisplay();
+            alert('授权已失效，请重新授权');
+            return;
+        }
         
         if (data.success) {
             await loadCloudBackupList();
@@ -8083,7 +8194,6 @@ async function deleteCloudBackup(filename) {
 async function toggleAutoBackup(e) {
     const enabled = e.target.checked;
     const serverUrl = document.getElementById('cloudBackupServer').value.trim();
-    const password = document.getElementById('cloudBackupPassword').value;
     const deviceName = document.getElementById('backupDeviceName').value.trim();
     
     if (enabled) {
@@ -8093,18 +8203,17 @@ async function toggleAutoBackup(e) {
             e.target.checked = false;
             return;
         }
-        if (!password) {
-            alert('请先输入管理密码');
+        if (!isAuthorized()) {
+            alert('请先点击"授权"按钮进行身份验证');
             e.target.checked = false;
             return;
         }
     }
     
-    // 保存配置
+    // 保存配置（使用Token而非密码）
     await chrome.storage.local.set({
         autoBookmarkBackupEnabled: enabled,
         cloudBackupServer: serverUrl,
-        cloudBackupPassword: password,
         backupDeviceName: deviceName || 'Chrome'
     });
     
@@ -8307,11 +8416,8 @@ async function loadWebDAVBackupList() {
 
 // 删除WebDAV备份
 async function deleteWebDAVBackup(filename) {
-    const password = document.getElementById('cloudBackupPassword').value;
-    
-    if (!password) {
-        alert('删除备份需要输入管理密码');
-        document.getElementById('cloudBackupPassword').focus();
+    if (!isAuthorized()) {
+        alert('请先点击"授权"按钮进行身份验证');
         return;
     }
     
@@ -8320,11 +8426,18 @@ async function deleteWebDAVBackup(filename) {
     try {
         const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/webdav/delete/${filename}`, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            headers: getAuthHeaders()
         });
         
         const data = await response.json();
+        
+        if (response.status === 401 && data.reason === 'token_invalid') {
+            cloudBackupToken = '';
+            await chrome.storage.local.remove('cloudBackupToken');
+            await updateAuthStatusDisplay();
+            alert('授权已失效，请重新授权');
+            return;
+        }
         
         if (data.success) {
             await loadWebDAVBackupList();
@@ -8343,10 +8456,8 @@ async function syncFromWebDAV() {
         return;
     }
     
-    const password = document.getElementById('cloudBackupPassword').value;
-    if (!password) {
-        alert('同步需要输入管理密码');
-        document.getElementById('cloudBackupPassword').focus();
+    if (!isAuthorized()) {
+        alert('请先点击"授权"按钮进行身份验证');
         return;
     }
     
@@ -8357,11 +8468,19 @@ async function syncFromWebDAV() {
     try {
         const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/webdav/sync-to-local`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            headers: getAuthHeaders()
         });
         
         const data = await response.json();
+        
+        if (response.status === 401 && data.reason === 'token_invalid') {
+            cloudBackupToken = '';
+            await chrome.storage.local.remove('cloudBackupToken');
+            await updateAuthStatusDisplay();
+            statusEl.textContent = '❌ 授权已失效，请重新授权';
+            statusEl.style.color = '#ef4444';
+            return;
+        }
         
         if (data.success) {
             statusEl.textContent = `✅ ${data.message}`;
@@ -8387,10 +8506,8 @@ async function syncToWebDAV() {
         return;
     }
     
-    const password = document.getElementById('cloudBackupPassword').value;
-    if (!password) {
-        alert('同步需要输入管理密码');
-        document.getElementById('cloudBackupPassword').focus();
+    if (!isAuthorized()) {
+        alert('请先点击"授权"按钮进行身份验证');
         return;
     }
     
@@ -8401,11 +8518,19 @@ async function syncToWebDAV() {
     try {
         const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/webdav/sync-to-webdav`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            headers: getAuthHeaders()
         });
         
         const data = await response.json();
+        
+        if (response.status === 401 && data.reason === 'token_invalid') {
+            cloudBackupToken = '';
+            await chrome.storage.local.remove('cloudBackupToken');
+            await updateAuthStatusDisplay();
+            statusEl.textContent = '❌ 授权已失效，请重新授权';
+            statusEl.style.color = '#ef4444';
+            return;
+        }
         
         if (data.success) {
             statusEl.textContent = `✅ ${data.message}`;
@@ -8431,16 +8556,14 @@ async function restoreBookmarkBackup() {
     const selectEl = document.getElementById('cloudBackupSelect');
     const filename = selectEl.value;
     const statusEl = document.getElementById('cloudBackupStatus');
-    const password = document.getElementById('cloudBackupPassword').value;
     
     if (!filename) {
         alert('请选择要恢复的备份');
         return;
     }
     
-    if (!password) {
-        alert('恢复书签需要输入管理密码');
-        document.getElementById('cloudBackupPassword').focus();
+    if (!isAuthorized()) {
+        alert('请先点击"授权"按钮进行身份验证');
         return;
     }
     

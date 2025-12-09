@@ -295,18 +295,50 @@ async function deleteBookmarkFromWebDAV(filename) {
 }
 
 
-// 灵活认证中间件
+// 灵活认证中间件（支持扩展Token和密码认证）
 function flexAuthMiddleware(req, res, next) {
     const auth = req.headers.authorization;
+    
+    // 优先使用Bearer Token认证
     if (auth && auth.startsWith('Bearer ')) {
         const token = auth.slice(7);
         try {
             const payload = jwt.verify(token, JWT_SECRET);
+            
+            // 如果是扩展Token，需要验证token_version
+            if (payload.type === 'extension') {
+                db.get('SELECT token_version FROM users WHERE id = ?', [payload.id], (err, user) => {
+                    if (err || !user) {
+                        return res.status(401).json({ success: false, message: '用户不存在' });
+                    }
+                    
+                    const currentVersion = user.token_version || 1;
+                    if (payload.tokenVersion !== currentVersion) {
+                        return res.status(401).json({ 
+                            success: false, 
+                            message: '密码已更改，请重新验证',
+                            reason: 'token_invalid'
+                        });
+                    }
+                    
+                    req.user = payload;
+                    next();
+                });
+                return;
+            }
+            
+            // 普通JWT Token
             req.user = payload;
             return next();
-        } catch (e) {}
+        } catch (e) {
+            if (e.name === 'TokenExpiredError') {
+                return res.status(401).json({ success: false, message: 'Token已过期', reason: 'token_expired' });
+            }
+            // Token无效，继续尝试密码认证
+        }
     }
     
+    // 密码认证（兼容旧版本，但不推荐）
     const { password } = req.body;
     if (password) {
         db.get('SELECT * FROM users WHERE id = 1', (err, user) => {

@@ -1027,12 +1027,12 @@ const DAILY_BACKUP_HOUR = 2; // 每天凌晨2点
 let backupDebounceTimer = null;
 let dailyBackupTimer = null;
 
-// 自动备份配置
+// 自动备份配置（使用Token认证）
 let autoBackupConfig = {
     enabled: false,
     serverUrl: '',
     deviceName: '',
-    password: ''
+    token: ''  // 使用Token替代密码
 };
 
 // 加载自动备份配置
@@ -1042,14 +1042,14 @@ async function loadAutoBackupConfig() {
             'autoBookmarkBackupEnabled',
             'cloudBackupServer',
             'backupDeviceName',
-            'cloudBackupPassword'
+            'cloudBackupToken'  // 使用Token
         ]);
         
         autoBackupConfig = {
             enabled: result.autoBookmarkBackupEnabled || false,
             serverUrl: result.cloudBackupServer || '',
             deviceName: result.backupDeviceName || '',
-            password: result.cloudBackupPassword || ''
+            token: result.cloudBackupToken || ''  // 使用Token
         };
         
         return autoBackupConfig;
@@ -1059,32 +1059,48 @@ async function loadAutoBackupConfig() {
     }
 }
 
-// 执行自动备份
+// 执行自动备份（使用Token认证）
 async function performAutoBackup(type = 'auto') {
     try {
         await loadAutoBackupConfig();
         
-        if (!autoBackupConfig.enabled || !autoBackupConfig.serverUrl || !autoBackupConfig.password) {
-            return { success: false, reason: '自动备份未配置' };
+        if (!autoBackupConfig.enabled || !autoBackupConfig.serverUrl || !autoBackupConfig.token) {
+            return { success: false, reason: '自动备份未配置或未授权' };
         }
         
         // 获取所有书签
         const tree = await chrome.bookmarks.getTree();
         
-        // 上传备份
+        // 上传备份（使用Token认证）
         const response = await fetch(`${autoBackupConfig.serverUrl}/api/bookmark-sync/upload`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${autoBackupConfig.token}`
+            },
             body: JSON.stringify({
                 bookmarks: tree,
                 deviceName: autoBackupConfig.deviceName || 'Chrome',
-                password: autoBackupConfig.password,
                 type: type,
                 skipIfSame: true
             })
         });
         
         const data = await response.json();
+        
+        // 检查Token是否失效
+        if (response.status === 401 && data.reason === 'token_invalid') {
+            // Token失效，禁用自动备份并通知用户
+            await chrome.storage.local.set({ autoBookmarkBackupEnabled: false });
+            await chrome.storage.local.remove('cloudBackupToken');
+            autoBackupConfig.enabled = false;
+            autoBackupConfig.token = '';
+            
+            // 显示通知提醒用户
+            showNotification('自动备份已暂停', '管理密码已更改，请重新授权以恢复自动备份');
+            
+            return { success: false, reason: 'token_invalid', message: '授权已失效' };
+        }
         
         if (data.success) {
             return { success: true, data };

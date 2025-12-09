@@ -167,6 +167,10 @@ async function initializeDatabase() {
     try {
       await dbRun(`ALTER TABLE users ADD COLUMN last_login_ip TEXT`);
     } catch (e) { }
+    // 添加token版本号（用于使扩展Token失效）
+    try {
+      await dbRun(`ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1`);
+    } catch (e) { }
 
 
 

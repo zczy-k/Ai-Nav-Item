@@ -95,4 +95,93 @@ router.post('/verify-password', loginLimiter, (req, res) => {
   });
 });
 
+// ==================== 扩展专用Token认证 ====================
+
+// 扩展登录 - 生成长期Token（用于自动备份等功能）
+router.post('/extension/login', loginLimiter, (req, res) => {
+  const { password } = req.body;
+  
+  if (!password) {
+    return res.status(400).json({ success: false, message: '请输入密码' });
+  }
+  
+  if (password.length < 1 || password.length > 128) {
+    return res.status(400).json({ success: false, message: '密码格式无效' });
+  }
+  
+  db.get('SELECT * FROM users WHERE id = 1', (err, user) => {
+    if (err || !user) {
+      return res.status(500).json({ success: false, message: '服务器错误' });
+    }
+    
+    bcrypt.compare(password, user.password, (err, result) => {
+      if (result) {
+        // 生成包含token_version的长期Token（365天有效）
+        const tokenVersion = user.token_version || 1;
+        const token = jwt.sign(
+          { 
+            id: user.id, 
+            username: user.username,
+            tokenVersion: tokenVersion,
+            type: 'extension'  // 标记为扩展Token
+          }, 
+          JWT_SECRET, 
+          { expiresIn: '365d' }
+        );
+        res.json({ 
+          success: true, 
+          token,
+          message: '登录成功'
+        });
+      } else {
+        res.status(401).json({ success: false, message: '密码错误' });
+      }
+    });
+  });
+});
+
+// 验证扩展Token是否有效
+router.get('/extension/verify', (req, res) => {
+  const auth = req.headers.authorization;
+  
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.json({ success: false, valid: false, message: '未提供Token' });
+  }
+  
+  const token = auth.slice(7);
+  
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    
+    // 检查是否是扩展Token
+    if (payload.type !== 'extension') {
+      return res.json({ success: false, valid: false, message: 'Token类型无效' });
+    }
+    
+    // 检查token_version是否匹配
+    db.get('SELECT token_version FROM users WHERE id = ?', [payload.id], (err, user) => {
+      if (err || !user) {
+        return res.json({ success: false, valid: false, message: '用户不存在' });
+      }
+      
+      const currentVersion = user.token_version || 1;
+      if (payload.tokenVersion !== currentVersion) {
+        return res.json({ 
+          success: false, 
+          valid: false, 
+          message: '密码已更改，请重新验证',
+          reason: 'password_changed'
+        });
+      }
+      
+      res.json({ success: true, valid: true });
+    });
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.json({ success: false, valid: false, message: 'Token已过期', reason: 'expired' });
+    }
+    return res.json({ success: false, valid: false, message: 'Token无效' });
+  }
+});
+
 module.exports = router; 
