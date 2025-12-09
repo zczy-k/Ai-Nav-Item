@@ -7571,9 +7571,16 @@ async function loadCloudBackupList() {
                         </div>
                         <div style="font-size: 11px; color: #999; margin-top: 2px;">${formatBackupTime(b.backupTime)}</div>
                     </div>
-                    <button class="btn btn-small btn-danger" onclick="deleteCloudBackup('${b.filename}')" title="删除">🗑️</button>
+                    <button class="btn btn-small btn-danger btn-delete-backup" data-filename="${b.filename}" title="删除">🗑️</button>
                 </div>
             `).join('');
+            
+            // 绑定删除按钮事件
+            listEl.querySelectorAll('.btn-delete-backup').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    deleteCloudBackup(btn.dataset.filename);
+                });
+            });
         } else {
             listEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #dc2626;">${data.message || '加载失败'}</div>`;
         }
