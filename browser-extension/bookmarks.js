@@ -8098,7 +8098,14 @@ async function loadWebDAVBackupList() {
         const data = await response.json();
         
         if (!data.success) {
-            listEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #f59e0b;">⚠️ ${data.message || 'WebDAV未配置'}</div>`;
+            const webdavConfigUrl = cloudBackupServerUrl ? `${cloudBackupServerUrl}/admin/backup` : '#';
+            listEl.innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <div style="color: #f59e0b; margin-bottom: 8px;">⚠️ ${data.message || 'WebDAV未配置'}</div>
+                    <a href="${webdavConfigUrl}" target="_blank" style="color: #3b82f6; font-size: 13px; text-decoration: underline; cursor: pointer;">
+                        👉 前往管理后台配置WebDAV
+                    </a>
+                </div>`;
             selectEl.innerHTML = '<option value="">-- WebDAV未配置 --</option>';
             return;
         }
