@@ -780,6 +780,65 @@ router.post('/webdav/sync-to-local', flexAuthMiddleware, async (req, res) => {
     }
 });
 
+// 同步本地备份到WebDAV
+router.post('/webdav/sync-to-webdav', flexAuthMiddleware, async (req, res) => {
+    try {
+        const client = await getWebDAVClient();
+        if (!client) {
+            return res.status(400).json({ success: false, message: 'WebDAV未配置' });
+        }
+
+        ensureDir();
+
+        // 确保WebDAV目录存在
+        try { await client.createDirectory('/Con-Nav-Item-Backups'); } catch (e) {}
+        try { await client.createDirectory(WEBDAV_BOOKMARK_DIR); } catch (e) {}
+
+        // 获取本地文件列表
+        const localFiles = fs.readdirSync(BOOKMARKS_DIR).filter(f => f.endsWith('.json'));
+
+        if (localFiles.length === 0) {
+            return res.json({ success: true, synced: 0, message: '本地暂无备份文件' });
+        }
+
+        // 获取WebDAV上的文件列表
+        let remoteFiles = [];
+        try {
+            const contents = await client.getDirectoryContents(WEBDAV_BOOKMARK_DIR);
+            remoteFiles = contents
+                .filter(item => item.type === 'file' && item.basename.endsWith('.json'))
+                .map(item => item.basename);
+        } catch (e) {}
+
+        // 找出WebDAV上没有的文件
+        const toSync = localFiles.filter(f => !remoteFiles.includes(f));
+
+        let synced = 0;
+        for (const filename of toSync) {
+            try {
+                const localPath = path.join(BOOKMARKS_DIR, filename);
+                const content = fs.readFileSync(localPath, 'utf-8');
+                const remotePath = `${WEBDAV_BOOKMARK_DIR}/${filename}`;
+                await client.putFileContents(remotePath, content);
+                synced++;
+            } catch (e) {
+                console.error(`[书签备份] 同步到WebDAV失败: ${filename}`, e.message);
+            }
+        }
+
+        res.json({
+            success: true,
+            synced,
+            total: localFiles.length,
+            message: synced > 0 ? `已同步 ${synced} 个备份到WebDAV` : 'WebDAV已是最新'
+        });
+
+    } catch (error) {
+        console.error('同步到WebDAV失败:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // 检查WebDAV配置状态
 router.get('/webdav/status', async (req, res) => {
     try {

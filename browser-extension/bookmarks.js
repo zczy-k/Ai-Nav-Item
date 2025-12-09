@@ -2144,6 +2144,7 @@ function bindEvents() {
     document.getElementById('cloudBackupSelect').addEventListener('change', onBackupSelectChange);
     document.getElementById('autoBackupEnabled').addEventListener('change', toggleAutoBackup);
     document.getElementById('btnSyncFromWebDAV').addEventListener('click', syncFromWebDAV);
+    document.getElementById('btnSyncToWebDAV').addEventListener('click', syncToWebDAV);
     // 备份来源切换
     document.querySelectorAll('.backup-source-btn').forEach(btn => {
         btn.addEventListener('click', () => switchBackupSource(btn.dataset.source));
@@ -7478,9 +7479,88 @@ async function showCloudBackupModal() {
     document.getElementById('cloudBackupModal').classList.add('active');
     document.getElementById('cloudBackupStatus').textContent = '';
     
-    // 如果已有服务器地址，自动加载备份列表
+    // 如果已有服务器地址，自动加载备份列表并检查WebDAV状态
     if (cloudBackupServerUrl) {
         await loadCloudBackupList();
+        await checkWebDAVStatus();
+    } else {
+        // 隐藏WebDAV状态横幅
+        const banner = document.getElementById('webdavStatusBanner');
+        if (banner) banner.style.display = 'none';
+    }
+}
+
+// 检查WebDAV配置状态并显示提示横幅
+async function checkWebDAVStatus() {
+    const banner = document.getElementById('webdavStatusBanner');
+    if (!banner || !cloudBackupServerUrl) {
+        if (banner) banner.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/webdav/status`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            banner.style.display = 'none';
+            return;
+        }
+        
+        if (!data.configured) {
+            // WebDAV未配置 - 显示警告横幅
+            banner.style.display = 'block';
+            banner.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+            banner.style.border = '1px solid #f59e0b';
+            banner.style.color = '#92400e';
+            banner.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 16px;">⚠️</span>
+                        <div>
+                            <div style="font-weight: 600;">WebDAV云存储未配置</div>
+                            <div style="font-size: 12px; margin-top: 2px;">配置WebDAV后，书签备份将自动同步到云端，实现多设备同步和容灾备份</div>
+                        </div>
+                    </div>
+                    <a href="${cloudBackupServerUrl}/admin" target="_blank" class="btn btn-small" style="background: #f59e0b; color: white; text-decoration: none; white-space: nowrap;">
+                        前往配置 →
+                    </a>
+                </div>
+            `;
+        } else if (!data.connected) {
+            // WebDAV已配置但连接失败 - 显示错误横幅
+            banner.style.display = 'block';
+            banner.style.background = 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
+            banner.style.border = '1px solid #ef4444';
+            banner.style.color = '#991b1b';
+            banner.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">❌</span>
+                    <div>
+                        <div style="font-weight: 600;">WebDAV连接失败</div>
+                        <div style="font-size: 12px; margin-top: 2px;">${data.message || '请检查WebDAV配置是否正确'}</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            // WebDAV已配置且连接正常 - 显示成功横幅
+            banner.style.display = 'block';
+            banner.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+            banner.style.border = '1px solid #10b981';
+            banner.style.color = '#065f46';
+            banner.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">✅</span>
+                    <div>
+                        <div style="font-weight: 600;">WebDAV云存储已连接</div>
+                        <div style="font-size: 12px; margin-top: 2px;">书签备份将自动同步到云端，支持多设备同步</div>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        // 网络错误 - 隐藏横幅
+        banner.style.display = 'none';
     }
 }
 
@@ -8213,7 +8293,7 @@ async function syncFromWebDAV() {
     }
     
     const statusEl = document.getElementById('cloudBackupStatus');
-    statusEl.textContent = '⏳ 正在从WebDAV同步...';
+    statusEl.textContent = '⏳ 正在从WebDAV下载...';
     statusEl.style.color = '#666';
     
     try {
@@ -8233,11 +8313,57 @@ async function syncFromWebDAV() {
                 await loadCloudBackupList();
             }
         } else {
-            statusEl.textContent = `❌ 同步失败: ${data.message}`;
+            statusEl.textContent = `❌ 下载失败: ${data.message}`;
             statusEl.style.color = '#dc2626';
         }
     } catch (error) {
-        statusEl.textContent = `❌ 同步失败: ${error.message}`;
+        statusEl.textContent = `❌ 下载失败: ${error.message}`;
+        statusEl.style.color = '#dc2626';
+    }
+}
+
+// 同步本地备份到WebDAV
+async function syncToWebDAV() {
+    if (!cloudBackupServerUrl) {
+        alert('请先测试服务器连接');
+        return;
+    }
+    
+    const password = document.getElementById('cloudBackupPassword').value;
+    if (!password) {
+        alert('同步需要输入管理密码');
+        document.getElementById('cloudBackupPassword').focus();
+        return;
+    }
+    
+    const statusEl = document.getElementById('cloudBackupStatus');
+    statusEl.textContent = '⏳ 正在上传到WebDAV...';
+    statusEl.style.color = '#666';
+    
+    try {
+        const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/webdav/sync-to-webdav`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusEl.textContent = `✅ ${data.message}`;
+            statusEl.style.color = '#059669';
+            // 刷新WebDAV备份列表
+            if (currentBackupSource === 'webdav') {
+                await loadWebDAVBackupList();
+            }
+            // 刷新WebDAV状态
+            await checkWebDAVStatus();
+        } else {
+            statusEl.textContent = `❌ 上传失败: ${data.message}`;
+            statusEl.style.color = '#dc2626';
+        }
+    } catch (error) {
+        statusEl.textContent = `❌ 上传失败: ${error.message}`;
         statusEl.style.color = '#dc2626';
     }
 }
