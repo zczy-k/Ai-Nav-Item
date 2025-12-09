@@ -405,7 +405,7 @@ router.get('/latest', async (req, res) => {
     }
 });
 
-// 删除书签备份
+// 删除书签备份（手动删除不同步WebDAV，保留云端备份作为容灾）
 router.delete('/delete/:filename', flexAuthMiddleware, async (req, res) => {
     try {
         const { filename } = req.params;
@@ -421,9 +421,10 @@ router.delete('/delete/:filename', flexAuthMiddleware, async (req, res) => {
         }
         
         fs.unlinkSync(filePath);
-        deleteBookmarkFromWebDAV(filename).catch(() => {});
+        // 注意：手动删除不同步删除WebDAV，保留云端备份作为容灾
+        // WebDAV上的备份需要用户在WebDAV标签页单独删除
         
-        res.json({ success: true, message: '删除成功' });
+        res.json({ success: true, message: '删除成功（WebDAV备份已保留）' });
         
     } catch (error) {
         console.error('删除书签备份失败:', error);
