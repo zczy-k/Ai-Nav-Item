@@ -7509,16 +7509,83 @@ function closeCloudBackupModal() {
     document.getElementById('cloudBackupModal').classList.remove('active');
 }
 
+// 验证服务器URL安全性
+function validateServerUrl(url) {
+    if (!url || typeof url !== 'string') {
+        return { valid: false, error: '请输入服务器地址' };
+    }
+    
+    // 移除首尾空格
+    url = url.trim();
+    
+    // 长度限制
+    if (url.length > 200) {
+        return { valid: false, error: '服务器地址过长' };
+    }
+    
+    // 检查危险字符（防止注入）
+    if (/[<>\"\'`\$\{\}]/.test(url)) {
+        return { valid: false, error: '服务器地址包含非法字符' };
+    }
+    
+    try {
+        const parsed = new URL(url);
+        
+        // 只允许http和https协议
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return { valid: false, error: '只支持 http:// 或 https:// 协议' };
+        }
+        
+        // 禁止本地文件协议
+        if (parsed.hostname === '' || parsed.hostname === 'localhost' && parsed.port === '') {
+            // localhost需要端口号（开发环境）
+        }
+        
+        // 禁止内网IP（可选，根据需求）
+        // const ip = parsed.hostname;
+        // if (/^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(ip)) {
+        //     return { valid: false, error: '不支持内网地址' };
+        // }
+        
+        return { valid: true, url: parsed.origin };
+    } catch (e) {
+        return { valid: false, error: '无效的URL格式' };
+    }
+}
+
+// 验证密码安全性
+function validatePassword(password) {
+    if (!password || typeof password !== 'string') {
+        return { valid: false, error: '请输入密码' };
+    }
+    
+    // 长度限制
+    if (password.length > 100) {
+        return { valid: false, error: '密码过长' };
+    }
+    
+    // 检查危险字符（防止注入，但密码允许大部分特殊字符）
+    if (/[<>]/.test(password)) {
+        return { valid: false, error: '密码包含非法字符' };
+    }
+    
+    return { valid: true };
+}
+
 // 测试服务器连接
 async function testBackupServerConnection() {
-    const serverUrl = document.getElementById('cloudBackupServer').value.trim();
+    const serverUrlInput = document.getElementById('cloudBackupServer').value;
     const statusEl = document.getElementById('backupServerStatus');
     
-    if (!serverUrl) {
-        statusEl.textContent = '❌ 请输入服务器地址';
+    // 验证URL
+    const urlValidation = validateServerUrl(serverUrlInput);
+    if (!urlValidation.valid) {
+        statusEl.textContent = `❌ ${urlValidation.error}`;
         statusEl.style.color = '#dc2626';
         return;
     }
+    
+    const serverUrl = urlValidation.url;
     
     statusEl.textContent = '⏳ 正在测试连接...';
     statusEl.style.color = '#666';
@@ -7531,8 +7598,10 @@ async function testBackupServerConnection() {
         
         if (response.ok) {
             cloudBackupServerUrl = serverUrl;
-            // 保存服务器地址
+            // 保存服务器地址（已验证）
             await chrome.storage.local.set({ cloudBackupServer: serverUrl });
+            // 更新输入框为规范化的URL
+            document.getElementById('cloudBackupServer').value = serverUrl;
             
             statusEl.textContent = '✅ 连接成功';
             statusEl.style.color = '#059669';
@@ -7710,13 +7779,15 @@ async function uploadBookmarkBackup() {
     const password = document.getElementById('cloudBackupPassword').value;
     const statusEl = document.getElementById('cloudBackupStatus');
     
-    if (!password) {
-        alert('上传备份需要输入管理密码');
+    // 验证密码
+    const pwdValidation = validatePassword(password);
+    if (!pwdValidation.valid) {
+        alert(pwdValidation.error || '上传备份需要输入管理密码');
         document.getElementById('cloudBackupPassword').focus();
         return;
     }
     
-    // 保存设备名称和密码
+    // 保存设备名称和密码（已验证）
     await chrome.storage.local.set({ backupDeviceName: deviceName, cloudBackupPassword: password });
     
     statusEl.textContent = '⏳ 正在备份...';
