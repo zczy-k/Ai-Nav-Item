@@ -641,10 +641,14 @@
                     </div>
                     <div style="flex: 1; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 12px; padding: 16px; border: 1px solid #bfdbfe;">
                         <div style="font-weight: 600; color: #1e40af; margin-bottom: 12px; font-size: 14px;">📥 从云端恢复</div>
-                        <select id="cloudBackupSelect" style="width: 100%; padding: 8px 12px; border: 1px solid #93c5fd; border-radius: 8px; font-size: 13px; margin-bottom: 10px; background: white;">
+                        <div style="display: flex; gap: 2px; background: #bfdbfe; border-radius: 6px; padding: 2px; margin-bottom: 10px;">
+                            <button class="btn btn-small restore-source-btn active" data-source="local" style="flex: 1; font-size: 11px; padding: 5px 8px; border-radius: 4px;">🖥️ 服务器</button>
+                            <button class="btn btn-small restore-source-btn" data-source="webdav" style="flex: 1; font-size: 11px; padding: 5px 8px; border-radius: 4px;">☁️ WebDAV</button>
+                        </div>
+                        <select id="cloudBackupSelect" style="width: 100%; padding: 8px 12px; border: 1px solid #93c5fd; border-radius: 8px; font-size: 13px; margin-bottom: 8px; background: white;">
                             <option value="">-- 请先测试连接 --</option>
                         </select>
-                        <div id="selectedBackupInfo" style="font-size: 12px; color: #666; margin-bottom: 12px; min-height: 20px;"></div>
+                        <div id="selectedBackupInfo" style="font-size: 12px; color: #666; margin-bottom: 10px; min-height: 18px;"></div>
                         <button class="btn btn-primary" id="btnRestoreBackup" style="width: 100%; padding: 10px;">恢复书签</button>
                     </div>
                 </div>
@@ -655,7 +659,7 @@
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <span style="font-weight: 600; font-size: 14px; color: #334155;">📋 备份历史</span>
                             <div style="display: flex; gap: 2px; background: #e2e8f0; border-radius: 6px; padding: 2px;">
-                                <button class="btn btn-small backup-source-btn active" data-source="local" style="font-size: 11px; padding: 4px 10px; border-radius: 4px;">本地</button>
+                                <button class="btn btn-small backup-source-btn active" data-source="local" style="font-size: 11px; padding: 4px 10px; border-radius: 4px;">服务器</button>
                                 <button class="btn btn-small backup-source-btn" data-source="webdav" style="font-size: 11px; padding: 4px 10px; border-radius: 4px;">WebDAV</button>
                             </div>
                             <span id="backupStats" style="font-size: 12px; color: #64748b;"></span>

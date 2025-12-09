@@ -2145,9 +2145,13 @@ function bindEvents() {
     document.getElementById('autoBackupEnabled').addEventListener('change', toggleAutoBackup);
     document.getElementById('btnSyncFromWebDAV').addEventListener('click', syncFromWebDAV);
     document.getElementById('btnSyncToWebDAV').addEventListener('click', syncToWebDAV);
-    // 备份来源切换
+    // 备份历史来源切换
     document.querySelectorAll('.backup-source-btn').forEach(btn => {
         btn.addEventListener('click', () => switchBackupSource(btn.dataset.source));
+    });
+    // 恢复来源切换
+    document.querySelectorAll('.restore-source-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchRestoreSource(btn.dataset.source));
     });
     
     // 空文件夹检测
@@ -7679,16 +7683,18 @@ async function testBackupServerConnection() {
     }
 }
 
-// 加载云端备份列表
+// 加载云端备份列表（仅更新备份历史列表，不更新恢复下拉框）
 async function loadCloudBackupList() {
     if (!cloudBackupServerUrl) return;
     
     const listEl = document.getElementById('cloudBackupList');
-    const selectEl = document.getElementById('cloudBackupSelect');
     const statsEl = document.getElementById('backupStats');
     
     listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">加载中...</div>';
     if (statsEl) statsEl.textContent = '';
+    
+    // 同时加载恢复下拉框（根据当前恢复来源）
+    loadRestoreBackupSelect(currentRestoreSource);
     
     try {
         const response = await fetch(`${cloudBackupServerUrl}/api/bookmark-sync/list`);
@@ -7697,7 +7703,6 @@ async function loadCloudBackupList() {
         if (data.success && data.backups) {
             if (data.backups.length === 0) {
                 listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">暂无备份</div>';
-                selectEl.innerHTML = '<option value="">-- 暂无备份 --</option>';
                 if (statsEl) statsEl.textContent = '';
                 return;
             }
@@ -7717,12 +7722,8 @@ async function loadCloudBackupList() {
                 if (typeCounts.weekly > 0) parts.push(`每周${typeCounts.weekly}`);
                 if (typeCounts.monthly > 0) parts.push(`每月${typeCounts.monthly}`);
                 if (typeCounts.manual > 0) parts.push(`手动${typeCounts.manual}`);
-                statsEl.textContent = `共 ${data.backups.length} 个备份（${parts.join('/')}）`;
+                statsEl.textContent = `共 ${data.backups.length} 个（${parts.join('/')}）`;
             }
-            
-            // 更新下拉选择
-            selectEl.innerHTML = '<option value="">-- 选择备份 --</option>' +
-                data.backups.map(b => `<option value="${b.filename}">${b.deviceName || '未知设备'} - ${formatBackupTime(b.backupTime)}</option>`).join('');
             
             // 更新列表
             listEl.innerHTML = data.backups.map(b => `
@@ -8138,9 +8139,10 @@ function updateAutoBackupStatus(enabled) {
 
 // ==================== WebDAV独立备份功能 ====================
 
-let currentBackupSource = 'local'; // 当前备份来源: 'local' 或 'webdav'
+let currentBackupSource = 'local'; // 当前备份历史来源: 'local' 或 'webdav'
+let currentRestoreSource = 'local'; // 当前恢复来源: 'local' 或 'webdav'
 
-// 切换备份来源
+// 切换备份历史来源
 async function switchBackupSource(source) {
     currentBackupSource = source;
     
@@ -8159,7 +8161,70 @@ async function switchBackupSource(source) {
     }
 }
 
-// 加载WebDAV备份列表
+// 切换恢复来源
+async function switchRestoreSource(source) {
+    currentRestoreSource = source;
+    
+    // 更新按钮状态
+    document.querySelectorAll('.restore-source-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.source === source);
+        btn.classList.toggle('btn-primary', btn.dataset.source === source);
+        btn.classList.toggle('btn-secondary', btn.dataset.source !== source);
+    });
+    
+    // 加载对应来源的备份到下拉框
+    await loadRestoreBackupSelect(source);
+}
+
+// 加载恢复备份下拉框
+async function loadRestoreBackupSelect(source) {
+    const selectEl = document.getElementById('cloudBackupSelect');
+    const infoEl = document.getElementById('selectedBackupInfo');
+    
+    if (!cloudBackupServerUrl) {
+        selectEl.innerHTML = '<option value="">-- 请先测试连接 --</option>';
+        if (infoEl) infoEl.textContent = '';
+        return;
+    }
+    
+    selectEl.innerHTML = '<option value="">加载中...</option>';
+    
+    try {
+        let apiPath = source === 'webdav' 
+            ? `${cloudBackupServerUrl}/api/bookmark-sync/webdav/list`
+            : `${cloudBackupServerUrl}/api/bookmark-sync/list`;
+        
+        const response = await fetch(apiPath);
+        const data = await response.json();
+        
+        if (!data.success && source === 'webdav') {
+            selectEl.innerHTML = '<option value="">-- WebDAV未配置 --</option>';
+            if (infoEl) infoEl.innerHTML = '<span style="color: #f59e0b;">请先在管理后台配置WebDAV</span>';
+            return;
+        }
+        
+        if (!data.backups || data.backups.length === 0) {
+            selectEl.innerHTML = '<option value="">-- 暂无备份 --</option>';
+            if (infoEl) infoEl.textContent = '';
+            return;
+        }
+        
+        const sourceLabel = source === 'webdav' ? 'WebDAV' : '服务器';
+        selectEl.innerHTML = `<option value="">-- 选择${sourceLabel}备份 --</option>` +
+            data.backups.map(b => {
+                const time = source === 'webdav' ? formatBackupTime(b.lastmod) : formatBackupTime(b.backupTime);
+                return `<option value="${b.filename}" data-source="${source}">${b.deviceName || '未知设备'} - ${time}</option>`;
+            }).join('');
+        
+        if (infoEl) infoEl.textContent = '';
+        
+    } catch (error) {
+        selectEl.innerHTML = '<option value="">-- 加载失败 --</option>';
+        if (infoEl) infoEl.innerHTML = `<span style="color: #dc2626;">${error.message}</span>`;
+    }
+}
+
+// 加载WebDAV备份列表（仅更新备份历史列表，不更新恢复下拉框）
 async function loadWebDAVBackupList() {
     if (!cloudBackupServerUrl) {
         document.getElementById('cloudBackupList').innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">请先测试服务器连接</div>';
@@ -8167,7 +8232,6 @@ async function loadWebDAVBackupList() {
     }
     
     const listEl = document.getElementById('cloudBackupList');
-    const selectEl = document.getElementById('cloudBackupSelect');
     const statsEl = document.getElementById('backupStats');
     
     listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">正在从WebDAV加载...</div>';
@@ -8186,13 +8250,11 @@ async function loadWebDAVBackupList() {
                         👉 前往管理后台配置WebDAV
                     </a>
                 </div>`;
-            selectEl.innerHTML = '<option value="">-- WebDAV未配置 --</option>';
             return;
         }
         
         if (!data.backups || data.backups.length === 0) {
             listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">WebDAV上暂无书签备份</div>';
-            selectEl.innerHTML = '<option value="">-- 暂无备份 --</option>';
             if (statsEl) statsEl.textContent = '';
             return;
         }
@@ -8214,10 +8276,6 @@ async function loadWebDAVBackupList() {
             if (typeCounts.manual > 0) parts.push(`手动${typeCounts.manual}`);
             statsEl.innerHTML = `<span style="color: #7c3aed;">WebDAV</span> ${data.backups.length} 个（${parts.join('/')}）`;
         }
-        
-        // 更新下拉选择
-        selectEl.innerHTML = '<option value="">-- 选择备份 --</option>' +
-            data.backups.map(b => `<option value="${b.filename}" data-source="webdav">${b.deviceName || '未知设备'} - ${formatBackupTime(b.lastmod)}</option>`).join('');
         
         // 更新列表
         listEl.innerHTML = data.backups.map(b => `
@@ -8386,9 +8444,8 @@ async function restoreBookmarkBackup() {
         return;
     }
     
-    // 检查是否是WebDAV来源
-    const selectedOption = selectEl.options[selectEl.selectedIndex];
-    const isWebDAV = selectedOption.dataset.source === 'webdav' || currentBackupSource === 'webdav';
+    // 使用恢复来源设置来确定是否从WebDAV恢复
+    const isWebDAV = currentRestoreSource === 'webdav';
     
     // 让用户选择恢复模式
     const restoreMode = await showRestoreModeDialog();
