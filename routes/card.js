@@ -208,15 +208,23 @@ router.post('/', auth, (req, res) => {
         
         const cardId = this.lastID;
         
-        // 如果有标签，关联标签
+        // 如果有标签，关联标签（使用参数化查询防止SQL注入）
         if (tagIds && Array.isArray(tagIds) && tagIds.length > 0) {
-          const values = tagIds.map(tagId => `(${cardId}, ${tagId})`).join(',');
-          db.run(`INSERT INTO card_tags (card_id, tag_id) VALUES ${values}`, (err) => {
-            if (err) return res.status(500).json({error: err.message});
-            
+          // 验证tagIds都是数字
+          const validTagIds = tagIds.filter(id => Number.isInteger(Number(id)) && Number(id) > 0);
+          if (validTagIds.length > 0) {
+            const placeholders = validTagIds.map(() => '(?, ?)').join(',');
+            const params = validTagIds.flatMap(tagId => [cardId, Number(tagId)]);
+            db.run(`INSERT INTO card_tags (card_id, tag_id) VALUES ${placeholders}`, params, (err) => {
+              if (err) return res.status(500).json({error: err.message});
+              
+              triggerDebouncedBackup();
+              res.json({ id: cardId });
+            });
+          } else {
             triggerDebouncedBackup();
             res.json({ id: cardId });
-          });
+          }
         } else {
           triggerDebouncedBackup();
           res.json({ id: cardId });
@@ -241,15 +249,23 @@ router.put('/:id', auth, (req, res) => {
       db.run('DELETE FROM card_tags WHERE card_id=?', [id], (err) => {
         if (err) return res.status(500).json({error: err.message});
         
-        // 如果有新标签，添加关联
+        // 如果有新标签，添加关联（使用参数化查询防止SQL注入）
         if (tagIds && Array.isArray(tagIds) && tagIds.length > 0) {
-          const values = tagIds.map(tagId => `(${id}, ${tagId})`).join(',');
-          db.run(`INSERT INTO card_tags (card_id, tag_id) VALUES ${values}`, (err) => {
-            if (err) return res.status(500).json({error: err.message});
-            
+          // 验证tagIds都是数字
+          const validTagIds = tagIds.filter(tid => Number.isInteger(Number(tid)) && Number(tid) > 0);
+          if (validTagIds.length > 0) {
+            const placeholders = validTagIds.map(() => '(?, ?)').join(',');
+            const params = validTagIds.flatMap(tagId => [id, Number(tagId)]);
+            db.run(`INSERT INTO card_tags (card_id, tag_id) VALUES ${placeholders}`, params, (err) => {
+              if (err) return res.status(500).json({error: err.message});
+              
+              triggerDebouncedBackup();
+              res.json({ changed: this.changes });
+            });
+          } else {
             triggerDebouncedBackup();
             res.json({ changed: this.changes });
-          });
+          }
         } else {
           triggerDebouncedBackup();
           res.json({ changed: this.changes });
@@ -325,7 +341,13 @@ router.post('/remove-duplicates', auth, (req, res) => {
     return res.status(400).json({ error: '无效的请求数据' });
   }
   
-  const placeholders = cardIds.map(() => '?').join(',');
+  // 验证所有cardIds都是有效的数字（防止SQL注入）
+  const validCardIds = cardIds.filter(id => Number.isInteger(Number(id)) && Number(id) > 0).map(Number);
+  if (validCardIds.length === 0) {
+    return res.status(400).json({ error: '无效的卡片ID' });
+  }
+  
+  const placeholders = validCardIds.map(() => '?').join(',');
   
   // 使用事务确保数据一致性
   db.serialize(() => {
@@ -335,14 +357,14 @@ router.post('/remove-duplicates', auth, (req, res) => {
       }
       
       // 先删除关联的标签（防止外键约束问题）
-      db.run(`DELETE FROM card_tags WHERE card_id IN (${placeholders})`, cardIds, (err) => {
+      db.run(`DELETE FROM card_tags WHERE card_id IN (${placeholders})`, validCardIds, (err) => {
         if (err) {
           db.run('ROLLBACK');
           return res.status(500).json({ error: '删除标签关联失败: ' + err.message });
         }
         
         // 再删除卡片
-        db.run(`DELETE FROM cards WHERE id IN (${placeholders})`, cardIds, function(err) {
+        db.run(`DELETE FROM cards WHERE id IN (${placeholders})`, validCardIds, function(err) {
           if (err) {
             db.run('ROLLBACK');
             return res.status(500).json({ error: '删除卡片失败: ' + err.message });

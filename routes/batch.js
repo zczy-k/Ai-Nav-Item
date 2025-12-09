@@ -303,13 +303,29 @@ router.post('/add', auth, (req, res) => {
             const cardId = this.lastID;
             insertedIds.push(cardId);
             
-            // 如果有标签，关联标签
+            // 如果有标签，关联标签（使用参数化查询防止SQL注入）
             if (tagIds && Array.isArray(tagIds) && tagIds.length > 0) {
-              const values = tagIds.map(tagId => `(${cardId}, ${tagId})`).join(',');
-              db.run(`INSERT INTO card_tags (card_id, tag_id) VALUES ${values}`, (tagErr) => {
-                if (tagErr) {
-                  console.error('标签关联失败:', tagErr);
-                }
+              // 验证tagIds都是数字
+              const validTagIds = tagIds.filter(tid => Number.isInteger(Number(tid)) && Number(tid) > 0);
+              if (validTagIds.length > 0) {
+                const placeholders = validTagIds.map(() => '(?, ?)').join(',');
+                const params = validTagIds.flatMap(tagId => [cardId, Number(tagId)]);
+                db.run(`INSERT INTO card_tags (card_id, tag_id) VALUES ${placeholders}`, params, (tagErr) => {
+                  if (tagErr) {
+                    console.error('标签关联失败:', tagErr);
+                  }
+                  completed++;
+                  if (completed === uniqueCards.length) {
+                    res.json({ 
+                      success: true, 
+                      added: insertedIds.length,
+                      skipped: skippedCards.length,
+                      skippedCards: skippedCards,
+                      ids: insertedIds 
+                    });
+                  }
+                });
+              } else {
                 completed++;
                 if (completed === uniqueCards.length) {
                   res.json({ 
@@ -320,7 +336,7 @@ router.post('/add', auth, (req, res) => {
                     ids: insertedIds 
                   });
                 }
-              });
+              }
             } else {
               completed++;
               if (completed === uniqueCards.length) {
