@@ -8098,7 +8098,7 @@ async function loadWebDAVBackupList() {
         const data = await response.json();
         
         if (!data.success) {
-            const webdavConfigUrl = cloudBackupServerUrl ? `${cloudBackupServerUrl}/admin/backup` : '#';
+            const webdavConfigUrl = cloudBackupServerUrl ? `${cloudBackupServerUrl}/admin` : '#';
             listEl.innerHTML = `
                 <div style="padding: 20px; text-align: center;">
                     <div style="color: #f59e0b; margin-bottom: 8px;">⚠️ ${data.message || 'WebDAV未配置'}</div>
