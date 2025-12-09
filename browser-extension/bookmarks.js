@@ -7698,9 +7698,9 @@ async function restoreBookmarkBackup() {
     
     // 让用户选择恢复模式
     const restoreMode = await showRestoreModeDialog();
-    if (!restoreMode) return; // 用户取消
+    if (!restoreMode) return;
     
-    statusEl.textContent = '⏳ 正在恢复...';
+    statusEl.textContent = '⏳ 正在分析备份数据...';
     
     try {
         // 获取备份数据
@@ -7715,27 +7715,81 @@ async function restoreBookmarkBackup() {
         
         // 获取当前浏览器的书签树
         const tree = await chrome.bookmarks.getTree();
-        const bookmarkBar = tree[0]?.children?.[0]; // 书签栏 (id: "1")
-        const otherBookmarks = tree[0]?.children?.[1]; // 其他书签 (id: "2")
+        const bookmarkBar = tree[0]?.children?.[0];
+        const otherBookmarks = tree[0]?.children?.[1];
         
         if (!bookmarkBar) {
             throw new Error('无法找到书签栏');
         }
         
-        // 递归导入书签
+        // 收集本地所有书签URL
+        const localBookmarks = [];
+        collectAllBookmarks(tree, localBookmarks);
+        const localUrlMap = new Map(); // url -> bookmark
+        localBookmarks.forEach(b => {
+            if (b.url) localUrlMap.set(b.url, b);
+        });
+        
+        // 收集备份中的所有书签
+        const backupBookmarksList = [];
+        function collectBackupBookmarks(nodes) {
+            for (const node of nodes) {
+                if (node.children) {
+                    collectBackupBookmarks(node.children);
+                } else if (node.url) {
+                    backupBookmarksList.push(node);
+                }
+            }
+        }
+        const bookmarksToImport = backupData.bookmarks || [];
+        for (const root of bookmarksToImport) {
+            if (root.children) collectBackupBookmarks(root.children);
+        }
+        
+        // 检测冲突（相同URL的书签）
+        const conflicts = [];
+        const newBookmarks = [];
+        
+        for (const backupItem of backupBookmarksList) {
+            if (localUrlMap.has(backupItem.url)) {
+                conflicts.push({
+                    backup: backupItem,
+                    local: localUrlMap.get(backupItem.url)
+                });
+            } else {
+                newBookmarks.push(backupItem);
+            }
+        }
+        
+        // 如果有冲突，让用户选择处理方式
+        let skipUrls = new Set();
+        if (conflicts.length > 0 && restoreMode === 'direct') {
+            statusEl.textContent = `发现 ${conflicts.length} 个冲突书签...`;
+            const conflictResult = await showConflictDialog(conflicts);
+            if (!conflictResult) return; // 用户取消
+            skipUrls = conflictResult.skipUrls;
+        }
+        
+        statusEl.textContent = '⏳ 正在恢复...';
+        
+        // 递归导入书签（带冲突检测）
         let importedCount = 0;
+        let skippedCount = 0;
         
         async function importBookmarks(nodes, parentId) {
             for (const node of nodes) {
                 if (node.children) {
-                    // 文件夹
                     const folder = await chrome.bookmarks.create({
                         parentId: parentId,
                         title: node.title || '未命名文件夹'
                     });
                     await importBookmarks(node.children, folder.id);
                 } else if (node.url) {
-                    // 书签
+                    // 检查是否需要跳过
+                    if (skipUrls.has(node.url)) {
+                        skippedCount++;
+                        continue;
+                    }
                     await chrome.bookmarks.create({
                         parentId: parentId,
                         title: node.title || node.url,
@@ -7746,11 +7800,8 @@ async function restoreBookmarkBackup() {
             }
         }
         
-        // 根据恢复模式确定目标文件夹
-        let restoreTargetId;
-        
+        // 执行恢复
         if (restoreMode === 'folder') {
-            // 模式1: 创建恢复文件夹
             const timestamp = new Date().toLocaleString('zh-CN', {
                 month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
             }).replace(/[\/\s:]/g, '-');
@@ -7759,23 +7810,17 @@ async function restoreBookmarkBackup() {
                 parentId: bookmarkBar.id,
                 title: `云端恢复-${backupData.deviceName || '未知'}-${timestamp}`
             });
-            restoreTargetId = restoreFolder.id;
             
-            // 导入所有内容到恢复文件夹
-            const bookmarksToImport = backupData.bookmarks || [];
             for (const root of bookmarksToImport) {
                 if (root.children) {
                     for (const topFolder of root.children) {
                         if (topFolder.children && topFolder.children.length > 0) {
-                            await importBookmarks(topFolder.children, restoreTargetId);
+                            await importBookmarks(topFolder.children, restoreFolder.id);
                         }
                     }
                 }
             }
         } else {
-            // 模式2: 直接恢复到原位置
-            const bookmarksToImport = backupData.bookmarks || [];
-            
             for (const root of bookmarksToImport) {
                 if (root.children) {
                     for (const topFolder of root.children) {
@@ -7795,16 +7840,112 @@ async function restoreBookmarkBackup() {
             }
         }
         
-        statusEl.textContent = `✅ 恢复成功！导入了 ${importedCount} 个书签`;
+        let msg = `✅ 恢复成功！导入了 ${importedCount} 个书签`;
+        if (skippedCount > 0) msg += `，跳过 ${skippedCount} 个重复`;
+        statusEl.textContent = msg;
         statusEl.style.color = '#059669';
         
-        // 刷新书签列表
         await loadBookmarks();
         
     } catch (error) {
         statusEl.textContent = `❌ 恢复失败: ${error.message}`;
         statusEl.style.color = '#dc2626';
     }
+}
+
+// 显示冲突处理对话框
+function showConflictDialog(conflicts) {
+    return new Promise((resolve) => {
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10002; display: flex; align-items: center; justify-content: center;';
+        dialog.innerHTML = `
+            <div style="background: white; border-radius: 12px; max-width: 700px; width: 95%; max-height: 80vh; display: flex; flex-direction: column;">
+                <div style="padding: 16px 20px; border-bottom: 1px solid #e0e0e0;">
+                    <div style="font-size: 18px; font-weight: 600;">⚠️ 发现 ${conflicts.length} 个重复书签</div>
+                    <div style="font-size: 13px; color: #666; margin-top: 4px;">以下书签在本地已存在，请选择处理方式</div>
+                </div>
+                <div style="padding: 12px 20px; border-bottom: 1px solid #e0e0e0; display: flex; gap: 12px; align-items: center;">
+                    <span style="font-size: 13px;">批量操作：</span>
+                    <button class="btn btn-small btn-secondary" id="btnSkipAll">全部跳过</button>
+                    <button class="btn btn-small btn-secondary" id="btnImportAll">全部导入（产生重复）</button>
+                    <label style="display: flex; align-items: center; gap: 4px; margin-left: auto; font-size: 13px;">
+                        <input type="checkbox" id="selectAllConflicts">
+                        <span>全选</span>
+                    </label>
+                </div>
+                <div style="flex: 1; overflow-y: auto; padding: 12px 20px;" id="conflictList"></div>
+                <div style="padding: 16px 20px; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 13px; color: #666;">
+                        <span id="conflictStats">已选择跳过 0 个</span>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" id="btnCancelConflict">取消恢复</button>
+                        <button class="btn btn-primary" id="btnConfirmConflict">继续恢复</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(dialog);
+        
+        // 渲染冲突列表
+        const listEl = dialog.querySelector('#conflictList');
+        listEl.innerHTML = conflicts.map((c, i) => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px;">
+                <input type="checkbox" class="conflict-checkbox" data-url="${encodeURIComponent(c.backup.url)}" data-index="${i}" checked>
+                <img src="https://www.google.com/s2/favicons?domain=${new URL(c.backup.url).hostname}&sz=32" style="width: 20px; height: 20px; border-radius: 4px;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${c.backup.title || '无标题'}</div>
+                    <div style="font-size: 11px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${c.backup.url}</div>
+                </div>
+                <div style="font-size: 11px; color: #666; text-align: right;">
+                    <div>本地: ${c.local.title || '无标题'}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        // 更新统计
+        const updateStats = () => {
+            const checked = dialog.querySelectorAll('.conflict-checkbox:checked').length;
+            dialog.querySelector('#conflictStats').textContent = `已选择跳过 ${checked} 个`;
+        };
+        updateStats();
+        
+        // 事件绑定
+        dialog.querySelectorAll('.conflict-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateStats);
+        });
+        
+        dialog.querySelector('#selectAllConflicts').addEventListener('change', (e) => {
+            dialog.querySelectorAll('.conflict-checkbox').forEach(cb => cb.checked = e.target.checked);
+            updateStats();
+        });
+        
+        dialog.querySelector('#btnSkipAll').addEventListener('click', () => {
+            dialog.querySelectorAll('.conflict-checkbox').forEach(cb => cb.checked = true);
+            dialog.querySelector('#selectAllConflicts').checked = true;
+            updateStats();
+        });
+        
+        dialog.querySelector('#btnImportAll').addEventListener('click', () => {
+            dialog.querySelectorAll('.conflict-checkbox').forEach(cb => cb.checked = false);
+            dialog.querySelector('#selectAllConflicts').checked = false;
+            updateStats();
+        });
+        
+        dialog.querySelector('#btnCancelConflict').addEventListener('click', () => {
+            dialog.remove();
+            resolve(null);
+        });
+        
+        dialog.querySelector('#btnConfirmConflict').addEventListener('click', () => {
+            const skipUrls = new Set();
+            dialog.querySelectorAll('.conflict-checkbox:checked').forEach(cb => {
+                skipUrls.add(decodeURIComponent(cb.dataset.url));
+            });
+            dialog.remove();
+            resolve({ skipUrls });
+        });
+    });
 }
 
 // 显示恢复模式选择对话框
