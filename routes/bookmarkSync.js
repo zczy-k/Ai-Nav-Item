@@ -25,11 +25,117 @@ const BACKUP_RETENTION = {
     manual: 20     // 手动备份保留20个
 };
 
+// 允许的备份类型
+const ALLOWED_BACKUP_TYPES = ['auto', 'daily', 'weekly', 'monthly', 'manual'];
+
+// 最大书签数量限制（防止恶意大数据攻击）
+const MAX_BOOKMARKS = 50000;
+const MAX_BOOKMARK_DEPTH = 20;
+
 // 确保目录存在
 function ensureDir() {
     if (!fs.existsSync(BOOKMARKS_DIR)) {
         fs.mkdirSync(BOOKMARKS_DIR, { recursive: true });
     }
+}
+
+// ==================== 安全验证函数 ====================
+
+// 清理设备名称（严格过滤，只允许安全字符）
+function sanitizeDeviceName(name) {
+    if (!name || typeof name !== 'string') return 'unknown';
+    // 只允许：字母、数字、中文、下划线、连字符
+    // 移除所有特殊字符、HTML标签、脚本等
+    return name
+        .replace(/<[^>]*>/g, '')  // 移除HTML标签
+        .replace(/[<>\"\'&;\\\/\`\$\{\}\[\]\(\)]/g, '')  // 移除危险字符
+        .replace(/[^a-zA-Z0-9\u4e00-\u9fa5_\-\s]/g, '_')  // 只保留安全字符
+        .replace(/\s+/g, '_')  // 空格转下划线
+        .replace(/_+/g, '_')  // 合并多个下划线
+        .trim()
+        .slice(0, 30) || 'unknown';  // 限制长度
+}
+
+// 验证备份类型
+function validateBackupType(type) {
+    if (!type || typeof type !== 'string') return 'manual';
+    return ALLOWED_BACKUP_TYPES.includes(type) ? type : 'manual';
+}
+
+// 验证书签数据结构（防止恶意数据注入）
+function validateBookmarkData(bookmarks, depth = 0) {
+    if (!Array.isArray(bookmarks)) return { valid: false, error: '书签数据必须是数组' };
+    if (depth > MAX_BOOKMARK_DEPTH) return { valid: false, error: '书签层级过深' };
+    
+    let totalCount = 0;
+    
+    for (const item of bookmarks) {
+        if (typeof item !== 'object' || item === null) {
+            return { valid: false, error: '书签项格式无效' };
+        }
+        
+        // 验证必要字段类型
+        if (item.title !== undefined && typeof item.title !== 'string') {
+            return { valid: false, error: '书签标题必须是字符串' };
+        }
+        if (item.url !== undefined && typeof item.url !== 'string') {
+            return { valid: false, error: '书签URL必须是字符串' };
+        }
+        if (item.id !== undefined && typeof item.id !== 'string') {
+            return { valid: false, error: '书签ID必须是字符串' };
+        }
+        
+        // 验证URL格式（如果存在）
+        if (item.url) {
+            try {
+                const url = new URL(item.url);
+                // 只允许安全协议
+                if (!['http:', 'https:', 'file:', 'ftp:'].includes(url.protocol)) {
+                    // 跳过不安全协议的书签，但不阻止整个备份
+                    item.url = '';
+                }
+            } catch (e) {
+                // URL格式无效，清空
+                item.url = '';
+            }
+        }
+        
+        // 清理标题中的潜在XSS
+        if (item.title) {
+            item.title = item.title
+                .replace(/<[^>]*>/g, '')
+                .replace(/[<>]/g, '')
+                .slice(0, 500);
+        }
+        
+        totalCount++;
+        if (totalCount > MAX_BOOKMARKS) {
+            return { valid: false, error: `书签数量超过限制（最大${MAX_BOOKMARKS}个）` };
+        }
+        
+        // 递归验证子节点
+        if (item.children) {
+            if (!Array.isArray(item.children)) {
+                return { valid: false, error: '子书签必须是数组' };
+            }
+            const childResult = validateBookmarkData(item.children, depth + 1);
+            if (!childResult.valid) return childResult;
+            totalCount += childResult.count;
+        }
+    }
+    
+    return { valid: true, count: totalCount };
+}
+
+// 验证文件名安全性
+function isValidFilename(filename) {
+    if (!filename || typeof filename !== 'string') return false;
+    // 只允许：字母、数字、中文、下划线、连字符、点
+    // 禁止路径遍历
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        return false;
+    }
+    return /^[a-zA-Z0-9\u4e00-\u9fa5_\-\.]+\.json$/.test(filename);
 }
 
 // 计算书签数据的哈希值（用于去重）
@@ -71,11 +177,14 @@ function getLastBackupHash(deviceName) {
 // 生成备份文件名
 function generateBackupFilename(deviceName, type = 'manual') {
     const now = new Date();
-    const device = (deviceName || 'unknown').replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').slice(0, 20);
+    // 使用安全的设备名称（已经过sanitizeDeviceName处理）
+    const device = sanitizeDeviceName(deviceName).replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').slice(0, 20) || 'unknown';
+    // 验证备份类型
+    const safeType = validateBackupType(type);
     
     // 根据类型生成不同格式的时间戳
     let timestamp;
-    switch (type) {
+    switch (safeType) {
         case 'daily':
             timestamp = now.toISOString().slice(0, 10); // 2024-12-09
             break;
@@ -90,7 +199,7 @@ function generateBackupFilename(deviceName, type = 'manual') {
             timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 16); // 2024-12-09T14-30
     }
     
-    return `bookmarks-${device}-${type}-${timestamp}.json`;
+    return `bookmarks-${device}-${safeType}-${timestamp}.json`;
 }
 
 // 获取周数
@@ -222,10 +331,20 @@ function flexAuthMiddleware(req, res, next) {
 // 上传书签备份
 router.post('/upload', flexAuthMiddleware, async (req, res) => {
     try {
-        const { bookmarks, deviceName, type = 'manual', skipIfSame = true } = req.body;
+        const { bookmarks, skipIfSame = true } = req.body;
+        
+        // 安全验证：清理和验证输入
+        const deviceName = sanitizeDeviceName(req.body.deviceName);
+        const type = validateBackupType(req.body.type);
         
         if (!bookmarks || !Array.isArray(bookmarks)) {
             return res.status(400).json({ success: false, message: '无效的书签数据' });
+        }
+        
+        // 验证书签数据结构
+        const validation = validateBookmarkData(bookmarks);
+        if (!validation.valid) {
+            return res.status(400).json({ success: false, message: validation.error });
         }
         
         ensureDir();
@@ -357,11 +476,19 @@ router.get('/download/:filename', async (req, res) => {
     try {
         const { filename } = req.params;
         
-        if (!filename.endsWith('.json') || filename.includes('..')) {
+        // 安全验证：检查文件名
+        if (!isValidFilename(filename)) {
             return res.status(400).json({ success: false, message: '无效的文件名' });
         }
         
         const filePath = path.join(BOOKMARKS_DIR, filename);
+        
+        // 二次验证：确保路径在备份目录内（防止路径遍历）
+        const resolvedPath = path.resolve(filePath);
+        const resolvedDir = path.resolve(BOOKMARKS_DIR);
+        if (!resolvedPath.startsWith(resolvedDir)) {
+            return res.status(403).json({ success: false, message: '禁止访问' });
+        }
         
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ success: false, message: '备份文件不存在' });
@@ -410,11 +537,19 @@ router.delete('/delete/:filename', flexAuthMiddleware, async (req, res) => {
     try {
         const { filename } = req.params;
         
-        if (!filename.endsWith('.json') || filename.includes('..')) {
+        // 安全验证：检查文件名
+        if (!isValidFilename(filename)) {
             return res.status(400).json({ success: false, message: '无效的文件名' });
         }
         
         const filePath = path.join(BOOKMARKS_DIR, filename);
+        
+        // 二次验证：确保路径在备份目录内（防止路径遍历）
+        const resolvedPath = path.resolve(filePath);
+        const resolvedDir = path.resolve(BOOKMARKS_DIR);
+        if (!resolvedPath.startsWith(resolvedDir)) {
+            return res.status(403).json({ success: false, message: '禁止访问' });
+        }
         
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ success: false, message: '备份文件不存在' });
@@ -527,7 +662,8 @@ router.get('/webdav/download/:filename', async (req, res) => {
     try {
         const { filename } = req.params;
 
-        if (!filename.endsWith('.json') || filename.includes('..')) {
+        // 安全验证：检查文件名
+        if (!isValidFilename(filename)) {
             return res.status(400).json({ success: false, message: '无效的文件名' });
         }
 
@@ -536,7 +672,9 @@ router.get('/webdav/download/:filename', async (req, res) => {
             return res.status(400).json({ success: false, message: 'WebDAV未配置' });
         }
 
-        const remotePath = `${WEBDAV_BOOKMARK_DIR}/${filename}`;
+        // 构建安全的远程路径（不允许路径遍历）
+        const safeFilename = path.basename(filename);
+        const remotePath = `${WEBDAV_BOOKMARK_DIR}/${safeFilename}`;
 
         // 检查文件是否存在
         const exists = await client.exists(remotePath);
@@ -561,7 +699,8 @@ router.delete('/webdav/delete/:filename', flexAuthMiddleware, async (req, res) =
     try {
         const { filename } = req.params;
 
-        if (!filename.endsWith('.json') || filename.includes('..')) {
+        // 安全验证：检查文件名
+        if (!isValidFilename(filename)) {
             return res.status(400).json({ success: false, message: '无效的文件名' });
         }
 

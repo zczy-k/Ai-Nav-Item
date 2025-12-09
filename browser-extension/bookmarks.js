@@ -7697,7 +7697,16 @@ async function uploadBookmarkBackup() {
         return;
     }
     
-    const deviceName = document.getElementById('backupDeviceName').value.trim() || '未命名设备';
+    // 获取并清理设备名称（前端验证）
+    let deviceName = document.getElementById('backupDeviceName').value.trim() || '未命名设备';
+    // 只允许安全字符：字母、数字、中文、下划线、连字符、空格
+    deviceName = deviceName
+        .replace(/<[^>]*>/g, '')  // 移除HTML标签
+        .replace(/[<>\"\'&;\\\/\`\$\{\}\[\]\(\)]/g, '')  // 移除危险字符
+        .replace(/[^a-zA-Z0-9\u4e00-\u9fa5_\-\s]/g, '')  // 只保留安全字符
+        .trim()
+        .slice(0, 30) || '未命名设备';
+    
     const password = document.getElementById('cloudBackupPassword').value;
     const statusEl = document.getElementById('cloudBackupStatus');
     
