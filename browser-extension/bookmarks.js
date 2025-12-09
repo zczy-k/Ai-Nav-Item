@@ -1969,33 +1969,12 @@ function createBookmarkItem(bookmark) {
         deleteBookmark(bookmark.id);
     });
     
-    // favicon 错误处理（多CDN降级）
+    // favicon 错误处理（降级到默认图标，避免多次重试产生更多错误）
     const faviconImg = div.querySelector('.bookmark-favicon');
-    let faviconRetryCount = 0;
-    const faviconCDNs = [
-        (url) => {
-            const domain = new URL(url).hostname;
-            return `https://api.xinac.net/icon/?url=${domain}&sz=128`;
-        },
-        (url) => {
-            const domain = new URL(url).hostname;
-            return `https://icon.horse/icon/${domain}`;
-        },
-        (url) => `chrome://favicon/size/16@1x/${url}`,
-        () => 'icons/icon16.png'
-    ];
-    
     faviconImg.addEventListener('error', function() {
-        faviconRetryCount++;
-        if (faviconRetryCount < faviconCDNs.length) {
-            try {
-                this.src = faviconCDNs[faviconRetryCount](bookmark.url);
-            } catch {
-                this.src = 'icons/icon16.png';
-            }
-        } else {
-            this.src = 'icons/icon16.png';
-        }
+        // 直接使用默认图标，避免多次重试产生更多控制台错误
+        this.src = 'icons/icon16.png';
+        this.onerror = null; // 防止循环
     });
     
     // 拖拽
@@ -4195,8 +4174,9 @@ function showStatisticsResult(stats) {
 function getFaviconUrl(url) {
     try {
         const urlObj = new URL(url);
-        // 直接从网站获取 favicon（最快最可靠）
-        return `${urlObj.protocol}//${urlObj.hostname}/favicon.ico`;
+        const domain = urlObj.hostname;
+        // 使用 Google Favicon 服务（更可靠，有缓存，减少404错误）
+        return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
     } catch {
         return 'icons/icon16.png';
     }
