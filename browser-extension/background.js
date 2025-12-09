@@ -1,10 +1,6 @@
 // background.js - 后台服务脚本
 // 用于处理右键菜单、快速添加到导航页、分类子菜单
 
-// 调试模式（生产环境设为false以减少控制台日志）
-const DEBUG_MODE = false;
-const debugLog = (...args) => { if (DEBUG_MODE) console.log(...args); };
-
 // 缓存的菜单数据
 let cachedMenus = [];
 let lastMenuFetchTime = 0;
@@ -81,7 +77,6 @@ async function loadAndCreateCategoryMenus() {
         
         // 防止并发请求
         if (isLoadingMenus) {
-            debugLog('正在加载菜单，跳过重复请求');
             return;
         }
         
@@ -118,7 +113,6 @@ async function loadAndCreateCategoryMenus() {
             });
             
             createCategorySubMenus(menus);
-            debugLog(`成功加载 ${menus.length} 个分类菜单`);
         } catch (fetchError) {
             clearTimeout(timeoutId);
             
@@ -129,7 +123,6 @@ async function loadAndCreateCategoryMenus() {
                     cachedMenus = stored.cachedMenus;
                     lastMenuFetchTime = stored.lastMenuFetchTime || 0;
                     createCategorySubMenus(cachedMenus);
-                    debugLog('从本地缓存加载菜单');
                     return;
                 }
             }
@@ -822,7 +815,6 @@ async function initHotBookmarksAutoUpdate() {
     // 检查是否启用自动更新
     const settings = await chrome.storage.local.get(['autoUpdateHotBookmarks']);
     if (settings.autoUpdateHotBookmarks === false) {
-        debugLog('热门书签自动更新已禁用');
         return;
     }
     
@@ -836,14 +828,11 @@ async function initHotBookmarksAutoUpdate() {
         clearInterval(hotBookmarksTimer);
     }
     hotBookmarksTimer = setInterval(autoUpdateHotBookmarks, HOT_UPDATE_INTERVAL);
-    debugLog('热门书签自动更新已启动，间隔5分钟');
 }
 
 // 自动更新热门书签
 async function autoUpdateHotBookmarks() {
     try {
-        debugLog('开始自动更新热门书签...');
-        
         // 获取所有书签
         const tree = await chrome.bookmarks.getTree();
         const allBookmarks = [];
@@ -853,7 +842,6 @@ async function autoUpdateHotBookmarks() {
         const normalBookmarks = allBookmarks.filter(b => !isInSpecialFolder(b, tree));
         
         if (normalBookmarks.length === 0) {
-            debugLog('没有找到普通书签');
             return;
         }
         
@@ -898,14 +886,12 @@ async function autoUpdateHotBookmarks() {
         const topBookmarks = scoredBookmarks.slice(0, HOT_BOOKMARKS_COUNT);
         
         if (topBookmarks.length === 0) {
-            debugLog('没有找到有访问记录的书签');
             return;
         }
         
         // 获取或创建热门书签文件夹
         const bookmarkBar = tree[0]?.children?.[0];
         if (!bookmarkBar) {
-            debugLog('无法找到书签栏');
             return;
         }
         
@@ -940,8 +926,6 @@ async function autoUpdateHotBookmarks() {
                 url: item.bookmark.url
             });
         }
-        
-        debugLog(`热门书签已更新，共 ${topBookmarks.length} 个`);
         
         // 记录更新时间
         await chrome.storage.local.set({ lastHotBookmarksUpdate: Date.now() });
@@ -1001,7 +985,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
                 clearInterval(hotBookmarksTimer);
                 hotBookmarksTimer = null;
             }
-            debugLog('热门书签自动更新已禁用');
         } else {
             // 启用自动更新
             initHotBookmarksAutoUpdate();
@@ -1085,8 +1068,6 @@ async function performAutoBackup(type = 'auto') {
             return { success: false, reason: '自动备份未配置' };
         }
         
-        debugLog(`[自动备份] 开始${type}备份...`);
-        
         // 获取所有书签
         const tree = await chrome.bookmarks.getTree();
         
@@ -1106,18 +1087,11 @@ async function performAutoBackup(type = 'auto') {
         const data = await response.json();
         
         if (data.success) {
-            if (data.skipped) {
-                debugLog(`[自动备份] 书签无变化，已跳过`);
-            } else {
-                debugLog(`[自动备份] ${type}备份成功: ${data.backup?.bookmarkCount || 0} 个书签`);
-            }
             return { success: true, data };
         } else {
-            console.error(`[自动备份] 失败: ${data.message}`);
             return { success: false, message: data.message };
         }
     } catch (error) {
-        console.error('[自动备份] 错误:', error);
         return { success: false, error: error.message };
     }
 }
@@ -1131,8 +1105,6 @@ function triggerDebouncedBackup() {
     backupDebounceTimer = setTimeout(async () => {
         await performAutoBackup('auto');
     }, BACKUP_DEBOUNCE_MS);
-    
-    debugLog('[自动备份] 检测到书签变化，将在5分钟后备份');
 }
 
 // 监听书签变化
@@ -1191,7 +1163,6 @@ async function checkScheduledBackups() {
     
     // 每日备份
     if (result.lastDailyBackupDate !== today) {
-        debugLog('[自动备份] 执行每日备份...');
         const backupResult = await performAutoBackup('daily');
         if (backupResult.success) {
             await chrome.storage.local.set({ lastDailyBackupDate: today });
@@ -1200,7 +1171,6 @@ async function checkScheduledBackups() {
     
     // 每周备份（周一执行）
     if (dayOfWeek === 1 && result.lastWeeklyBackupWeek !== currentWeek) {
-        debugLog('[自动备份] 执行每周备份...');
         const backupResult = await performAutoBackup('weekly');
         if (backupResult.success) {
             await chrome.storage.local.set({ lastWeeklyBackupWeek: currentWeek });
@@ -1209,7 +1179,6 @@ async function checkScheduledBackups() {
     
     // 每月备份（每月1号执行）
     if (dayOfMonth === 1 && result.lastMonthlyBackupMonth !== currentMonth) {
-        debugLog('[自动备份] 执行每月备份...');
         const backupResult = await performAutoBackup('monthly');
         if (backupResult.success) {
             await chrome.storage.local.set({ lastMonthlyBackupMonth: currentMonth });
@@ -1235,8 +1204,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') {
         if (changes.autoBookmarkBackupEnabled) {
             const enabled = changes.autoBookmarkBackupEnabled.newValue;
-            debugLog(`[自动备份] ${enabled ? '已启用' : '已禁用'}`);
-            
             if (enabled) {
                 initScheduledBackupTimer();
             } else {
@@ -1258,7 +1225,6 @@ chrome.runtime.onStartup.addListener(async () => {
     const config = await loadAutoBackupConfig();
     if (config.enabled) {
         initScheduledBackupTimer();
-        debugLog('[自动备份] 已初始化');
     }
 });
 
