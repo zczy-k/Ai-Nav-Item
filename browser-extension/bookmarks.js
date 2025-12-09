@@ -7696,15 +7696,9 @@ async function restoreBookmarkBackup() {
         return;
     }
     
-    const confirmed = confirm(
-        '⚠️ 恢复书签将会：\n\n' +
-        '• 将备份的书签直接恢复到书签栏\n' +
-        '• 保持原有的文件夹结构\n' +
-        '• 不会删除现有书签（可能产生重复）\n\n' +
-        '是否继续？'
-    );
-    
-    if (!confirmed) return;
+    // 让用户选择恢复模式
+    const restoreMode = await showRestoreModeDialog();
+    if (!restoreMode) return; // 用户取消
     
     statusEl.textContent = '⏳ 正在恢复...';
     
@@ -7752,27 +7746,50 @@ async function restoreBookmarkBackup() {
             }
         }
         
-        // 从备份数据的根节点开始导入
-        // 备份结构: [{id: "0", children: [{id: "1", title: "书签栏", children: [...]}, {id: "2", title: "其他书签", children: [...]}]}]
-        const bookmarksToImport = backupData.bookmarks || [];
+        // 根据恢复模式确定目标文件夹
+        let restoreTargetId;
         
-        for (const root of bookmarksToImport) {
-            if (root.children) {
-                // 遍历顶级系统文件夹（书签栏、其他书签等）
-                for (const topFolder of root.children) {
-                    // 判断是书签栏还是其他书签
-                    const isBookmarkBar = topFolder.id === '1';
-                    const isOtherBookmarks = topFolder.id === '2';
-                    
-                    // 确定目标文件夹
-                    let targetFolder = bookmarkBar; // 默认恢复到书签栏
-                    if (isOtherBookmarks && otherBookmarks) {
-                        targetFolder = otherBookmarks;
+        if (restoreMode === 'folder') {
+            // 模式1: 创建恢复文件夹
+            const timestamp = new Date().toLocaleString('zh-CN', {
+                month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+            }).replace(/[\/\s:]/g, '-');
+            
+            const restoreFolder = await chrome.bookmarks.create({
+                parentId: bookmarkBar.id,
+                title: `云端恢复-${backupData.deviceName || '未知'}-${timestamp}`
+            });
+            restoreTargetId = restoreFolder.id;
+            
+            // 导入所有内容到恢复文件夹
+            const bookmarksToImport = backupData.bookmarks || [];
+            for (const root of bookmarksToImport) {
+                if (root.children) {
+                    for (const topFolder of root.children) {
+                        if (topFolder.children && topFolder.children.length > 0) {
+                            await importBookmarks(topFolder.children, restoreTargetId);
+                        }
                     }
-                    
-                    if (topFolder.children && topFolder.children.length > 0) {
-                        // 直接恢复到对应的系统文件夹
-                        await importBookmarks(topFolder.children, targetFolder.id);
+                }
+            }
+        } else {
+            // 模式2: 直接恢复到原位置
+            const bookmarksToImport = backupData.bookmarks || [];
+            
+            for (const root of bookmarksToImport) {
+                if (root.children) {
+                    for (const topFolder of root.children) {
+                        const isBookmarkBar = topFolder.id === '1';
+                        const isOtherBookmarks = topFolder.id === '2';
+                        
+                        let targetFolder = bookmarkBar;
+                        if (isOtherBookmarks && otherBookmarks) {
+                            targetFolder = otherBookmarks;
+                        }
+                        
+                        if (topFolder.children && topFolder.children.length > 0) {
+                            await importBookmarks(topFolder.children, targetFolder.id);
+                        }
                     }
                 }
             }
@@ -7788,6 +7805,65 @@ async function restoreBookmarkBackup() {
         statusEl.textContent = `❌ 恢复失败: ${error.message}`;
         statusEl.style.color = '#dc2626';
     }
+}
+
+// 显示恢复模式选择对话框
+function showRestoreModeDialog() {
+    return new Promise((resolve) => {
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;';
+        dialog.innerHTML = `
+            <div style="background: white; border-radius: 12px; padding: 24px; max-width: 450px; width: 90%;">
+                <div style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">📥 选择恢复模式</div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; margin-bottom: 12px; transition: all 0.2s;" id="modeFolder">
+                        <input type="radio" name="restoreMode" value="folder" style="margin-top: 4px;">
+                        <div>
+                            <div style="font-weight: 500;">📁 恢复到独立文件夹</div>
+                            <div style="font-size: 13px; color: #666; margin-top: 4px;">在书签栏创建"云端恢复"文件夹，所有书签放入其中。<br>✅ 安全，不影响现有书签</div>
+                        </div>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: all 0.2s;" id="modeDirect">
+                        <input type="radio" name="restoreMode" value="direct" checked style="margin-top: 4px;">
+                        <div>
+                            <div style="font-weight: 500;">🔄 直接恢复到原位置</div>
+                            <div style="font-size: 13px; color: #666; margin-top: 4px;">书签栏内容恢复到书签栏，其他书签恢复到其他书签。<br>⚠️ 可能产生重复，恢复后可用"查找重复"清理</div>
+                        </div>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button class="btn btn-secondary" id="btnCancelRestore">取消</button>
+                    <button class="btn btn-primary" id="btnConfirmRestore">确认恢复</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(dialog);
+        
+        // 高亮选中项
+        const updateHighlight = () => {
+            const selected = dialog.querySelector('input[name="restoreMode"]:checked').value;
+            dialog.querySelector('#modeFolder').style.borderColor = selected === 'folder' ? '#3b82f6' : '#e0e0e0';
+            dialog.querySelector('#modeFolder').style.background = selected === 'folder' ? '#eff6ff' : 'white';
+            dialog.querySelector('#modeDirect').style.borderColor = selected === 'direct' ? '#3b82f6' : '#e0e0e0';
+            dialog.querySelector('#modeDirect').style.background = selected === 'direct' ? '#eff6ff' : 'white';
+        };
+        updateHighlight();
+        
+        dialog.querySelectorAll('input[name="restoreMode"]').forEach(input => {
+            input.addEventListener('change', updateHighlight);
+        });
+        
+        dialog.querySelector('#btnCancelRestore').addEventListener('click', () => {
+            dialog.remove();
+            resolve(null);
+        });
+        
+        dialog.querySelector('#btnConfirmRestore').addEventListener('click', () => {
+            const mode = dialog.querySelector('input[name="restoreMode"]:checked').value;
+            dialog.remove();
+            resolve(mode);
+        });
+    });
 }
 
 // 删除云端备份
