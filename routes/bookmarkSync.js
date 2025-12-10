@@ -159,16 +159,27 @@ function calculateBookmarkHash(bookmarks) {
 function getLastBackupHash(deviceName) {
     try {
         ensureDir();
+        const safeDeviceName = sanitizeDeviceName(deviceName);
         const files = fs.readdirSync(BOOKMARKS_DIR)
-            .filter(f => f.endsWith('.json') && f.includes(deviceName))
-            .sort((a, b) => b.localeCompare(a));
+            .filter(f => f.endsWith('.json') && f.includes(`-${safeDeviceName}-`))
+            .sort((a, b) => {
+                // 按修改时间排序，最新的在前
+                const statA = fs.statSync(path.join(BOOKMARKS_DIR, a));
+                const statB = fs.statSync(path.join(BOOKMARKS_DIR, b));
+                return statB.mtime.getTime() - statA.mtime.getTime();
+            });
         
-        if (files.length === 0) return null;
+        if (files.length === 0) {
+            console.log(`[书签备份] 未找到设备 ${safeDeviceName} 的历史备份`);
+            return null;
+        }
         
         const lastFile = path.join(BOOKMARKS_DIR, files[0]);
         const data = JSON.parse(fs.readFileSync(lastFile, 'utf-8'));
+        console.log(`[书签备份] 上次备份: ${files[0]}, 哈希: ${data.contentHash}`);
         return data.contentHash || null;
     } catch (e) {
+        console.error('[书签备份] 获取上次备份哈希失败:', e.message);
         return null;
     }
 }
@@ -383,11 +394,14 @@ router.post('/upload', flexAuthMiddleware, async (req, res) => {
         
         // 计算内容哈希
         const contentHash = calculateBookmarkHash(bookmarks);
+        console.log(`[书签备份] 当前内容哈希: ${contentHash}, 类型: ${type}, skipIfSame: ${skipIfSame}`);
         
         // 检查是否与上次备份相同
         if (skipIfSame && type !== 'manual') {
             const lastHash = getLastBackupHash(deviceName);
-            if (lastHash === contentHash) {
+            console.log(`[书签备份] 对比哈希 - 当前: ${contentHash}, 上次: ${lastHash}`);
+            if (lastHash && lastHash === contentHash) {
+                console.log('[书签备份] 内容无变化，跳过备份');
                 return res.json({
                     success: true,
                     message: '书签无变化，跳过备份',
