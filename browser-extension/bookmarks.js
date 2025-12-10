@@ -7555,8 +7555,14 @@ async function showAuthLoginDialog() {
     const authStatusEl = document.getElementById('authStatus');
     const btnEl = document.getElementById('btnAuthLogin');
     
+    // 显示加载状态
     statusEl.textContent = '⏳ 正在授权...';
     statusEl.style.color = '#666';
+    authStatusEl.innerHTML = '<span style="color: #666;">⏳ 验证中...</span>';
+    authStatusEl.style.borderColor = '#e5e7eb';
+    authStatusEl.style.background = '#f9fafb';
+    btnEl.disabled = true;
+    btnEl.style.opacity = '0.6';
     
     try {
         const response = await fetch(`${cloudBackupServerUrl}/api/extension/login`, {
@@ -7568,10 +7574,10 @@ async function showAuthLoginDialog() {
         const data = await response.json();
         
         if (data.success && data.token) {
+            // 先更新内存变量和界面，再异步保存storage
             cloudBackupToken = data.token;
-            await chrome.storage.local.set({ cloudBackupToken: data.token });
             
-            // 立即更新界面状态，无需再次验证
+            // 立即更新界面状态
             statusEl.textContent = '✅ 授权成功';
             statusEl.style.color = '#10b981';
             authStatusEl.innerHTML = '<span style="color: #10b981;">✅ 已授权</span>';
@@ -7579,13 +7585,28 @@ async function showAuthLoginDialog() {
             authStatusEl.style.background = '#ecfdf5';
             btnEl.textContent = '重新授权';
             btnEl.style.background = '#6b7280';
+            btnEl.disabled = false;
+            btnEl.style.opacity = '1';
+            
+            // 异步保存到storage（不阻塞界面）
+            chrome.storage.local.set({ cloudBackupToken: data.token }).catch(console.error);
         } else {
             statusEl.textContent = `❌ 授权失败: ${data.message || '密码错误'}`;
             statusEl.style.color = '#ef4444';
+            authStatusEl.innerHTML = '<span style="color: #ef4444;">❌ 授权失败</span>';
+            authStatusEl.style.borderColor = '#fecaca';
+            authStatusEl.style.background = '#fef2f2';
+            btnEl.disabled = false;
+            btnEl.style.opacity = '1';
         }
     } catch (error) {
         statusEl.textContent = `❌ 授权失败: ${error.message}`;
         statusEl.style.color = '#ef4444';
+        authStatusEl.innerHTML = '<span style="color: #ef4444;">❌ 网络错误</span>';
+        authStatusEl.style.borderColor = '#fecaca';
+        authStatusEl.style.background = '#fef2f2';
+        btnEl.disabled = false;
+        btnEl.style.opacity = '1';
     }
 }
 
