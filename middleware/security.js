@@ -35,6 +35,16 @@ const backupLimiter = rateLimit({
   skipFailedRequests: true, // 失败的请求不计入限制
 });
 
+// 书签同步限流器（防止滥用）
+const bookmarkSyncLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1小时
+  max: 20, // 每小时最多20次书签同步
+  message: { success: false, message: '书签同步过于频繁，请稍后再试' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+});
+
 // 文件上传限流器
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1小时
@@ -201,6 +211,7 @@ module.exports = {
   backupLimiter,
   uploadLimiter,
   wallpaperLimiter,
+  bookmarkSyncLimiter,
   helmetConfig,
   sanitizeMiddleware,
   validatePasswordStrength,

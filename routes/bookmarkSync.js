@@ -9,6 +9,7 @@ const db = require('../db');
 const config = require('../config');
 const { createClient } = require('webdav');
 const { decryptWebDAVConfig } = require('../utils/crypto');
+const { bookmarkSyncLimiter } = require('../middleware/security');
 
 const JWT_SECRET = config.server.jwtSecret;
 
@@ -372,8 +373,8 @@ function flexAuthMiddleware(req, res, next) {
     return res.status(401).json({ success: false, message: '请先授权登录' });
 }
 
-// 上传书签备份
-router.post('/upload', flexAuthMiddleware, async (req, res) => {
+// 上传书签备份（需要认证 + 限流）
+router.post('/upload', bookmarkSyncLimiter, flexAuthMiddleware, async (req, res) => {
     try {
         const { bookmarks, skipIfSame = true } = req.body;
         
