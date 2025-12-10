@@ -7455,20 +7455,22 @@ async function toggleAutoUpdateHot(e) {
 
 let cloudBackupServerUrl = '';
 let cloudBackupToken = ''; // 使用Token替代密码
-let lastLoginTime = 0; // 最后登录时间戳（用于防止刚登录后验证失败清除Token）
+let skipNextVerification = false; // 标记是否跳过下一次验证（仅在当前会话刚登录成功后使用）
 
 // 显示云备份弹窗
 async function showCloudBackupModal() {
     console.log('[云备份弹窗] 开始打开弹窗');
     
+    // 每次打开弹窗时重置跳过验证标志（确保会正常验证）
+    skipNextVerification = false;
+    
     // 加载保存的服务器地址和Token
     try {
-        const result = await chrome.storage.local.get(['cloudBackupServer', 'backupDeviceName', 'cloudBackupToken', 'autoBookmarkBackupEnabled', 'cloudBackupLastLoginTime']);
+        const result = await chrome.storage.local.get(['cloudBackupServer', 'backupDeviceName', 'cloudBackupToken', 'autoBookmarkBackupEnabled']);
         console.log('[云备份弹窗] 从storage加载配置:', {
             hasServer: !!result.cloudBackupServer,
             hasToken: !!result.cloudBackupToken,
-            tokenLength: result.cloudBackupToken ? result.cloudBackupToken.length : 0,
-            lastLoginTime: result.cloudBackupLastLoginTime
+            tokenLength: result.cloudBackupToken ? result.cloudBackupToken.length : 0
         });
         
         if (result.cloudBackupServer) {
@@ -7480,7 +7482,6 @@ async function showCloudBackupModal() {
         }
         // 始终从storage同步Token状态（包括清空的情况）
         cloudBackupToken = result.cloudBackupToken || '';
-        lastLoginTime = result.cloudBackupLastLoginTime || 0;
         console.log('[云备份弹窗] 内存Token已更新:', cloudBackupToken ? '有Token' : '无Token');
         
         // 加载自动备份状态
@@ -7523,29 +7524,22 @@ async function updateAuthStatusDisplay() {
     const statusEl = document.getElementById('authStatus');
     const btnEl = document.getElementById('btnAuthLogin');
     
-    // 先从storage重新读取Token和登录时间，确保使用最新的值
+    // 先从storage重新读取Token，确保使用最新的值
     try {
-        const result = await chrome.storage.local.get(['cloudBackupToken', 'cloudBackupLastLoginTime']);
+        const result = await chrome.storage.local.get(['cloudBackupToken']);
         if (result.cloudBackupToken && result.cloudBackupToken !== cloudBackupToken) {
             console.log('[授权状态] 从storage同步最新Token');
             cloudBackupToken = result.cloudBackupToken;
-        }
-        if (result.cloudBackupLastLoginTime) {
-            lastLoginTime = result.cloudBackupLastLoginTime;
         }
     } catch (e) {
         console.error('[授权状态] 读取storage失败:', e);
     }
     
-    // 检查是否是最近登录的（60秒内）
-    const isRecentLogin = lastLoginTime && (Date.now() - lastLoginTime < 60000);
-    
     console.log('[授权状态] 当前状态:', {
         hasToken: !!cloudBackupToken,
         hasServer: !!cloudBackupServerUrl,
         tokenLength: cloudBackupToken ? cloudBackupToken.length : 0,
-        lastLoginTime: lastLoginTime,
-        isRecentLogin: isRecentLogin
+        skipNextVerification: skipNextVerification
     });
     
     if (!cloudBackupToken || !cloudBackupServerUrl) {
@@ -7560,10 +7554,11 @@ async function updateAuthStatusDisplay() {
         return;
     }
     
-    // 如果是最近登录的，直接显示已授权，不再验证
-    // 这是因为登录成功本身就证明了Token是有效的
-    if (isRecentLogin) {
-        console.log('[授权状态] 最近登录，跳过验证，直接显示已授权');
+    // 如果标记了跳过验证（刚刚在当前会话中登录成功），直接显示已授权
+    // 这个标志只在当前会话有效，关闭弹窗后会被重置
+    if (skipNextVerification) {
+        console.log('[授权状态] 当前会话刚登录，跳过验证，直接显示已授权');
+        skipNextVerification = false; // 使用后立即重置
         statusEl.innerHTML = '<span style="color: #10b981;">✅ 已授权</span>';
         statusEl.style.borderColor = '#a7f3d0';
         statusEl.style.background = '#ecfdf5';
@@ -7600,10 +7595,9 @@ async function updateAuthStatusDisplay() {
         } else {
             console.log('[授权状态] Token无效，原因:', data.reason);
             
-            // Token确实无效，清除本地Token和登录时间
+            // Token确实无效，清除本地Token
             cloudBackupToken = '';
-            lastLoginTime = 0;
-            await chrome.storage.local.remove(['cloudBackupToken', 'cloudBackupLastLoginTime']);
+            await chrome.storage.local.remove(['cloudBackupToken']);
             console.log('[授权状态] 已清除无效Token');
             
             // 显示需要重新授权的提示
@@ -7667,23 +7661,14 @@ async function showAuthLoginDialog() {
         if (data.success && data.token) {
             console.log('[授权] 登录成功，准备保存Token');
             
-            // 记录登录时间
-            const loginTime = Date.now();
-            
-            // 先保存到storage，确保持久化（同时保存登录时间）
+            // 先保存到storage，确保持久化
             try {
-                await chrome.storage.local.set({ 
-                    cloudBackupToken: data.token,
-                    cloudBackupLastLoginTime: loginTime
-                });
-                console.log('[授权] Token和登录时间已保存到storage');
+                await chrome.storage.local.set({ cloudBackupToken: data.token });
+                console.log('[授权] Token已保存到storage');
                 
                 // 验证是否真的保存成功
-                const verify = await chrome.storage.local.get(['cloudBackupToken', 'cloudBackupLastLoginTime']);
-                console.log('[授权] 验证storage:', {
-                    hasToken: !!verify.cloudBackupToken,
-                    loginTime: verify.cloudBackupLastLoginTime
-                });
+                const verify = await chrome.storage.local.get(['cloudBackupToken']);
+                console.log('[授权] 验证storage:', { hasToken: !!verify.cloudBackupToken });
                 
                 if (!verify.cloudBackupToken) {
                     throw new Error('Token保存验证失败');
@@ -7695,8 +7680,10 @@ async function showAuthLoginDialog() {
             
             // 更新内存变量
             cloudBackupToken = data.token;
-            lastLoginTime = loginTime;
-            console.log('[授权] 内存变量已更新');
+            // 标记跳过下一次验证（仅在当前会话有效）
+            // 这样如果用户在当前弹窗中再次触发验证，不会因为服务器时序问题而失败
+            skipNextVerification = true;
+            console.log('[授权] 内存变量已更新，设置skipNextVerification=true');
             
             // 更新界面状态
             statusEl.textContent = '✅ 授权成功';
