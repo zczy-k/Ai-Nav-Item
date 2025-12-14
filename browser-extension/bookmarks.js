@@ -7465,6 +7465,15 @@ async function showCloudBackupModal() {
     // 先禁用所有操作，等待验证完成
     disableCloudBackupOperations();
     
+    // 立即设置授权状态为"验证中"，避免显示旧状态
+    const authStatusEl = document.getElementById('authStatus');
+    const authBtnEl = document.getElementById('btnAuthLogin');
+    authStatusEl.innerHTML = '<span style="color: #666;">⏳ 验证中...</span>';
+    authStatusEl.style.borderColor = '#e5e7eb';
+    authStatusEl.style.background = '#f9fafb';
+    authBtnEl.disabled = true;
+    authBtnEl.style.opacity = '0.6';
+    
     // 加载保存的服务器地址和Token
     try {
         const result = await chrome.storage.local.get(['cloudBackupServer', 'backupDeviceName', 'cloudBackupToken', 'autoBookmarkBackupEnabled']);
