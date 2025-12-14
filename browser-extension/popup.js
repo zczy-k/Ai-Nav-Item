@@ -66,7 +66,7 @@ document.getElementById('openSettings').addEventListener('click', function() {
     chrome.runtime.openOptionsPage();
 });
 
-// 访问导航站
+// 访问管理后台
 document.getElementById('openNav').addEventListener('click', function() {
     chrome.storage.sync.get(['navUrl'], function(result) {
         if (result.navUrl) {
