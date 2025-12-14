@@ -7,44 +7,48 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            width: 320px;
-            padding: 16px;
+            width: 300px;
+            padding: 12px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #f9fafb;
         }
         .header {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
+            justify-content: space-between;
+            margin-bottom: 10px;
         }
-        .header img { width: 32px; height: 32px; }
-        .header h2 { font-size: 16px; color: #333; }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header img { width: 24px; height: 24px; }
+        .header h2 { font-size: 14px; color: #333; }
+        .header .version { font-size: 11px; color: #999; }
         .info {
             background: white;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
         }
-        .info-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+        .info-label { font-size: 11px; color: #666; margin-bottom: 3px; }
         .info-value {
-            font-size: 13px;
+            font-size: 12px;
             color: #333;
-            word-break: break-all;
-            font-family: monospace;
             background: #f3f4f6;
-            padding: 6px 8px;
+            padding: 4px 6px;
             border-radius: 4px;
         }
-        .info-value.empty { color: #999; font-style: italic; }
-        .buttons { display: flex; flex-direction: column; gap: 8px; }
+        .buttons { display: flex; gap: 6px; margin-bottom: 8px; }
+        .buttons.vertical { flex-direction: column; }
         button {
-            width: 100%;
-            padding: 10px;
+            flex: 1;
+            padding: 8px 10px;
             border: none;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
@@ -53,35 +57,32 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102,126,234,0.4);
-        }
+        .btn-primary:hover { box-shadow: 0 2px 8px rgba(102,126,234,0.4); }
         .btn-secondary {
             background: white;
             color: #333;
             border: 1px solid #e5e7eb;
         }
-        .btn-secondary:hover { background: #f9fafb; }
+        .btn-secondary:hover { background: #f5f5f5; }
         .btn-bookmarks {
             background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
             color: white;
         }
-        .btn-bookmarks:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(245,158,11,0.4);
-        }
+        .btn-bookmarks:hover { box-shadow: 0 2px 8px rgba(245,158,11,0.4); }
         .section-title {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
-            color: #666;
-            margin: 16px 0 8px 0;
+            color: #888;
+            margin: 10px 0 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
         .switch {
             position: relative;
             display: inline-block;
-            width: 44px;
-            height: 24px;
+            width: 36px;
+            height: 20px;
         }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
@@ -90,13 +91,13 @@
             top: 0; left: 0; right: 0; bottom: 0;
             background-color: #ccc;
             transition: .3s;
-            border-radius: 24px;
+            border-radius: 20px;
         }
         .slider:before {
             position: absolute;
             content: "";
-            height: 18px;
-            width: 18px;
+            height: 14px;
+            width: 14px;
             left: 3px;
             bottom: 3px;
             background-color: white;
@@ -107,60 +108,113 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         input:checked + .slider:before {
-            transform: translateX(20px);
+            transform: translateX(16px);
         }
+        .tip-toggle {
+            font-size: 11px;
+            color: #3b82f6;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .tip-toggle:hover { text-decoration: underline; }
         .tip-box {
             background: #eff6ff;
             border: 1px solid #bfdbfe;
-            border-radius: 8px;
-            padding: 10px 12px;
-            font-size: 12px;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 11px;
             color: #1e40af;
-            margin-top: 12px;
+            margin-top: 6px;
+            display: none;
+            line-height: 1.5;
         }
-        .tip-box strong { display: block; margin-bottom: 4px; }
-        .footer {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e5e7eb;
-            text-align: center;
-            font-size: 12px;
-            color: #999;
+        .tip-box.show { display: block; }
+        .cloud-tip {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .cloud-tip .content {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        .cloud-tip .icon { font-size: 14px; }
+        .cloud-tip .text { flex: 1; }
+        .cloud-tip .title { font-size: 11px; font-weight: 600; color: #92400e; margin-bottom: 2px; }
+        .cloud-tip .desc { font-size: 10px; color: #a16207; line-height: 1.3; margin-bottom: 6px; }
+        .cloud-tip .actions { display: flex; gap: 4px; }
+        .cloud-tip .actions button {
+            padding: 4px 8px;
+            font-size: 10px;
+            flex: none;
+        }
+        .cloud-tip .btn-setup {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+        .cloud-tip .btn-dismiss {
+            background: transparent;
+            color: #92400e;
+            border: 1px solid #d97706;
         }
     </style>
 </head>
 <body>
+    <!-- 云备份未配置提示（顶部显眼位置） -->
+    <div id="cloudBackupTip" class="cloud-tip">
+        <div class="content">
+            <span class="icon">☁️</span>
+            <div class="text">
+                <div class="title">开启云端书签备份</div>
+                <div class="desc">配置后可自动同步书签，实现多设备同步</div>
+                <div class="actions">
+                    <button id="btnSetupCloudBackup" class="btn-setup">立即配置</button>
+                    <button id="btnDismissCloudTip" class="btn-dismiss">稍后</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="header">
-        <img src="icons/icon48.png" alt="导航站">
-        <h2>导航站插件</h2>
+        <div class="header-left">
+            <img src="icons/icon48.png" alt="导航站">
+            <h2>导航站插件</h2>
+        </div>
+        <span class="version">v1.3.0</span>
     </div>
 
     <div class="info">
         <div class="info-label">新标签页模式</div>
-        <select id="newtabMode" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; margin-top: 4px;">
+        <select id="newtabMode" style="width: 100%; padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; margin-top: 3px;">
             <option value="nav">导航站模式</option>
             <option value="quickaccess">快速访问面板</option>
         </select>
     </div>
 
     <div class="info" id="navUrlInfo">
-        <div class="info-label">当前导航站地址</div>
-        <div class="info-value" id="currentUrl">未设置</div>
-        <div style="font-size: 11px; color: #999; margin-top: 4px;">地址已隐藏，点击下方按钮查看或修改</div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="info-label" style="margin: 0;">导航站地址</div>
+            <div class="info-value" id="currentUrl" style="font-size: 11px;">未设置</div>
+        </div>
     </div>
 
     <div class="buttons" id="navButtons">
-        <button class="btn-primary" id="openSettings">⚙️ 设置导航站地址</button>
-        <button class="btn-secondary" id="openNav">🌐 访问管理后台</button>
+        <button class="btn-primary" id="openSettings">⚙️ 设置地址</button>
+        <button class="btn-secondary" id="openNav">🌐 管理后台</button>
     </div>
-
-    <div class="section-title">⚡ 快捷功能</div>
 
     <div class="info">
         <div style="display: flex; align-items: center; justify-content: space-between;">
             <div>
                 <div class="info-label" style="margin-bottom: 0;">浮动快捷按钮</div>
-                <div style="font-size: 11px; color: #999;">在网页右下角显示快速添加按钮</div>
+                <div style="font-size: 10px; color: #999;">网页右下角快速添加</div>
             </div>
             <label class="switch">
                 <input type="checkbox" id="floatBtnEnabled" checked>
@@ -169,37 +223,20 @@
         </div>
     </div>
 
-    <div class="tip-box">
-        <strong>💡 添加网站到导航页</strong>
-        • 右键点击网页 → 选择分类添加<br>
-        • 点击网页右下角浮动按钮<br>
-        • 在书签管理器中批量添加
-    </div>
-
-    <div class="section-title">🔖 本地书签</div>
-
     <div class="buttons">
         <button class="btn-bookmarks" id="openBookmarks">📚 书签管理器</button>
     </div>
 
-    <!-- 云备份未配置提示 -->
-    <div id="cloudBackupTip" style="display: none; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 8px; padding: 10px 12px; margin-top: 12px;">
-        <div style="display: flex; align-items: flex-start; gap: 8px;">
-            <span style="font-size: 16px;">☁️</span>
-            <div style="flex: 1;">
-                <div style="font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 4px;">开启云端书签备份</div>
-                <div style="font-size: 11px; color: #a16207; line-height: 1.4; margin-bottom: 8px;">
-                    配置后可自动同步书签到服务器，实现多设备同步。
-                </div>
-                <div style="display: flex; gap: 6px;">
-                    <button id="btnSetupCloudBackup" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 500; cursor: pointer;">立即配置</button>
-                    <button id="btnDismissCloudTip" style="background: transparent; color: #92400e; border: 1px solid #d97706; padding: 6px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">稍后</button>
-                </div>
-            </div>
-        </div>
+    <!-- 可折叠的提示 -->
+    <div class="tip-toggle" id="tipToggle">
+        <span id="tipArrow">▶</span>
+        <span>💡 添加网站到导航页的方法</span>
     </div>
-
-    <div class="footer">v1.3.0</div>
+    <div class="tip-box" id="tipBox">
+        • 右键点击网页 → 选择分类添加<br>
+        • 点击网页右下角浮动按钮<br>
+        • 在书签管理器中批量添加
+    </div>
 
     <script src="popup.js"></script>
 </body>

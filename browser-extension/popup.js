@@ -160,3 +160,16 @@ document.getElementById('btnDismissCloudTip').addEventListener('click', function
     // 记住用户选择，7天内不再提示
     chrome.storage.local.set({ cloudBackupPopupDismissed: Date.now() });
 });
+
+// 提示框折叠/展开功能
+document.getElementById('tipToggle').addEventListener('click', function() {
+    const tipBox = document.getElementById('tipBox');
+    const tipArrow = document.getElementById('tipArrow');
+    if (tipBox.classList.contains('show')) {
+        tipBox.classList.remove('show');
+        tipArrow.textContent = '▶';
+    } else {
+        tipBox.classList.add('show');
+        tipArrow.textContent = '▼';
+    }
+});
