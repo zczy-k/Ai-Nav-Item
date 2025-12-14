@@ -7707,9 +7707,15 @@ async function verifyTokenWithRetry(token, maxRetries = 1, timeout = 10000) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeout);
             
-            const response = await fetch(`${cloudBackupServerUrl}/api/extension/verify`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-                signal: controller.signal
+            // 添加时间戳防止缓存，并设置cache: 'no-store'确保不使用缓存
+            const response = await fetch(`${cloudBackupServerUrl}/api/extension/verify?_t=${Date.now()}`, {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                },
+                signal: controller.signal,
+                cache: 'no-store'
             });
             
             clearTimeout(timeoutId);

@@ -151,6 +151,13 @@ router.post('/extension/login', loginLimiter, (req, res) => {
 
 // 验证扩展Token是否有效
 router.get('/extension/verify', (req, res) => {
+  // 禁用缓存，确保每次都是实时验证
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  });
+  
   const auth = req.headers.authorization;
   
   if (!auth || !auth.startsWith('Bearer ')) {
