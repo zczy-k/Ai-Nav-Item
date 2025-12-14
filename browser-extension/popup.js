@@ -85,28 +85,67 @@ document.getElementById('openBookmarks').addEventListener('click', function() {
 });
 
 // 检查云备份配置状态，显示提示
-chrome.storage.local.get(['cloudBackupServer', 'cloudBackupPopupDismissed'], function(result) {
+// 只有服务器地址已配置且Token有效（已授权）时才不显示提示
+async function checkCloudBackupStatus() {
     const tip = document.getElementById('cloudBackupTip');
     if (!tip) return;
     
-    // 如果已配置服务器地址，不显示提示
-    if (result.cloudBackupServer) {
-        tip.style.display = 'none';
-        return;
-    }
-    
-    // 检查用户是否在7天内关闭过提示
-    if (result.cloudBackupPopupDismissed) {
-        const sevenDays = 7 * 24 * 60 * 60 * 1000;
-        if (Date.now() - result.cloudBackupPopupDismissed < sevenDays) {
-            tip.style.display = 'none';
+    try {
+        const result = await chrome.storage.local.get(['cloudBackupServer', 'cloudBackupToken', 'cloudBackupPopupDismissed']);
+        
+        // 检查用户是否在7天内关闭过提示
+        if (result.cloudBackupPopupDismissed) {
+            const sevenDays = 7 * 24 * 60 * 60 * 1000;
+            if (Date.now() - result.cloudBackupPopupDismissed < sevenDays) {
+                tip.style.display = 'none';
+                return;
+            }
+        }
+        
+        // 如果没有配置服务器地址，显示提示
+        if (!result.cloudBackupServer) {
+            tip.style.display = 'block';
             return;
         }
+        
+        // 如果没有Token，显示提示
+        if (!result.cloudBackupToken) {
+            tip.style.display = 'block';
+            return;
+        }
+        
+        // 验证Token是否有效
+        const serverUrl = result.cloudBackupServer.replace(/\/+$/, '');
+        const timestamp = Date.now();
+        const response = await fetch(`${serverUrl}/api/extension/verify?_t=${timestamp}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${result.cloudBackupToken}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            },
+            cache: 'no-store'
+        });
+        
+        const data = await response.json();
+        
+        // 如果Token无效，显示提示
+        if (!data.success || !data.valid) {
+            tip.style.display = 'block';
+            return;
+        }
+        
+        // 服务器已配置且Token有效，不显示提示
+        tip.style.display = 'none';
+    } catch (e) {
+        console.error('[云备份检查] 验证失败:', e);
+        // 验证失败时显示提示
+        tip.style.display = 'block';
     }
-    
-    // 显示提示
-    tip.style.display = 'block';
-});
+}
+
+// 执行云备份状态检查
+checkCloudBackupStatus();
 
 // 云备份提示 - 立即配置按钮
 document.getElementById('btnSetupCloudBackup').addEventListener('click', function() {
