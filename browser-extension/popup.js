@@ -70,7 +70,9 @@ document.getElementById('openSettings').addEventListener('click', function() {
 document.getElementById('openNav').addEventListener('click', function() {
     chrome.storage.sync.get(['navUrl'], function(result) {
         if (result.navUrl) {
-            chrome.tabs.create({ url: result.navUrl });
+            // 管理后台地址为 domain/admin
+            let adminUrl = result.navUrl.replace(/\/+$/, '') + '/admin';
+            chrome.tabs.create({ url: adminUrl });
             window.close();
         }
     });
