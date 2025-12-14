@@ -324,8 +324,10 @@ function flexAuthMiddleware(req, res, next) {
                         return res.status(401).json({ success: false, message: '用户不存在' });
                     }
                     
-                    const currentVersion = user.token_version || 1;
-                    if (payload.tokenVersion !== currentVersion) {
+                    // 确保类型一致，都转换为数字进行比较
+                    const currentVersion = parseInt(user.token_version, 10) || 1;
+                    const tokenVersion = parseInt(payload.tokenVersion, 10) || 1;
+                    if (tokenVersion !== currentVersion) {
                         return res.status(401).json({ 
                             success: false, 
                             message: '密码已更改，请重新验证',

@@ -115,13 +115,14 @@ router.post('/extension/login', loginLimiter, (req, res) => {
       return res.status(500).json({ success: false, message: '服务器错误' });
     }
     
-    console.log('[扩展登录] 当前用户token_version:', user.token_version);
+    console.log('[扩展登录] 当前用户token_version:', user.token_version, '类型:', typeof user.token_version);
     
     bcrypt.compare(password, user.password, (err, result) => {
       if (result) {
         // 生成包含token_version的长期Token（365天有效）
-        const tokenVersion = user.token_version || 1;
-        console.log('[扩展登录] 生成Token，tokenVersion:', tokenVersion);
+        // 确保tokenVersion是数字类型
+        const tokenVersion = parseInt(user.token_version, 10) || 1;
+        console.log('[扩展登录] 生成Token，tokenVersion:', tokenVersion, '类型:', typeof tokenVersion);
         
         const token = jwt.sign(
           { 
@@ -181,10 +182,12 @@ router.get('/extension/verify', (req, res) => {
         return res.json({ success: false, valid: false, message: '用户不存在' });
       }
       
-      const currentVersion = user.token_version || 1;
-      console.log('[Token验证] 版本对比 - Token中:', payload.tokenVersion, '数据库中:', currentVersion);
+      // 确保类型一致，都转换为数字进行比较
+      const currentVersion = parseInt(user.token_version, 10) || 1;
+      const tokenVersion = parseInt(payload.tokenVersion, 10) || 1;
+      console.log('[Token验证] 版本对比 - Token中:', tokenVersion, '(类型:', typeof payload.tokenVersion, ') 数据库中:', currentVersion, '(类型:', typeof user.token_version, ')');
       
-      if (payload.tokenVersion !== currentVersion) {
+      if (tokenVersion !== currentVersion) {
         console.log('[Token验证] 版本不匹配，Token无效');
         return res.json({ 
           success: false, 
