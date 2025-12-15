@@ -1,6 +1,6 @@
 # Con-Nav-Item - 现代化个人导航站
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Dual%20License-orange.svg)](NOTICE)
 [![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue.js-3-brightgreen.svg)](https://vuejs.org/)
 
@@ -211,9 +211,14 @@ docker exec -it Con-Nav-Item node check-password.js reset 新密码
 
 ## 📄 许可证
 
-Apache License 2.0 - 查看 [LICENSE](LICENSE)
+本项目采用双重许可证：
 
-基于 [nav-item](https://github.com/eooce/nav-item) by eooce
+- **原始代码**：基于 [nav-item](https://github.com/eooce/nav-item) by eooce，采用 Apache License 2.0
+- **新增功能**：由 zczy-k 开发的所有修改和新增功能为闭源专有代码，仅供个人使用
+
+新增的闭源功能包括但不限于：浏览器扩展、云端书签备份、WebDAV集成、书签管理器、快速访问面板等。
+
+详细信息请查看 [NOTICE](NOTICE) 文件。
 
 ## 🔗 链接
 

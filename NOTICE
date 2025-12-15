@@ -7,6 +7,24 @@ Copyright 2024 eooce
 
 ================================================================================
 
+DUAL LICENSE NOTICE
+
+This project contains two types of code with different licenses:
+
+1. ORIGINAL CODE (Apache License 2.0)
+   The original nav-item code and its core functionality remain under
+   the Apache License, Version 2.0.
+
+2. PROPRIETARY MODIFICATIONS (All Rights Reserved)
+   All modifications, enhancements, and new features added by zczy-k
+   are proprietary and closed-source. These modifications are provided
+   for personal use only and may not be redistributed, modified, or
+   used for commercial purposes without explicit written permission.
+
+================================================================================
+
+ORIGINAL CODE LICENSE (Apache 2.0):
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -21,22 +39,33 @@ limitations under the License.
 
 ================================================================================
 
-MODIFICATIONS AND ENHANCEMENTS BY zczy-k:
+PROPRIETARY MODIFICATIONS BY zczy-k (All Rights Reserved):
 
-This derivative work includes significant enhancements and modifications:
+The following enhancements and modifications are proprietary:
 
-- Complete duplicate detection system
-- Intelligent pinyin search functionality  
-- Browser extension quick-add features
-- Tag management system
-- Enhanced backup and recovery system
-- PWA support
-- Multi-platform deployment scripts
-- WebDAV cloud backup support
-- Custom search engine configuration
-- And many other improvements
+- Browser extension with bookmark management
+- Cloud bookmark backup and sync system
+- Token-based authentication for extensions
+- WebDAV cloud storage integration
+- Automatic bookmark backup functionality
+- Quick access panel
+- Enhanced popup interface
+- Bookmark tag system
+- Smart bookmark sorting
+- Bookmark usage analytics
+- Duplicate bookmark detection
+- Invalid link detection
+- Batch bookmark operations
+- Add to navigation from bookmarks
+- And all other new features not present in the original nav-item
 
-For a complete list of changes, see the project's commit history.
+These proprietary modifications:
+- May NOT be redistributed in source or binary form
+- May NOT be modified or create derivative works
+- May NOT be used for commercial purposes
+- Are provided for PERSONAL USE ONLY
+
+For licensing inquiries, contact the copyright holder.
 
 ================================================================================
 
