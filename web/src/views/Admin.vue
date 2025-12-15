@@ -3,12 +3,12 @@
     <div class="login-card">
       <h2 class="login-title">后台管理登录</h2>
       <div class="login-form">
-        <input v-model="username" type="text" placeholder="用户名" class="login-input" @keyup.enter="handleLogin" />
+        <input v-model="username" type="text" placeholder="用户名（默认：admin）" class="login-input" @keyup.enter="handleLogin" />
         <div class="password-input-wrapper">
           <input
             v-model="password"
             :type="showPassword ? 'text' : 'password'"
-            placeholder="密码"
+            placeholder="密码（默认：123456）"
             class="login-input password-input"
             @keyup.enter="handleLogin"
           />
