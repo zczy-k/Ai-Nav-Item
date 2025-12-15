@@ -5677,7 +5677,7 @@ async function getNavAuthToken(forceNew = false) {
     }
     
     // 没有有效token，提示用户输入密码
-    const password = prompt('请输入导航站管理密码：');
+    const password = await showAuthPasswordModal('请输入导航站管理密码：');
     if (!password) return null;
     
     try {
@@ -7701,7 +7701,7 @@ async function verifyTokenWithRetry(token, maxRetries = 1, timeout = 10000) {
 }
 
 // 显示授权密码输入弹窗
-function showAuthPasswordModal() {
+function showAuthPasswordModal(promptText = '请输入管理密码进行授权：') {
     return new Promise((resolve) => {
         const modal = document.getElementById('authPasswordModal');
         const input = document.getElementById('authPasswordInput');
@@ -7709,11 +7709,13 @@ function showAuthPasswordModal() {
         const confirmBtn = document.getElementById('btnAuthPasswordConfirm');
         const cancelBtn = document.getElementById('btnAuthPasswordCancel');
         const closeBtn = document.getElementById('authPasswordClose');
+        const labelEl = modal.querySelector('.form-group label');
         
         // 重置状态
         input.value = '';
         errorEl.style.display = 'none';
         errorEl.textContent = '';
+        if (labelEl) labelEl.textContent = promptText;
         
         // 显示弹窗
         modal.classList.add('active');
