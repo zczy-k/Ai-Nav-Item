@@ -4,16 +4,24 @@
 (function() {
     'use strict';
     
-    // 避免重复注入
+    // 监听后台管理页面发出的菜单更新事件（在所有窗口包括iframe中监听）
+    // 当用户在后台管理中修改栏目后，通知扩展刷新右键菜单
+    if (!window.__navMenusListenerAdded) {
+        window.__navMenusListenerAdded = true;
+        window.addEventListener('nav-menus-updated', () => {
+            console.log('[导航站扩展] 检测到菜单更新，刷新右键菜单...');
+            chrome.runtime.sendMessage({ action: 'refreshMenus' }).catch(() => {});
+        });
+    }
+    
+    // 浮动按钮只在顶层窗口显示，不在iframe中显示
+    if (window !== window.top) {
+        return;
+    }
+    
+    // 避免重复注入浮动按钮
     if (window.__navFloatBtnInjected) return;
     window.__navFloatBtnInjected = true;
-    
-    // 监听后台管理页面发出的菜单更新事件
-    // 当用户在后台管理中修改栏目后，通知扩展刷新右键菜单
-    window.addEventListener('nav-menus-updated', () => {
-        console.log('[导航站扩展] 检测到菜单更新，刷新右键菜单...');
-        chrome.runtime.sendMessage({ action: 'refreshMenus' }).catch(() => {});
-    });
     
     // 检查是否应该显示浮动按钮
     async function shouldShowFloatBtn() {
