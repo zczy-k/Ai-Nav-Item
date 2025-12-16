@@ -221,15 +221,15 @@ function openEditMenu(menu) {
 
 // 保存主菜单编辑
 async function saveEdit() {
-  if (!editForm.value.name.trim()) return;
+  if (!editForm.value.name.trim() || !editingMenu.value) return;
+  const menuId = editingMenu.value.id; // 先保存id
+  const name = editForm.value.name.trim();
+  const order = editForm.value.order;
   closeModal();
   loading.value = true;
   loadingText.value = '保存中...';
   try {
-    await apiUpdateMenu(editingMenu.value.id, {
-      name: editForm.value.name.trim(),
-      order: editForm.value.order
-    });
+    await apiUpdateMenu(menuId, { name, order });
     await loadMenus();
   } catch (e) {
     alert('保存失败: ' + (e.response?.data?.error || e.message));
@@ -288,15 +288,15 @@ function openEditSubMenu(menu, sub) {
 
 // 保存子菜单编辑
 async function saveSubMenuEdit() {
-  if (!editSubForm.value.name.trim()) return;
+  if (!editSubForm.value.name.trim() || !editingSubMenu.value) return;
+  const subMenuId = editingSubMenu.value.id; // 先保存id
+  const name = editSubForm.value.name.trim();
+  const order = editSubForm.value.order;
   closeModal();
   loading.value = true;
   loadingText.value = '保存中...';
   try {
-    await apiUpdateSubMenu(editingSubMenu.value.id, {
-      name: editSubForm.value.name.trim(),
-      order: editSubForm.value.order
-    });
+    await apiUpdateSubMenu(subMenuId, { name, order });
     await loadMenus();
   } catch (e) {
     alert('保存失败: ' + (e.response?.data?.error || e.message));
