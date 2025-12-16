@@ -46,11 +46,11 @@ export const uploadLogo = (file) => {
   return axios.post(`${BASE}/upload`, formData, { headers: { ...authHeaders(), 'Content-Type': 'multipart/form-data' } });
 };
 
-// 广告API
-export const getAds = () => axios.get(`${BASE}/ads`);
-export const addAd = (data) => axios.post(`${BASE}/ads`, data, { headers: authHeaders() });
-export const updateAd = (id, data) => axios.put(`${BASE}/ads/${id}`, data, { headers: authHeaders() });
-export const deleteAd = (id) => axios.delete(`${BASE}/ads/${id}`, { headers: authHeaders() });
+// 宣传API
+export const getPromos = () => axios.get(`${BASE}/promos`);
+export const addPromo = (data) => axios.post(`${BASE}/promos`, data, { headers: authHeaders() });
+export const updatePromo = (id, data) => axios.put(`${BASE}/promos/${id}`, data, { headers: authHeaders() });
+export const deletePromo = (id) => axios.delete(`${BASE}/promos/${id}`, { headers: authHeaders() });
 
 // 友链API
 export const getFriends = () => axios.get(`${BASE}/friends`);

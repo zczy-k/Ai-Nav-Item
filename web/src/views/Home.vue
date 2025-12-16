@@ -149,16 +149,16 @@
       </div>
     </transition>
     
-    <!-- 左侧广告条 -->
-    <div v-if="leftAds.length" class="ad-space-fixed left-ad-fixed">
-      <a v-for="ad in leftAds" :key="ad.id" :href="ad.url" target="_blank">
-        <img :src="ad.img" alt="广告" loading="lazy" />
+    <!-- 左侧宣传条 -->
+    <div v-if="leftPromos.length" class="promo-space-fixed left-promo-fixed">
+      <a v-for="item in leftPromos" :key="item.id" :href="item.url" target="_blank">
+        <img :src="item.img" alt="宣传" loading="lazy" />
       </a>
     </div>
-    <!-- 右侧广告条 -->
-    <div v-if="rightAds.length" class="ad-space-fixed right-ad-fixed">
-      <a v-for="ad in rightAds" :key="ad.id" :href="ad.url" target="_blank">
-        <img :src="ad.img" alt="广告" loading="lazy" />
+    <!-- 右侧宣传条 -->
+    <div v-if="rightPromos.length" class="promo-space-fixed right-promo-fixed">
+      <a v-for="item in rightPromos" :key="item.id" :href="item.url" target="_blank">
+        <img :src="item.img" alt="宣传" loading="lazy" />
       </a>
     </div>
     
@@ -729,7 +729,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeMount, computed, defineAsyncComponent, onUnmounted } from 'vue';
-import { getMenus, getCards, getAllCards, getAds, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags } from '../api';
+import { getMenus, getCards, getAllCards, getPromos, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags } from '../api';
 import MenuBar from '../components/MenuBar.vue';
 import { filterCardsWithPinyin } from '../utils/pinyin';
 import { isDuplicateCard } from '../utils/urlNormalizer';
@@ -742,8 +742,8 @@ const cards = ref([]);
 const cardsLoading = ref(false); // 禁用骨架屏
 const allCards = ref([]); // 存储所有菜单的卡片，用于搜索
 const searchQuery = ref('');
-const leftAds = ref([]);
-const rightAds = ref([]);
+const leftPromos = ref([]);
+const rightPromos = ref([]);
 const showFriendLinks = ref(false);
 const friendLinks = ref([]);
 const allTags = ref([]);
@@ -1190,9 +1190,9 @@ onMounted(async () => {
       if (data.tags) {
         allTags.value = data.tags;
       }
-      if (data.ads) {
-        leftAds.value = data.ads.filter(ad => ad.position === 'left');
-        rightAds.value = data.ads.filter(ad => ad.position === 'right');
+      if (data.promos) {
+        leftPromos.value = data.promos.filter(item => item.position === 'left');
+        rightPromos.value = data.promos.filter(item => item.position === 'right');
       }
       if (data.friends) {
         friendLinks.value = data.friends;
@@ -1268,10 +1268,10 @@ onMounted(async () => {
   }
   
   // ========== 后台加载最新数据 ==========
-  // 并行加载所有独立数据：菜单、广告、友链、标签、自定义搜索引擎
-  const [menusRes, adsRes, friendsRes, tagsRes, enginesRes] = await Promise.allSettled([
+  // 并行加载所有独立数据：菜单、宣传、友链、标签、自定义搜索引擎
+  const [menusRes, promosRes, friendsRes, tagsRes, enginesRes] = await Promise.allSettled([
     getMenus(),
-    getAds(),
+    getPromos(),
     getFriends(),
     getTags(),
     getSearchEngines()
@@ -1297,11 +1297,11 @@ onMounted(async () => {
     }
   }
   
-  // 处理广告数据
-  if (adsRes.status === 'fulfilled') {
-    leftAds.value = adsRes.value.data.filter(ad => ad.position === 'left');
-    rightAds.value = adsRes.value.data.filter(ad => ad.position === 'right');
-    cacheData.ads = adsRes.value.data;
+  // 处理宣传数据
+  if (promosRes.status === 'fulfilled') {
+    leftPromos.value = promosRes.value.data.filter(item => item.position === 'left');
+    rightPromos.value = promosRes.value.data.filter(item => item.position === 'right');
+    cacheData.promos = promosRes.value.data;
   }
   
   // 处理友链数据
@@ -3269,7 +3269,7 @@ async function saveCardEdit() {
   min-width: 0;
 }
 
-.ad-space {
+.promo-space {
   width: 90px;
   min-width: 60px;
   display: flex;
@@ -3280,11 +3280,11 @@ async function saveCardEdit() {
   background: transparent;
   margin: 0;
 }
-.ad-space a {
+.promo-space a {
   width: 100%;
   display: block;
 }
-.ad-space img {
+.promo-space img {
   width: 100%;
   max-width: 90px;
   max-height: 160px;
@@ -3295,7 +3295,7 @@ async function saveCardEdit() {
   margin: 0 auto;
 }
 
-.ad-placeholder {
+.promo-placeholder {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border: 2px dashed rgba(255, 255, 255, 0.3);
@@ -3512,7 +3512,7 @@ async function saveCardEdit() {
   z-index: 2;
 }
 
-.ad-space-fixed {
+.promo-space-fixed {
   position: fixed;
   top: 13rem;
   z-index: 10;
@@ -3526,17 +3526,17 @@ async function saveCardEdit() {
   background: transparent;
   margin: 0;
 }
-.left-ad-fixed {
+.left-promo-fixed {
   left: 0;
 }
-.right-ad-fixed {
+.right-promo-fixed {
   right: 0;
 }
-.ad-space-fixed a {
+.promo-space-fixed a {
   width: 100%;
   display: block;
 }
-.ad-space-fixed img {
+.promo-space-fixed img {
   width: 100%;
   max-width: 90px;
   max-height: 160px;
@@ -3551,12 +3551,12 @@ async function saveCardEdit() {
     gap: 1rem;
   }
   
-  .ad-space {
+  .promo-space {
     width: 100%;
     height: 100px;
   }
   
-  .ad-placeholder {
+  .promo-placeholder {
     height: 80px;
   }
 }
@@ -3570,11 +3570,11 @@ async function saveCardEdit() {
     gap: 0.5rem;
   }
   
-  .ad-space {
+  .promo-space {
     height: 60px;
   }
   
-  .ad-placeholder {
+  .promo-placeholder {
     height: 50px;
     font-size: 12px;
     padding: 1rem 0.5rem;

@@ -111,13 +111,13 @@ async function initializeDatabase() {
     )`);
     await dbRun(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
 
-    await dbRun(`CREATE TABLE IF NOT EXISTS ads (
+    await dbRun(`CREATE TABLE IF NOT EXISTS promos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       position TEXT NOT NULL,
       img TEXT NOT NULL,
       url TEXT NOT NULL
     )`);
-    await dbRun(`CREATE INDEX IF NOT EXISTS idx_ads_position ON ads(position)`);
+    await dbRun(`CREATE INDEX IF NOT EXISTS idx_promos_position ON promos(position)`);
 
     await dbRun(`CREATE TABLE IF NOT EXISTS friends (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

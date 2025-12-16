@@ -41,7 +41,7 @@
         <li :class="{active: page==='card'}" @click="page='card'; closeSider()">卡片管理</li>
         <li :class="{active: page==='duplicate'}" @click="page='duplicate'; closeSider()">去重管理</li>
         <li :class="{active: page==='tag'}" @click="page='tag'; closeSider()">标签管理</li>
-        <li :class="{active: page==='ad'}" @click="page='ad'; closeSider()">广告管理</li>
+        <li :class="{active: page==='promo'}" @click="page='promo'; closeSider()">宣传管理</li>
         <li :class="{active: page==='friend'}" @click="page='friend'; closeSider()">友链管理</li>
         <li :class="{active: page==='user'}" @click="page='user'; closeSider()">用户管理</li>
         <li :class="{active: page==='backup'}" @click="page='backup'; closeSider()">备份管理</li>
@@ -80,7 +80,7 @@ import MenuManage from './admin/MenuManage.vue';
 import CardManage from './admin/CardManage.vue';
 import DuplicateManage from './admin/DuplicateManage.vue';
 import TagManage from './admin/TagManage.vue';
-import AdManage from './admin/AdManage.vue';
+import PromoManage from './admin/PromoManage.vue';
 import FriendLinkManage from './admin/FriendLinkManage.vue';
 import UserManage from './admin/UserManage.vue';
 import BackupManage from './admin/BackupManage.vue';
@@ -94,7 +94,7 @@ const componentMap = {
   card: CardManage,
   duplicate: DuplicateManage,
   tag: TagManage,
-  ad: AdManage,
+  promo: PromoManage,
   friend: FriendLinkManage,
   user: UserManage,
   backup: BackupManage
@@ -133,7 +133,7 @@ const pageTitle = computed(() => {
     case 'card': return '卡片管理';
     case 'duplicate': return '去重管理';
     case 'tag': return '标签管理';
-    case 'ad': return '广告管理';
+    case 'promo': return '宣传管理';
     case 'friend': return '友链管理';
     case 'user': return '用户管理';
     case 'backup': return '备份管理';
