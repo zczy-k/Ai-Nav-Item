@@ -594,6 +594,8 @@ function closeModal() {
   border-radius: 8px;
   font-size: 0.95rem;
   transition: all 0.2s;
+  color: #333;
+  background: white;
 }
 
 .input:focus {
