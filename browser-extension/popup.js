@@ -1,5 +1,8 @@
 // popup.js - 扩展弹窗脚本
 
+// 每次打开弹窗时刷新右键菜单分类（确保与后台管理同步）
+chrome.runtime.sendMessage({ action: 'refreshMenus' }).catch(() => {});
+
 // 加载当前设置
 chrome.storage.sync.get(['navUrl', 'newtabMode', 'floatBtnEnabled'], function(result) {
     const urlElement = document.getElementById('currentUrl');
