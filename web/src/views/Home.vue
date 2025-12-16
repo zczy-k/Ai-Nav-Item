@@ -1604,24 +1604,75 @@ function saveCardsCache() {
 async function loadCards(forceRefresh = false) {
   if (!activeMenu.value) return;
   
-  const cacheKey = getCardsCacheKey(activeMenu.value.id, activeSubMenu.value?.id);
-  
-  // 优先使用内存缓存，实现秒切换（除非强制刷新）
-  if (!forceRefresh && cardsCache.value[cacheKey]) {
-    cards.value = cardsCache.value[cacheKey];
-  }
-  
-  // 从服务器获取最新数据（强制刷新时绕过浏览器缓存）
-  try {
-    const res = await getCards(activeMenu.value.id, activeSubMenu.value?.id, forceRefresh);
-    cards.value = res.data;
-    cardsCache.value[cacheKey] = res.data;
-    saveCardsCache();
-  } catch (error) {
-    console.error('加载卡片失败:', error);
-    if (!cardsCache.value[cacheKey]) {
-      cards.value = [];
+  // 如果选择了子菜单，只加载该子菜单的卡片
+  if (activeSubMenu.value) {
+    const cacheKey = getCardsCacheKey(activeMenu.value.id, activeSubMenu.value.id);
+    
+    // 优先使用内存缓存，实现秒切换（除非强制刷新）
+    if (!forceRefresh && cardsCache.value[cacheKey]) {
+      cards.value = cardsCache.value[cacheKey];
     }
+    
+    // 从服务器获取最新数据
+    try {
+      const res = await getCards(activeMenu.value.id, activeSubMenu.value.id, forceRefresh);
+      cards.value = res.data;
+      cardsCache.value[cacheKey] = res.data;
+      saveCardsCache();
+    } catch (error) {
+      console.error('加载卡片失败:', error);
+      if (!cardsCache.value[cacheKey]) {
+        cards.value = [];
+      }
+    }
+  } else {
+    // 选择主菜单时，加载该主菜单下所有卡片（包括子菜单中的卡片）
+    const allCardsInMenu = [];
+    const subMenus = activeMenu.value.subMenus || [];
+    
+    // 先加载主菜单直接的卡片
+    const mainCacheKey = getCardsCacheKey(activeMenu.value.id, null);
+    try {
+      // 优先使用缓存
+      if (!forceRefresh && cardsCache.value[mainCacheKey]) {
+        allCardsInMenu.push(...cardsCache.value[mainCacheKey]);
+      } else {
+        const res = await getCards(activeMenu.value.id, null, forceRefresh);
+        cardsCache.value[mainCacheKey] = res.data;
+        allCardsInMenu.push(...res.data);
+      }
+    } catch (error) {
+      console.error('加载主菜单卡片失败:', error);
+      if (cardsCache.value[mainCacheKey]) {
+        allCardsInMenu.push(...cardsCache.value[mainCacheKey]);
+      }
+    }
+    
+    // 并行加载所有子菜单的卡片
+    if (subMenus.length > 0) {
+      const subPromises = subMenus.map(async (subMenu) => {
+        const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
+        try {
+          if (!forceRefresh && cardsCache.value[subCacheKey]) {
+            return cardsCache.value[subCacheKey];
+          }
+          const res = await getCards(activeMenu.value.id, subMenu.id, forceRefresh);
+          cardsCache.value[subCacheKey] = res.data;
+          return res.data;
+        } catch (error) {
+          console.error(`加载子菜单 ${subMenu.name} 卡片失败:`, error);
+          return cardsCache.value[subCacheKey] || [];
+        }
+      });
+      
+      const subResults = await Promise.all(subPromises);
+      subResults.forEach(subCards => {
+        allCardsInMenu.push(...subCards);
+      });
+    }
+    
+    cards.value = allCardsInMenu;
+    saveCardsCache();
   }
 }
 
