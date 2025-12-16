@@ -1,46 +1,67 @@
 ﻿<template>
   <div class="ad-manage">
-    <div class="ad-header">
-      <form class="ad-add-row" @submit.prevent="handleAddAd">
-        <input v-model="newAdImg" placeholder="广告图片链接" class="input" />
-        <input v-model="newAdUrl" placeholder="广告跳转链接" class="input" />
-        <select v-model="newAdPos" class="input select-input">
-          <option value="left">左侧广告</option>
-          <option value="right">右侧广告</option>
-        </select>
-        <button class="btn" type="submit">添加广告</button>
-      </form>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <span>加载中...</span>
     </div>
-    <div class="ad-section">
-      <h3 class="section-title">左侧广告列表</h3>
-      <div class="ad-card">
-        <table class="ad-table">
-          <thead><tr><th>图片</th><th>跳转链接</th><th>操作</th></tr></thead>
-          <tbody>
-            <tr v-for="ad in leftAds" :key="ad.id">
-              <td><input v-model="ad.img" @blur="updateAd(ad)" class="input" /></td>
-              <td><input v-model="ad.url" @blur="updateAd(ad)" class="input" /></td>
-              <td><button class="btn btn-danger" @click="deleteAd(ad.id)">删除广告</button></td>
-            </tr>
-          </tbody>
-        </table>
+
+    <!-- 错误提示 -->
+    <div v-else-if="error" class="error-state">
+      <p>{{ error }}</p>
+      <button class="btn" @click="loadAds">重试</button>
+    </div>
+
+    <!-- 正常内容 -->
+    <template v-else>
+      <div class="ad-header">
+        <form class="ad-add-row" @submit.prevent="handleAddAd">
+          <input v-model="newAdImg" placeholder="广告图片链接" class="input" />
+          <input v-model="newAdUrl" placeholder="广告跳转链接" class="input" />
+          <select v-model="newAdPos" class="input select-input">
+            <option value="left">左侧广告</option>
+            <option value="right">右侧广告</option>
+          </select>
+          <button class="btn" type="submit">添加广告</button>
+        </form>
       </div>
-    </div>
-    <div class="ad-section">
-      <h3 class="section-title">右侧广告列表</h3>
-      <div class="ad-card">
-        <table class="ad-table">
-          <thead><tr><th>图片</th><th>跳转链接</th><th>操作</th></tr></thead>
-          <tbody>
-            <tr v-for="ad in rightAds" :key="ad.id">
-              <td><input v-model="ad.img" @blur="updateAd(ad)" class="input" /></td>
-              <td><input v-model="ad.url" @blur="updateAd(ad)" class="input" /></td>
-              <td><button class="btn btn-danger" @click="deleteAd(ad.id)">删除广告</button></td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="ad-section">
+        <h3 class="section-title">左侧广告列表</h3>
+        <div class="ad-card">
+          <table class="ad-table">
+            <thead><tr><th>图片</th><th>跳转链接</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr v-if="leftAds.length === 0">
+                <td colspan="3" class="empty-row">暂无左侧广告</td>
+              </tr>
+              <tr v-for="ad in leftAds" :key="ad.id">
+                <td><input v-model="ad.img" @blur="updateAd(ad)" class="input" /></td>
+                <td><input v-model="ad.url" @blur="updateAd(ad)" class="input" /></td>
+                <td><button class="btn btn-danger" @click="deleteAd(ad.id)">删除广告</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+      <div class="ad-section">
+        <h3 class="section-title">右侧广告列表</h3>
+        <div class="ad-card">
+          <table class="ad-table">
+            <thead><tr><th>图片</th><th>跳转链接</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr v-if="rightAds.length === 0">
+                <td colspan="3" class="empty-row">暂无右侧广告</td>
+              </tr>
+              <tr v-for="ad in rightAds" :key="ad.id">
+                <td><input v-model="ad.img" @blur="updateAd(ad)" class="input" /></td>
+                <td><input v-model="ad.url" @blur="updateAd(ad)" class="input" /></td>
+                <td><button class="btn btn-danger" @click="deleteAd(ad.id)">删除广告</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -53,10 +74,14 @@ const rightAds = ref([]);
 const newAdImg = ref('');
 const newAdUrl = ref('');
 const newAdPos = ref('left');
+const loading = ref(true);
+const error = ref('');
 
 onMounted(loadAds);
 
 async function loadAds() {
+  loading.value = true;
+  error.value = '';
   try {
     const res = await getAds();
     // 兼容不同的返回格式
@@ -70,8 +95,11 @@ async function loadAds() {
     rightAds.value = ads.filter(ad => ad.position === 'right');
   } catch (err) {
     console.error('加载广告失败:', err);
+    error.value = '加载广告失败: ' + (err.response?.data?.error || err.message);
     leftAds.value = [];
     rightAds.value = [];
+  } finally {
+    loading.value = false;
   }
 }
 async function handleAddAd() {
@@ -126,6 +154,48 @@ async function deleteAd(id) {
   max-width: 1400px;
   width: 90%;
   margin: 0 auto;
+}
+
+/* 加载状态 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #1890ff;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #1890ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 错误状态 */
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #ff4d4f;
+}
+
+.error-state p {
+  margin-bottom: 16px;
+}
+
+/* 空数据行 */
+.empty-row {
+  text-align: center;
+  color: #999;
+  padding: 20px !important;
 }
 .page-title {
   text-align: center;
