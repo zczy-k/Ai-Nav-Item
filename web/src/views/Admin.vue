@@ -209,7 +209,7 @@ const pageTitle = computed(() => {
   }
 });
 
-onMounted(() => {
+onMounted(async () => {
   // 检查是否已超时
   if (checkIdleTimeout()) {
     isLoggedIn.value = false;
@@ -217,13 +217,19 @@ onMounted(() => {
   }
   
   const token = localStorage.getItem('token');
-  isLoggedIn.value = !!token;
-  if (isLoggedIn.value) {
-    // 拉取用户信息
-    fetchLastLoginInfo();
-    // 启动空闲计时器和活动监听
-    resetIdleTimer();
-    setupActivityListeners();
+  if (token) {
+    // 先设置为已登录状态，然后验证token
+    isLoggedIn.value = true;
+    // 验证token有效性并获取用户信息
+    await fetchLastLoginInfo();
+    // 如果验证失败，fetchLastLoginInfo会调用logout()，此时isLoggedIn已变为false
+    if (isLoggedIn.value) {
+      // 启动空闲计时器和活动监听
+      resetIdleTimer();
+      setupActivityListeners();
+    }
+  } else {
+    isLoggedIn.value = false;
   }
 });
 async function fetchLastLoginInfo() {
@@ -234,6 +240,10 @@ async function fetchLastLoginInfo() {
       lastLoginTime.value = data.last_login_time || '';
       lastLoginIp.value = data.last_login_ip || '';
       currentUsername.value = data.username || 'admin';
+    } else if (res.status === 401) {
+      // Token无效，自动退出登录
+      console.warn('Token验证失败，自动退出登录');
+      logout();
     }
   } catch (error) {
     console.error('获取用户信息失败:', error);
