@@ -261,6 +261,7 @@ const gradients = [
 </script>
 
 <style scoped>
+/* ========== 网格布局 ========== */
 .container {
   max-width: 70rem;
   margin: 0 auto;
@@ -268,103 +269,126 @@ const gradients = [
   width: 100%;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 15px;
-  opacity: 1 !important;
+  gap: 14px;
   position: relative;
   z-index: 1;
 }
+
 @media (max-width: 1200px) {
-  .container {
-    grid-template-columns: repeat(4, 1fr);
-  }
+  .container { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-width: 768px) {
-  .container {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  .container { grid-template-columns: repeat(3, 1fr); gap: 10px; }
 }
 @media (max-width: 480px) {
-  .container {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  .container { grid-template-columns: repeat(3, 1fr); gap: 8px; }
 }
+
+/* ========== 卡片主体 - 现代毛玻璃风格 ========== */
 .link-item {
-  /* background 由 JS 动态设置 */
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 16px;
-  padding: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  text-align: center;
-  min-height: 85px;
-  height: 85px;
+  /* 背景由 JS 动态设置渐变色 */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 14px;
+  min-height: 82px;
+  height: 82px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
+  /* 精致的边框 */
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  /* 柔和的阴影 */
+  box-shadow: 
+    0 4px 24px -1px rgba(0, 0, 0, 0.12),
+    0 0 1px rgba(255, 255, 255, 0.1) inset;
+  /* 平滑过渡 */
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  cursor: pointer;
 }
 
-/* 苹果风格光晕效果 */
+/* 顶部高光条 - 增加质感 */
 .link-item::before {
   content: '';
   position: absolute;
   top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.3),
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.5), 
     transparent
   );
-  transition: left 0.5s;
+  border-radius: 1px;
 }
 
-.link-item:hover::before {
-  left: 100%;
-}
-
+/* 悬停效果 */
 .link-item:hover {
-  filter: brightness(1.08);
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(-6px) scale(1.02);
+  border-color: rgba(255, 255, 255, 0.35);
   box-shadow: 
-    0 4px 16px rgba(0, 0, 0, 0.2),
-    0 8px 32px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  border-color: rgba(255, 255, 255, 0.5);
+    0 12px 40px -5px rgba(0, 0, 0, 0.2),
+    0 0 1px rgba(255, 255, 255, 0.2) inset;
 }
 
+/* 点击效果 */
 .link-item:active {
   transform: translateY(-2px) scale(0.98);
-  transition: all 0.1s;
+  transition: transform 0.1s ease;
 }
+
+/* ========== 链接样式 ========== */
 .link-item a {
-  /* margin-top: 8px; */
   text-decoration: none;
   color: #ffffff;
-  font-weight: 600;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: 0;
+  padding: 8px 6px;
   box-sizing: border-box;
   position: relative;
   z-index: 1;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-/* 在编辑模式下，拖拽手柄不应该阻止按钮点击 */
+/* ========== 图标样式 ========== */
+.link-icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+  transition: transform 0.25s ease;
+  margin-bottom: 4px;
+}
+
+.link-item:hover .link-icon {
+  transform: scale(1.12);
+}
+
+/* ========== 文字样式 ========== */
+.link-text {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  max-width: 100%;
+  padding: 0 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+/* ========== 编辑模式 ========== */
 .edit-mode .link-item a.drag-handle {
   pointer-events: none;
 }
@@ -374,58 +398,7 @@ const gradients = [
   pointer-events: auto;
 }
 
-/* 确保编辑模式下的按钮可以点击 */
-.edit-mode .card-btns {
-  pointer-events: auto !important;
-  z-index: 100 !important;
-}
-
-.edit-mode .card-btn {
-  pointer-events: auto !important;
-}
-
-.edit-mode .card-checkbox {
-  pointer-events: auto !important;
-}
-.link-icon {
-  width: 28px;
-  height: 28px;
-  margin: 4px auto;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.link-item:hover .link-icon {
-  transform: scale(1.15);
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.4));
-}
-.link-text {
-  padding-right: 4px;
-  padding-left: 4px;
-  font-size: 13px;
-  font-weight: normal;
-  text-align: center;
-  word-break: break-all;
-  max-width: 100%;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
-  line-height: 1.2;
-  min-height: 1.5em;
-  letter-spacing: -0.01em;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-}
-
-/* 所有动画已完全移除 */
-
-/* 拖拽相关样式 */
 .edit-mode .link-item.draggable {
-  cursor: move;
   cursor: grab;
 }
 
@@ -433,66 +406,69 @@ const gradients = [
   cursor: grabbing;
 }
 
-.sortable-ghost {
-  opacity: 0.5;
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
-.sortable-chosen {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
-}
-
-.sortable-drag {
-  opacity: 0.8;
-  transform: rotate(2deg);
-}
-
-/* 编辑模式下的视觉提示 */
 .edit-mode .link-item {
-  border: 2px dashed transparent;
-  transition: all 0.2s;
-  position: relative;
+  border: 1.5px dashed transparent;
 }
 
 .edit-mode .link-item:hover {
-  border-color: rgba(59, 130, 246, 0.5);
+  border-color: rgba(99, 179, 237, 0.6);
 }
 
+/* ========== 拖拽状态 ========== */
+.sortable-ghost {
+  opacity: 0.4;
+}
+
+.sortable-chosen {
+  box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.6);
+}
+
+.sortable-drag {
+  opacity: 0.9;
+  transform: rotate(1deg) scale(1.02);
+}
+
+/* ========== 编辑按钮 ========== */
 .card-btns {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 4px;
+  right: 4px;
   display: flex;
-  gap: 4px;
+  gap: 3px;
   align-items: center;
   z-index: 10;
   pointer-events: auto;
 }
 
+.edit-mode .card-btns {
+  pointer-events: auto !important;
+  z-index: 100 !important;
+}
+
 .card-checkbox {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
-  accent-color: #1890ff;
-  z-index: 11;
+  accent-color: #63b3ed;
   pointer-events: auto;
 }
 
 .card-btn {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: none;
   border-radius: 4px;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   color: #fff;
-  font-size: 12px;
+  font-size: 10px;
   cursor: pointer;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 11;
   pointer-events: auto;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
 
 .card-btn:hover {
@@ -500,15 +476,15 @@ const gradients = [
 }
 
 .edit-btn:hover {
-  background: rgba(59, 130, 246, 0.9);
+  background: rgba(99, 179, 237, 0.85);
 }
 
 .del-btn:hover {
-  background: rgba(239, 68, 68, 0.9);
+  background: rgba(245, 101, 101, 0.85);
 }
 
-/* 卡片默认立即可见，无任何动画 */
-.link-item {
-  opacity: 1 !important;
+.edit-mode .card-btn,
+.edit-mode .card-checkbox {
+  pointer-events: auto !important;
 }
 </style>
