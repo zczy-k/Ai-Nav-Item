@@ -817,6 +817,12 @@ const saveWebdavConfig = async () => {
     // 如果已配置，自动加载WebDAV备份列表
     if (webdavConfig.configured) {
       await loadWebdavBackupList();
+      // 自动开启WebDAV自动同步
+      if (!autoBackupConfig.webdav.enabled) {
+        autoBackupConfig.webdav.enabled = true;
+        await saveAutoBackupConfig();
+        showMessage('WebDAV配置保存成功，已自动开启WebDAV自动同步！');
+      }
     }
   } else {
     showMessage(data.message || 'WebDAV配置保存失败', 'error');
