@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { login } from '../api';
 import WelcomePage from './admin/WelcomePage.vue';
 import MenuManage from './admin/MenuManage.vue';
@@ -86,6 +86,74 @@ import UserManage from './admin/UserManage.vue';
 import BackupManage from './admin/BackupManage.vue';
 
 const page = ref('welcome');
+
+// ========== 30分钟无操作自动退出 ==========
+const IDLE_TIMEOUT = 30 * 60 * 1000; // 30分钟
+let idleTimer = null;
+let lastActivityTime = Date.now();
+
+// 重置空闲计时器
+function resetIdleTimer() {
+  lastActivityTime = Date.now();
+  // 保存最后活动时间到 localStorage
+  localStorage.setItem('lastActivityTime', lastActivityTime.toString());
+  
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+  }
+  
+  if (isLoggedIn.value) {
+    idleTimer = setTimeout(() => {
+      handleIdleLogout();
+    }, IDLE_TIMEOUT);
+  }
+}
+
+// 空闲超时自动退出
+function handleIdleLogout() {
+  if (isLoggedIn.value) {
+    alert('由于长时间未操作，已自动退出登录');
+    logout();
+  }
+}
+
+// 检查是否已超时（页面刷新时检查）
+function checkIdleTimeout() {
+  const savedTime = localStorage.getItem('lastActivityTime');
+  if (savedTime) {
+    const elapsed = Date.now() - parseInt(savedTime);
+    if (elapsed >= IDLE_TIMEOUT) {
+      // 已超时，清除登录状态
+      localStorage.removeItem('token');
+      localStorage.removeItem('lastActivityTime');
+      return true;
+    }
+  }
+  return false;
+}
+
+// 用户活动事件监听
+const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+
+function setupActivityListeners() {
+  activityEvents.forEach(event => {
+    document.addEventListener(event, resetIdleTimer, { passive: true });
+  });
+}
+
+function removeActivityListeners() {
+  activityEvents.forEach(event => {
+    document.removeEventListener(event, resetIdleTimer);
+  });
+}
+
+// 组件卸载时清理
+onUnmounted(() => {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+  }
+  removeActivityListeners();
+});
 
 // 组件映射
 const componentMap = {
@@ -142,11 +210,20 @@ const pageTitle = computed(() => {
 });
 
 onMounted(() => {
+  // 检查是否已超时
+  if (checkIdleTimeout()) {
+    isLoggedIn.value = false;
+    return;
+  }
+  
   const token = localStorage.getItem('token');
   isLoggedIn.value = !!token;
   if (isLoggedIn.value) {
     // 拉取用户信息
     fetchLastLoginInfo();
+    // 启动空闲计时器和活动监听
+    resetIdleTimer();
+    setupActivityListeners();
   }
 });
 async function fetchLastLoginInfo() {
@@ -181,6 +258,9 @@ async function handleLogin() {
       lastLoginIp.value = response.data.lastLoginIp || '';
       // 登录成功后立即获取用户信息
       await fetchLastLoginInfo();
+      // 登录成功后启动空闲计时器
+      resetIdleTimer();
+      setupActivityListeners();
     }
   } catch (error) {
     loginError.value = error.response?.data?.message || '登录失败，请检查用户名和密码';
@@ -190,7 +270,14 @@ async function handleLogin() {
 }
 
 function logout() {
+  // 清理空闲计时器
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+  removeActivityListeners();
   localStorage.removeItem('token');
+  localStorage.removeItem('lastActivityTime');
   isLoggedIn.value = false;
   username.value = '';
   password.value = '';
