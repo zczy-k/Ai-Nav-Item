@@ -542,6 +542,16 @@ const showMessage = (text, type = 'success', duration = 4000) => {
   }, timeout);
 };
 
+// 通知浏览器扩展刷新右键菜单（恢复备份后菜单数据可能已变化）
+function notifyExtensionMenusUpdated() {
+  try {
+    window.dispatchEvent(new CustomEvent('nav-menus-updated'));
+    console.log('[备份管理] 已通知扩展刷新右键菜单');
+  } catch (e) {
+    console.warn('[备份管理] 通知扩展失败:', e);
+  }
+}
+
 const showCreateBackupDialog = () => {
   createBackupForm.name = '';
   createBackupForm.description = '';
@@ -678,6 +688,7 @@ const executeAction = async () => {
           loadWebdavBackupList(),
           loadAutoBackupConfig()
         ]);
+        notifyExtensionMenusUpdated();
         showMessage('✓ 恢复完成！数据已更新', 'success', 5000);
       } else if (data.requireConfirm && data.code === 'NO_SIGNATURE') {
         // 未签名的备份，需要二次确认
@@ -696,6 +707,7 @@ const executeAction = async () => {
               loadWebdavBackupList(),
               loadAutoBackupConfig()
             ]);
+            notifyExtensionMenusUpdated();
             showMessage('✓ 恢复完成！数据已更新', 'success', 5000);
           } else {
             showMessage('✗ ' + (retryData.message || '恢复失败'), 'error');
@@ -896,6 +908,7 @@ const restoreFromWebdav = async (filename) => {
         loadWebdavBackupList(),
         loadAutoBackupConfig()
       ]);
+      notifyExtensionMenusUpdated();
       showMessage('✓ 恢复完成！数据已更新', 'success', 5000);
     } else {
       showMessage('✗ ' + (data.message || '从 WebDAV 恢复失败'), 'error');
