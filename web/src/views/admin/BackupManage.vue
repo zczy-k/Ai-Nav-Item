@@ -331,12 +331,12 @@
 
         <!-- Action Buttons -->
         <div class="config-actions">
-          <button class="btn btn-secondary" @click="loadAutoBackupConfig">
+          <button class="btn btn-secondary" @click="resetToDefaults">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M1 4v6h6M23 20v-6h-6"/>
               <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
             </svg>
-            重置
+            恢复默认
           </button>
           <button class="btn btn-primary" @click="saveAutoBackupConfig" :disabled="loading.autoBackupConfig">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -969,6 +969,33 @@ const formatNextScheduled = () => {
   const hour = String(autoBackupConfig.scheduled.hour).padStart(2, '0');
   const minute = String(autoBackupConfig.scheduled.minute).padStart(2, '0');
   return `每天 ${hour}:${minute}`;
+};
+
+// 恢复默认配置
+const resetToDefaults = () => {
+  if (!confirm('确定要恢复为默认配置吗？这将重置所有自动备份设置。')) {
+    return;
+  }
+  // 默认配置
+  autoBackupConfig.debounce = {
+    enabled: true,
+    delay: 5,
+    keep: 5
+  };
+  autoBackupConfig.scheduled = {
+    enabled: true,
+    hour: 2,
+    minute: 0,
+    keep: 7,
+    onlyIfModified: true
+  };
+  autoBackupConfig.webdav = {
+    enabled: false,
+    syncDaily: true,
+    syncIncremental: true
+  };
+  autoBackupConfig.autoClean = true;
+  showMessage('已恢复默认配置，请点击"保存配置"以生效');
 };
 
 onMounted(async () => {
