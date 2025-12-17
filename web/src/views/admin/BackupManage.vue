@@ -498,7 +498,7 @@ const webdavConfigForm = reactive({
 const autoBackupConfig = reactive({
   debounce: {
     enabled: true,
-    delay: 30,
+    delay: 5,
     keep: 5
   },
   scheduled: {

@@ -17,7 +17,7 @@ function getWebDAVConfigPath() {
 const DEFAULT_CONFIG = {
   debounce: {
     enabled: true,
-    delay: 30,                     // 30分钟防抖延迟
+    delay: 5,                      // 5分钟防抖延迟
     keep: 5                        // 保留5个增量备份
   },
   scheduled: {
