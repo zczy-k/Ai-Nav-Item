@@ -672,6 +672,14 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
       preRestoreFiles.push('config/.jwt-secret');
     }
     
+    // 备份当前WebDAV配置
+    const webdavConfigPath = path.join(projectRoot, 'config', '.webdav-config.json');
+    if (fs.existsSync(webdavConfigPath)) {
+      const backupWebdavPath = path.join(preRestoreBackupDir, `.webdav-config.json.pre-restore-${timestamp}`);
+      fs.copyFileSync(webdavConfigPath, backupWebdavPath);
+      preRestoreFiles.push('config/.webdav-config.json');
+    }
+    
     if (preRestoreFiles.length > 0) {
       console.log(`✓ 恢复前已备份关键配置: ${preRestoreFiles.join(', ')}`);
     }
@@ -748,11 +756,17 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
           if (!fs.existsSync(destPath)) {
             fs.mkdirSync(destPath, { recursive: true });
           }
-          // 逐个复制config目录中的文件，跳过.jwt-secret
+          // 逐个复制config目录中的文件，跳过敏感配置
           const configFiles = fs.readdirSync(sourcePath);
           for (const configFile of configFiles) {
+            // 保护JWT密钥
             if (configFile === '.jwt-secret') {
               skippedFiles.push('config/.jwt-secret (保护当前JWT密钥)');
+              continue;
+            }
+            // 保护WebDAV配置
+            if (configFile === '.webdav-config.json') {
+              skippedFiles.push('config/.webdav-config.json (保护当前WebDAV配置)');
               continue;
             }
             const srcFile = path.join(sourcePath, configFile);
@@ -1258,6 +1272,14 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
       preRestoreFiles.push('config/.jwt-secret');
     }
     
+    // 备份当前WebDAV配置
+    const webdavConfigPath = path.join(projectRoot, 'config', '.webdav-config.json');
+    if (fs.existsSync(webdavConfigPath)) {
+      const backupWebdavPath = path.join(preRestoreBackupDir, `.webdav-config.json.pre-restore-${timestamp}`);
+      fs.copyFileSync(webdavConfigPath, backupWebdavPath);
+      preRestoreFiles.push('config/.webdav-config.json');
+    }
+    
     // 保存到临时文件
     const tempPath = path.join(__dirname, '..', `temp-webdav-${Date.now()}.zip`);
     fs.writeFileSync(tempPath, fileBuffer);
@@ -1334,15 +1356,21 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
       const destPath = path.join(projectRoot, item);
       
       if (fs.statSync(sourcePath).isDirectory()) {
-        // 特殊处理config目录，保护.jwt-secret
+        // 特殊处理config目录，保护敏感配置
         if (item === 'config') {
           if (!fs.existsSync(destPath)) {
             fs.mkdirSync(destPath, { recursive: true });
           }
           const configFiles = fs.readdirSync(sourcePath);
           for (const configFile of configFiles) {
+            // 保护JWT密钥
             if (configFile === '.jwt-secret') {
               skippedFiles.push('config/.jwt-secret (保护当前JWT密钥)');
+              continue;
+            }
+            // 保护WebDAV配置
+            if (configFile === '.webdav-config.json') {
+              skippedFiles.push('config/.webdav-config.json (保护当前WebDAV配置)');
               continue;
             }
             const srcFile = path.join(sourcePath, configFile);
