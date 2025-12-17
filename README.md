@@ -4,7 +4,7 @@
 [![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue.js-3-brightgreen.svg)](https://vuejs.org/)
 
-现代化的个人导航站，提供美观的卡片式导航界面和强大的后台管理系统。
+现代化的个人导航站，提供美观的卡片式导航界面、强大的后台管理系统和功能丰富的浏览器扩展。
 
 ## 📸 界面预览
 
@@ -24,33 +24,73 @@
 
 ## ✨ 功能特性
 
-### 前端功能
-- 🏠 **卡片式导航** - 美观现代的导航界面
-- 🔍 **智能搜索** - 支持拼音搜索，输入首字母即可匹配中文卡片
-- 🔍 **聚合搜索** - 支持 Google、百度、Bing、GitHub 等多引擎搜索
-- 🎨 **自定义主题** - 渐变背景、一键切换壁纸
-- 📱 **响应式设计** - 完美适配桌面端和移动端
-- 🔗 **友情链接** - 展示和管理友情链接
-- 📢 **广告位** - 可选的左右两侧广告展示
-- 🚫 **重复检测** - 批量添加时自动标记重复卡片
-- 📱 **PWA 支持** - 可安装为独立应用，离线访问
+### 🏠 前端导航
 
-### 后台管理
-- 👤 **用户管理** - 支持修改用户名和密码
-- 📋 **栏目管理** - 主菜单和子菜单的增删改查
-- 🃏 **卡片管理** - 导航卡片批量管理，拖拽排序
-- 🔍 **搜索引擎** - 自定义搜索引擎配置
-- 🏷️ **标签管理** - 创建和管理卡片标签，支持颜色自定义
-- 🔄 **重复管理** - 一键检测和删除重复卡片
-- 💾 **自动备份** - 智能增量备份 + 定时备份
-- ☁️ **WebDAV 备份** - 支持坚果云、Nextcloud 等云备份
+- **卡片式导航** - 美观现代的渐变卡片界面，支持拖拽排序
+- **多级菜单** - 支持主菜单和子菜单，点击主菜单显示所有子菜单卡片
+- **智能搜索** - 支持拼音搜索，输入首字母即可匹配中文卡片
+- **聚合搜索** - 内置 Google、百度、Bing、GitHub 等多引擎，支持自定义搜索引擎
+- **动态壁纸** - 支持随机壁纸、自定义壁纸URL
+- **响应式设计** - 完美适配桌面端和移动端
+- **友情链接** - 底部展示友情链接
+- **宣传位** - 可选的左右两侧宣传展示区域
+- **PWA 支持** - 可安装为独立应用，支持离线访问
+- **前端编辑** - 无需进入后台，直接在首页编辑、删除、批量管理卡片
 
-### 技术特性
-- 🔐 **JWT 认证** - 安全的用户认证机制
-- 🗄️ **SQLite 数据库** - 轻量级，无需额外配置
-- 🎯 **PM2 部署** - 进程守护，开机自启
-- 🐳 **Docker 支持** - 容器化部署
-- 🔧 **一键部署** - 多平台自动化部署脚本
+### 🔧 后台管理
+
+- **用户管理** - 修改管理员用户名和密码
+- **栏目管理** - 主菜单和子菜单的增删改查，支持拖拽排序
+- **卡片管理** - 导航卡片批量管理，支持按分类筛选
+- **标签管理** - 创建和管理卡片标签，支持颜色自定义
+- **搜索引擎** - 自定义搜索引擎配置，支持解析URL自动填充
+- **友链管理** - 管理友情链接
+- **宣传管理** - 管理左右两侧宣传位内容
+- **重复检测** - 一键检测和删除重复卡片
+- **备份管理** - 本地备份 + WebDAV 云备份（支持坚果云、Nextcloud 等）
+- **自动备份** - 智能增量备份 + 定时备份
+
+### 🌐 浏览器扩展
+
+功能强大的浏览器扩展，支持 Chrome/Edge/Brave/Firefox 127+ 等浏览器。
+
+#### 新标签页模式
+- **导航站模式** - 新标签页直接显示你的导航站
+- **快速访问面板** - 基于浏览历史的智能书签面板，显示常用/最近/固定书签
+
+#### 快速添加网站
+- **右键菜单添加** - 在任意网页右键，选择分类快速添加到导航站
+- **浮动快捷按钮** - 网页右下角浮动按钮，一键添加当前页面
+- **智能标签生成** - 自动根据网站域名、标题生成标签
+- **编辑后添加** - 添加前可编辑书签标题
+
+#### 书签管理器
+- **本地书签管理** - 查看、搜索、编辑浏览器书签
+- **智能排序** - 按使用频率、最近访问、字母顺序排序
+- **标签系统** - 为书签添加自定义标签，支持标签筛选
+- **笔记功能** - 为书签添加备注笔记
+- **批量操作** - 批量添加到导航站、批量删除、批量打标签
+- **热门书签** - 自动更新热门书签文件夹
+- **重复检测** - 检测并清理重复书签
+
+#### 云端同步
+- **书签云备份** - 将浏览器书签备份到导航站服务器
+- **多设备同步** - 在不同设备间同步书签数据
+- **自动同步** - 支持定时自动同步
+
+### 🔐 安全特性
+
+- **JWT 认证** - 安全的用户认证机制
+- **密码加密** - bcrypt 加密存储密码
+- **Token 过期** - 自动过期的访问令牌
+- **安全中间件** - XSS 防护、请求限流
+
+### 🗄️ 数据管理
+
+- **SQLite 数据库** - 轻量级，无需额外配置
+- **自动备份** - 支持本地备份和 WebDAV 云备份
+- **数据导入导出** - 支持备份文件的导入导出
+- **增量备份** - 智能检测变化，只备份有变动的数据
 
 ## 🚀 快速部署
 
@@ -67,11 +107,7 @@ DOMAIN=your-domain.com bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/
 
 **重置**（会备份数据）：
 ```bash
-# 使用默认域名
 bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/reset-serv00.sh)
-
-# 指定自定义域名
-DOMAIN=your-domain.com bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/reset-serv00.sh)
 ```
 
 ### Linux 服务器
@@ -85,21 +121,11 @@ bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scrip
 INSTALL_DIR=/opt/Con-Nav-Item bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/install-linux.sh)
 ```
 
-**卸载**（会备份数据）：
-```bash
-# 默认安装目录
-bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/uninstall-linux.sh)
-
-# 自定义安装目录
-INSTALL_DIR=/opt/Con-Nav-Item bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/uninstall-linux.sh)
-```
-
 **管理命令**：
 ```bash
 pm2 status                # 查看运行状态
 pm2 logs Con-Nav-Item     # 查看日志
 pm2 restart Con-Nav-Item  # 重启应用
-pm2 stop Con-Nav-Item     # 停止应用
 ```
 
 ### Docker
@@ -117,7 +143,7 @@ docker run -d \
   ghcr.io/zczy-k/con-nav-item:latest
 ```
 
-**使用 Docker Compose**：
+**Docker Compose**：
 ```yaml
 version: '3'
 services:
@@ -135,32 +161,13 @@ services:
     restart: unless-stopped
 ```
 
-启动：`docker-compose up -d`
-
-**管理命令**：
-```bash
-docker ps                      # 查看容器状态
-docker logs -f Con-Nav-Item    # 查看日志
-docker restart Con-Nav-Item    # 重启容器
-docker stop Con-Nav-Item       # 停止容器
-docker rm -f Con-Nav-Item      # 删除容器
-```
-
-**更新到最新版本**：
-```bash
-docker stop Con-Nav-Item
-docker rm Con-Nav-Item
-docker pull ghcr.io/zczy-k/con-nav-item:latest
-# 然后重新运行 docker run 命令
-```
-
 ### 源码部署
 
 ```bash
 git clone https://github.com/zczy-k/Con-Nav-Item.git
 cd Con-Nav-Item
 npm install
-cd web && npm install && npm run build:prod && cd ..
+cd web && npm install && npm run build && cd ..
 npm start
 ```
 
@@ -171,6 +178,28 @@ npm start
 - **默认账号**：admin / 123456
 
 ⚠️ **首次登录后请立即修改密码！**
+
+## 📱 浏览器扩展安装
+
+### Chrome / Edge / Brave
+
+1. 打开 `chrome://extensions/`（Edge 用 `edge://extensions/`）
+2. 开启"开发者模式"
+3. 点击"加载已解压的扩展程序"
+4. 选择 `browser-extension` 文件夹
+
+### Firefox 127+
+
+1. 打开 `about:debugging#/runtime/this-firefox`
+2. 点击"临时载入附加组件"
+3. 选择 `browser-extension/manifest.json`
+
+### 扩展配置
+
+1. 点击扩展图标，进入设置
+2. 输入你的导航站地址
+3. 选择新标签页模式（导航站/快速访问面板）
+4. 在书签管理器中配置云备份（可选）
 
 ## 🔧 常见问题
 
@@ -193,21 +222,22 @@ Docker 环境：
 docker exec -it Con-Nav-Item node check-password.js reset 新密码
 ```
 
-## 📱 浏览器扩展
+### 自定义搜索引擎
 
-将导航站设为浏览器新标签页，支持快速添加网站。
+支持添加自定义搜索引擎，只需提供搜索URL，系统会自动解析图标和名称。
 
-安装方法：
-1. 打开 `chrome://extensions/`
-2. 开启"开发者模式"
-3. 加载 `browser-extension` 文件夹
+详见 [自定义搜索引擎文档](docs/custom-search-engine.md)
 
 ## 🛠️ 技术栈
 
-- **前端**：Vue 3 + Vite
-- **后端**：Node.js + Express
-- **数据库**：SQLite
-- **部署**：PM2 / Docker / Passenger
+| 类别 | 技术 |
+|------|------|
+| 前端 | Vue 3 + Vite + Sortable.js |
+| 后端 | Node.js + Express |
+| 数据库 | SQLite (better-sqlite3) |
+| 认证 | JWT + bcrypt |
+| 部署 | PM2 / Docker / Passenger |
+| 扩展 | Chrome Extension Manifest V3 |
 
 ## 📄 许可证
 
@@ -215,8 +245,6 @@ docker exec -it Con-Nav-Item node check-password.js reset 新密码
 
 - **原始代码**：基于 [nav-item](https://github.com/eooce/nav-item) by eooce，采用 Apache License 2.0
 - **新增功能**：由 zczy-k 开发的所有修改和新增功能为闭源专有代码，仅供个人使用
-
-新增的闭源功能包括但不限于：浏览器扩展、云端书签备份、WebDAV集成、书签管理器、快速访问面板等。
 
 详细信息请查看 [NOTICE](NOTICE) 文件。
 
