@@ -312,6 +312,7 @@ router.post('/add', auth, (req, res) => {
                 }
                 completed++;
                 if (completed === uniqueCards.length) {
+                  triggerDebouncedBackup(); // 触发数据变更通知和自动备份
                   res.json({ 
                     success: true, 
                     added: insertedIds.length,
@@ -324,7 +325,7 @@ router.post('/add', auth, (req, res) => {
             } else {
               completed++;
               if (completed === uniqueCards.length) {
-                triggerDebouncedBackup(); // 触发自动备份
+                triggerDebouncedBackup(); // 触发数据变更通知和自动备份
                 res.json({ 
                   success: true, 
                   added: insertedIds.length,

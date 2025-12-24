@@ -322,19 +322,29 @@ function cleanOldBackups(prefix, keepCount) {
 }
 
 /**
- * 防抖备份 - 数据修改后触发
+ * 通知数据变更 - 立即递增版本号并广播给所有客户端
+ * 用于让前端实时刷新数据
  */
-function triggerDebouncedBackup() {
-  // 递增数据版本号并广播给所有客户端
+function notifyDataChange() {
   const db = require('../db');
   const { broadcastVersionChange } = require('./sseManager');
   
   db.incrementDataVersion().then(() => {
-    // 获取新版本号并广播
     db.getDataVersion().then(version => {
       broadcastVersionChange(version);
     });
+  }).catch(err => {
+    console.error('[数据变更通知] 版本号更新失败:', err);
   });
+}
+
+/**
+ * 防抖备份 - 数据修改后触发
+ * 注意：此函数会同时触发数据变更通知（立即）和自动备份（延迟）
+ */
+function triggerDebouncedBackup() {
+  // 立即通知数据变更，让前端实时刷新
+  notifyDataChange();
   
   if (!config.debounce.enabled) {
     return;
@@ -525,6 +535,7 @@ function getConfig() {
 
 module.exports = {
   triggerDebouncedBackup,
+  notifyDataChange,
   startScheduledBackup,
   getBackupStats,
   getConfig,
