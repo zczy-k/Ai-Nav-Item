@@ -334,7 +334,6 @@ async function notifyDataChange() {
     const newVersion = await db.incrementDataVersion();
     // 立即广播给所有客户端
     broadcastVersionChange(newVersion);
-    console.log(`[数据变更通知] 版本号已更新: ${newVersion}`);
   } catch (err) {
     console.error('[数据变更通知] 版本号更新失败:', err);
   }
