@@ -506,8 +506,10 @@ async function incrementDataVersion() {
     const current = await dbGet('SELECT version FROM data_version WHERE id = 1');
     const newVersion = (current && current.version >= MAX_VERSION) ? 1 : (current?.version || 0) + 1;
     await dbRun('UPDATE data_version SET version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1', [newVersion]);
+    return newVersion; // 返回新版本号
   } catch (e) {
     console.error('递增数据版本号失败:', e);
+    throw e;
   }
 }
 

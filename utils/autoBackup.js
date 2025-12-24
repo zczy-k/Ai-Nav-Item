@@ -325,20 +325,19 @@ function cleanOldBackups(prefix, keepCount) {
  * 通知数据变更 - 立即递增版本号并广播给所有客户端
  * 用于让前端实时刷新数据
  */
-function notifyDataChange() {
+async function notifyDataChange() {
   const db = require('../db');
   const { broadcastVersionChange } = require('./sseManager');
   
-  console.log('[数据变更通知] 开始通知...');
-  
-  db.incrementDataVersion().then(() => {
-    db.getDataVersion().then(version => {
-      console.log('[数据变更通知] 广播版本号:', version);
-      broadcastVersionChange(version);
-    });
-  }).catch(err => {
+  try {
+    // 递增版本号并获取新版本号
+    const newVersion = await db.incrementDataVersion();
+    // 立即广播给所有客户端
+    broadcastVersionChange(newVersion);
+    console.log(`[数据变更通知] 版本号已更新: ${newVersion}`);
+  } catch (err) {
     console.error('[数据变更通知] 版本号更新失败:', err);
-  });
+  }
 }
 
 /**

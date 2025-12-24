@@ -169,10 +169,10 @@ app.get('/api/sse/data-sync', async (req, res) => {
   // 添加到客户端列表
   addClient(res);
   
-  // 保持连接（心跳）- 15秒间隔避免代理超时
+  // 保持连接（心跳）
   const heartbeat = setInterval(() => {
     res.write(': heartbeat\n\n');
-  }, 15000);
+  }, 30000);
   
   // 清理
   req.on('close', () => {
