@@ -276,7 +276,8 @@ onUnmounted(() => {
   background: rgba(30, 30, 30, 0.95);
   backdrop-filter: blur(8px);
   border-radius: 8px;
-  min-width: 160px;
+  min-width: max-content;
+  white-space: nowrap;
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s ease;
@@ -367,6 +368,7 @@ onUnmounted(() => {
   border-radius: 4px !important;
   text-shadow: none !important;
   line-height: 1.5 !important;
+  white-space: nowrap !important;
 }
 
 .sub-menu-item:hover {
@@ -448,7 +450,8 @@ onUnmounted(() => {
   background: rgba(30, 30, 30, 0.9);
   backdrop-filter: blur(8px);
   border-radius: 6px;
-  min-width: 140px;
+  min-width: max-content;
+  white-space: nowrap;
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s ease;
@@ -509,7 +512,7 @@ onUnmounted(() => {
   
   .menu-dropdown,
   .sub-menu {
-    min-width: 120px;
+    min-width: max-content;
   }
   
   .sub-menu-item {
