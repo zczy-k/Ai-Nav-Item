@@ -15,26 +15,56 @@
         {{ menu.name }}
       </button>
       
-      <!-- 编辑模式下的操作按钮 - 悬停时显示在菜单下方 -->
-      <div v-if="editMode" class="menu-actions-wrapper">
-        <div class="menu-actions">
-          <button class="action-btn edit-btn" @click.stop="$emit('editMenu', menu)" title="编辑">✏️</button>
-          <button class="action-btn del-btn" @click.stop="$emit('deleteMenu', menu)" title="删除">🗑️</button>
+      <!-- 编辑模式下的下拉面板（包含操作按钮和子菜单） -->
+      <div 
+        v-if="editMode" 
+        class="menu-dropdown"
+        :class="{ 'show': hoveredMenuId === menu.id }"
+      >
+        <!-- 主菜单操作按钮 -->
+        <div class="menu-actions-row">
+          <span class="menu-actions-label">菜单操作</span>
+          <div class="menu-actions">
+            <button class="action-btn edit-btn" @click.stop="$emit('editMenu', menu)" title="编辑">✏️</button>
+            <button class="action-btn del-btn" @click.stop="$emit('deleteMenu', menu)" title="删除">🗑️</button>
+          </div>
         </div>
+        
+        <!-- 子菜单列表 -->
+        <div v-if="menu.subMenus && menu.subMenus.length > 0" class="sub-menu-list">
+          <div 
+            v-for="subMenu in menu.subMenus" 
+            :key="subMenu.id" 
+            class="sub-menu-row"
+            :data-submenu-id="subMenu.id"
+          >
+            <button 
+              @click="$emit('select', subMenu, menu)"
+              :class="{active: subMenu.id === activeSubMenuId}"
+              class="sub-menu-item"
+            >
+              {{ subMenu.name }}
+            </button>
+            <div class="sub-menu-actions">
+              <button class="action-btn-sm" @click.stop="$emit('editSubMenu', subMenu, menu)" title="编辑">✏️</button>
+              <button class="action-btn-sm" @click.stop="$emit('deleteSubMenu', subMenu, menu)" title="删除">🗑️</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 添加子菜单按钮 -->
+        <button class="add-sub-menu-btn" @click.stop="$emit('addSubMenu', menu)">
+          + 添加子菜单
+        </button>
       </div>
       
-      <!-- 二级菜单 -->
+      <!-- 非编辑模式下的二级菜单 -->
       <div 
-        v-if="menu.subMenus && menu.subMenus.length > 0 || editMode" 
+        v-if="!editMode && menu.subMenus && menu.subMenus.length > 0" 
         class="sub-menu"
         :class="{ 'show': hoveredMenuId === menu.id }"
       >
-        <div 
-          v-for="subMenu in menu.subMenus" 
-          :key="subMenu.id" 
-          class="sub-menu-row"
-          :data-submenu-id="subMenu.id"
-        >
+        <div v-for="subMenu in menu.subMenus" :key="subMenu.id" class="sub-menu-row">
           <button 
             @click="$emit('select', subMenu, menu)"
             :class="{active: subMenu.id === activeSubMenuId}"
@@ -42,15 +72,7 @@
           >
             {{ subMenu.name }}
           </button>
-          <div v-if="editMode" class="sub-menu-actions">
-            <button class="action-btn-sm" @click.stop="$emit('editSubMenu', subMenu, menu)" title="编辑">✏️</button>
-            <button class="action-btn-sm" @click.stop="$emit('deleteSubMenu', subMenu, menu)" title="删除">🗑️</button>
-          </div>
         </div>
-        <!-- 编辑模式下添加子菜单按钮 -->
-        <button v-if="editMode" class="add-sub-menu-btn" @click.stop="$emit('addSubMenu', menu)">
-          + 添加子菜单
-        </button>
       </div>
     </div>
     
@@ -107,7 +129,7 @@ function initSortable() {
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
     handle: '.drag-handle',
-    filter: '.add-menu-item, .action-btn, .action-btn-sm',
+    filter: '.add-menu-item, .action-btn, .action-btn-sm, .menu-dropdown',
     preventOnFilter: false,
     onEnd: (evt) => {
       const menuIds = Array.from(container.querySelectorAll('.menu-item:not(.add-menu-item)')).map((el) => {
@@ -213,32 +235,50 @@ onUnmounted(() => {
   cursor: grabbing;
 }
 
-/* 操作按钮容器 - 悬停时显示在菜单下方 */
-.menu-actions-wrapper {
+/* 编辑模式下拉面板 */
+.menu-dropdown {
   position: absolute;
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  min-width: 160px;
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s ease;
-  z-index: 20;
-  padding-top: 4px;
+  z-index: 1000;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: 4px;
+  padding: 8px 0;
 }
 
-.menu-item:hover .menu-actions-wrapper {
+.menu-dropdown.show {
   opacity: 1;
   visibility: visible;
+  transform: translateX(-50%) translateY(2px);
+}
+
+/* 菜单操作行 */
+.menu-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 4px;
+}
+
+.menu-actions-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .menu-actions {
   display: flex;
   gap: 4px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  padding: 4px 8px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .action-btn {
@@ -253,6 +293,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  padding: 0;
 }
 
 .action-btn:hover {
@@ -267,30 +308,9 @@ onUnmounted(() => {
   background: rgba(245, 101, 101, 0.8);
 }
 
-/* 二级菜单样式 */
-.sub-menu {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(30, 30, 30, 0.9);
-  backdrop-filter: blur(8px);
-  border-radius: 6px;
-  min-width: 140px;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.2s ease;
-  z-index: 1000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  margin-top: -2px;
-  padding: 4px 0;
-}
-
-.sub-menu.show {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(2px);
+/* 子菜单列表 */
+.sub-menu-list {
+  padding: 0;
 }
 
 .sub-menu-row {
@@ -351,6 +371,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  padding: 0;
 }
 
 .action-btn-sm:hover {
@@ -358,13 +379,14 @@ onUnmounted(() => {
 }
 
 .add-sub-menu-btn {
-  width: 100% !important;
+  width: calc(100% - 16px) !important;
+  margin: 4px 8px !important;
   padding: 0.4rem 0.8rem !important;
-  margin-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
   color: rgba(99, 179, 237, 0.8) !important;
   font-size: 12px !important;
-  border-radius: 0 !important;
+  border-radius: 4px !important;
+  text-align: center !important;
 }
 
 .add-sub-menu-btn:hover {
@@ -374,6 +396,32 @@ onUnmounted(() => {
 
 .add-sub-menu-btn::before {
   display: none;
+}
+
+/* 非编辑模式二级菜单样式 */
+.sub-menu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.9);
+  backdrop-filter: blur(8px);
+  border-radius: 6px;
+  min-width: 140px;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  z-index: 1000;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: -2px;
+  padding: 4px 0;
+}
+
+.sub-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(2px);
 }
 
 /* 添加菜单按钮 */
@@ -418,6 +466,7 @@ onUnmounted(() => {
     padding: .4rem .8rem;
   }
   
+  .menu-dropdown,
   .sub-menu {
     min-width: 120px;
   }
