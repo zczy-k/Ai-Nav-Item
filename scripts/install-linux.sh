@@ -43,30 +43,28 @@ install_nodejs() {
     yellow "检查 Node.js..."
     
     if command -v node &> /dev/null; then
-        NODE_VERSION=$(node --version)
-        green "Node.js 已安装: $NODE_VERSION"
+        green "  ✔ Node.js 已安装: $(node --version)"
         return 0
     fi
     
-    yellow "安装 Node.js 20..."
+    yellow "  → 安装 Node.js 20..."
     
     case "$OS" in
         ubuntu|debian)
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            sudo apt-get install -y nodejs
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >/dev/null 2>&1
+            sudo apt-get install -y nodejs >/dev/null 2>&1
             ;;
         centos|rhel|fedora)
-            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-            sudo yum install -y nodejs
+            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash - >/dev/null 2>&1
+            sudo yum install -y nodejs >/dev/null 2>&1
             ;;
         *)
-            red "不支持的操作系统: $OS"
-            red "请手动安装 Node.js 20: https://nodejs.org/"
+            red "  ✗ 不支持的操作系统: $OS"
             exit 1
             ;;
     esac
     
-    green "Node.js 安装完成: $(node --version)"
+    green "  ✔ Node.js 安装完成: $(node --version)"
 }
 
 # 安装 PM2
@@ -74,13 +72,13 @@ install_pm2() {
     yellow "检查 PM2..."
     
     if command -v pm2 &> /dev/null; then
-        green "PM2 已安装"
+        green "  ✔ PM2 已安装"
         return 0
     fi
     
-    yellow "安装 PM2..."
-    sudo npm install -g pm2
-    green "PM2 安装完成"
+    yellow "  → 安装 PM2..."
+    sudo npm install -g pm2 >/dev/null 2>&1
+    green "  ✔ PM2 安装完成"
 }
 
 # 安装项目
@@ -91,13 +89,13 @@ install_app() {
     
     # 如果目录存在，询问是否备份
     if [ -d "$INSTALL_DIR" ]; then
-        yellow "检测到已存在的安装目录: $INSTALL_DIR"
+        yellow "  ⚠ 检测到已存在的安装目录"
         read -p "是否备份并重新安装? (y/n): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             BACKUP_DIR="${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
-            yellow "备份到: $BACKUP_DIR"
             mv "$INSTALL_DIR" "$BACKUP_DIR"
+            green "  ✔ 已备份到: $BACKUP_DIR"
         else
             yellow "取消安装"
             exit 0
@@ -105,22 +103,23 @@ install_app() {
     fi
     
     # 克隆项目
-    yellow "克隆项目..."
-    git clone https://github.com/zczy-k/Con-Nav-Item.git "$INSTALL_DIR"
+    yellow "  → 克隆项目..."
+    git clone --quiet https://github.com/zczy-k/Con-Nav-Item.git "$INSTALL_DIR"
     cd "$INSTALL_DIR"
+    green "  ✔ 项目克隆完成"
     
     # 安装后端依赖
-    yellow "安装后端依赖..."
-    npm install
+    yellow "  → 安装后端依赖..."
+    npm install --silent 2>/dev/null
+    green "  ✔ 后端依赖安装完成"
     
     # 构建前端
-    yellow "构建前端..."
+    yellow "  → 构建前端..."
     cd web
-    npm install
-    npm run build:prod
+    npm install --silent 2>/dev/null
+    npm run build:prod >/dev/null 2>&1
     cd ..
-    
-    green "项目安装完成！"
+    green "  ✔ 前端构建完成"
 }
 
 # 配置环境变量
@@ -214,7 +213,7 @@ EOF
 
 # 使用 PM2 启动应用
 start_with_pm2() {
-    yellow "使用 PM2 启动应用..."
+    yellow "启动应用..."
     
     cd "$INSTALL_DIR"
     
@@ -223,20 +222,18 @@ start_with_pm2() {
     pm2 delete Con-Nav-Item 2>/dev/null || true
     
     # 启动应用
-    pm2 start app.js --name Con-Nav-Item
+    pm2 start app.js --name Con-Nav-Item >/dev/null 2>&1
     
     # 设置开机自启
-    pm2 save
-    pm2 startup | tail -n 1 | bash
+    pm2 save >/dev/null 2>&1
+    pm2 startup 2>/dev/null | tail -n 1 | bash >/dev/null 2>&1 || true
     
-    green "应用已启动！"
-    pm2 status
+    green "  ✔ 应用已启动"
 }
 
 # 配置防火墙（可选）
 configure_firewall() {
-    yellow "是否配置防火墙规则？"
-    read -p "开放端口 $PORT (y/n): " -n 1 -r
+    read -p "是否开放端口 $PORT 的防火墙规则? (y/n): " -n 1 -r
     echo
     
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -244,14 +241,14 @@ configure_firewall() {
     fi
     
     if command -v ufw &> /dev/null; then
-        sudo ufw allow $PORT/tcp
-        green "UFW 防火墙规则已添加"
+        sudo ufw allow $PORT/tcp >/dev/null 2>&1
+        green "  ✔ UFW 防火墙规则已添加"
     elif command -v firewall-cmd &> /dev/null; then
-        sudo firewall-cmd --permanent --add-port=$PORT/tcp
-        sudo firewall-cmd --reload
-        green "FirewallD 规则已添加"
+        sudo firewall-cmd --permanent --add-port=$PORT/tcp >/dev/null 2>&1
+        sudo firewall-cmd --reload >/dev/null 2>&1
+        green "  ✔ FirewallD 规则已添加"
     else
-        yellow "未检测到防火墙管理工具"
+        yellow "  ⚠ 未检测到防火墙管理工具"
     fi
 }
 
@@ -259,7 +256,7 @@ configure_firewall() {
 show_info() {
     echo ""
     green "=========================================="
-    green "  安装完成！"
+    green "  ✔ 安装完成！"
     green "=========================================="
     echo ""
     
@@ -268,19 +265,14 @@ show_info() {
     echo -e "${green}访问地址：${purple}http://${IP}:${PORT}${re}"
     echo -e "${green}后台管理：${purple}http://${IP}:${PORT}/admin${re}"
     echo -e "${green}管理账号：${purple}${ADMIN_USER}${re}"
-    echo -e "${green}管理密码：${purple}${ADMIN_PASS}${re}"
     echo ""
     red "⚠️  请登录后立即修改密码！"
     echo ""
-    
     yellow "常用命令："
-    echo "  pm2 status              - 查看应用状态"
+    echo "  pm2 status              - 查看状态"
     echo "  pm2 logs Con-Nav-Item   - 查看日志"
     echo "  pm2 restart Con-Nav-Item - 重启应用"
-    echo "  pm2 stop Con-Nav-Item   - 停止应用"
     echo ""
-    
-    green "=========================================="
 }
 
 # 主函数
