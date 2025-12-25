@@ -5,8 +5,9 @@
 [![Vue](https://img.shields.io/badge/Vue.js-3-brightgreen.svg)](https://vuejs.org/)
 
 现代化的个人导航站，提供美观的卡片式导航界面、强大的后台管理系统和功能丰富的浏览器扩展。
+#　示例站：https://con-nav-item.zeabur.app/
 
-## 🎉 推荐：安装浏览器扩展
+## 🎉 强烈推荐：安装部署后搭配浏览器扩展使用
 
 > **💡 强烈推荐安装浏览器扩展！** 扩展可以让你：
 > - 🚀 **右键快速添加** - 浏览任意网页时，右键即可添加到导航站
@@ -309,3 +310,4 @@ docker exec -it Con-Nav-Item node check-password.js reset 新密码
 ---
 
 ⭐ 如果这个项目对你有帮助，请给它一个星标！
+
