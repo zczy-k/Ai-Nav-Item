@@ -6,7 +6,7 @@
 
 现代化的个人导航站，提供美观的卡片式导航界面、强大的后台管理系统和功能丰富的浏览器扩展。
 
-#　示例站：https://con-nav-item.zeabur.app/
+示例站：https://con-nav-item.zeabur.app/
 
 ## 🎉 强烈推荐：安装部署后搭配浏览器扩展使用
 
@@ -311,5 +311,6 @@ docker exec -it Con-Nav-Item node check-password.js reset 新密码
 ---
 
 ⭐ 如果这个项目对你有帮助，请给它一个星标！
+
 
 
