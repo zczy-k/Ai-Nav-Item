@@ -1292,6 +1292,9 @@ onBeforeMount(() => {
 });
 
 onMounted(async () => {
+  // 检查 AI 配置状态
+  checkAIConfig();
+  
   // ========== 优化：先加载缓存数据实现秒开 ==========
   const CACHE_KEY = 'nav_data_cache';
   const CARDS_CACHE_KEY = 'nav_cards_cache'; // 分类卡片缓存
@@ -2664,6 +2667,9 @@ function handleTokenInvalid() {
 
 // 进入编辑模式
 async function enterEditMode() {
+  // 刷新 AI 配置状态
+  checkAIConfig();
+  
   // 检查是否有保存的密码token
   const savedData = localStorage.getItem('nav_password_token');
   if (savedData) {
@@ -3265,8 +3271,8 @@ async function handleEditCard(card) {
   editError.value = '';
   showEditCardModal.value = true;
   
-  // 检查 AI 配置状态
-  await checkAIConfig();
+  // 刷新 AI 配置状态（确保最新）
+  checkAIConfig();
 }
 
 // 检查 AI 是否已配置
