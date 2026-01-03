@@ -10,13 +10,14 @@
     "dev": "node app.js",
     "start": "node app.js",
     "start:https": "node start-with-https.js",
-    "build": "cd web && npm run build:prod && cd .."
+    "build": "cd web && npm run build && cd .."
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
     "axios": "^1.13.1",
     "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^11.8.1",
     "cheerio": "^1.1.2",
     "compression": "^1.8.1",
     "cors": "^2.8.5",

@@ -97,11 +97,18 @@ function saveSecretToDatabase(secret) {
 
 /**
  * 获取或生成 CRYPTO_SECRET（同步版本，用于兼容现有代码）
+ * 注意：此函数应该只在 initCryptoSecret 完成后被调用
  */
 function getCryptoSecretSync() {
+  // 如果已经有缓存的密钥，直接返回
+  if (cachedSecret) {
+    return cachedSecret;
+  }
+  
   // 1. 优先使用环境变量
   if (process.env.CRYPTO_SECRET) {
-    return process.env.CRYPTO_SECRET;
+    cachedSecret = process.env.CRYPTO_SECRET;
+    return cachedSecret;
   }
   
   // 2. 尝试从文件读取（兼容旧版本）
@@ -109,15 +116,40 @@ function getCryptoSecretSync() {
     if (fs.existsSync(CRYPTO_SECRET_PATH)) {
       const secret = fs.readFileSync(CRYPTO_SECRET_PATH, 'utf-8').trim();
       if (secret && secret.length >= 32) {
-        return secret;
+        cachedSecret = secret;
+        return cachedSecret;
       }
     }
   } catch (e) {
     console.warn('读取密钥文件失败:', e.message);
   }
   
-  // 3. 生成新密钥（临时使用，会在异步初始化时保存到数据库）
+  // 3. 尝试同步读取数据库（最后的备选方案）
+  try {
+    const Database = require('better-sqlite3');
+    if (fs.existsSync(DB_PATH)) {
+      const db = new Database(DB_PATH, { readonly: true });
+      try {
+        const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('crypto_secret');
+        if (row && row.value && row.value.length >= 32) {
+          cachedSecret = row.value;
+          db.close();
+          console.log('✓ 同步从数据库加载加密密钥');
+          return cachedSecret;
+        }
+      } catch (e) {
+        // settings表可能不存在
+      }
+      db.close();
+    }
+  } catch (e) {
+    // better-sqlite3 可能不可用，忽略
+  }
+  
+  // 4. 生成新密钥（临时使用，会在异步初始化时保存到数据库）
+  console.warn('⚠️ 生成临时加密密钥，WebDAV配置可能需要重新设置');
   const newSecret = crypto.randomBytes(32).toString('hex');
+  cachedSecret = newSecret;
   
   // 尝试保存到文件（作为备用）
   try {
