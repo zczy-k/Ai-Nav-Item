@@ -4738,8 +4738,9 @@ async function saveCardEdit() {
   border-radius: 16px;
   width: 90%;
   max-width: 800px;
-  max-height: 80vh;
-  overflow: hidden;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
@@ -4749,6 +4750,7 @@ async function saveCardEdit() {
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
 }
 
 .bg-panel-header h4 {
@@ -4760,15 +4762,15 @@ async function saveCardEdit() {
 
 .bg-panel-content {
   padding: 20px;
-  padding-bottom: 30px;
-  max-height: calc(80vh - 60px);
   overflow-y: auto;
+  flex: 1;
 }
 
 .bg-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
+  padding-bottom: 10px;
 }
 
 .bg-item {
