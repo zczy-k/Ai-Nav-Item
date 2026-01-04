@@ -22,19 +22,23 @@
       (function() {
         try {
           // 背景版本号 - 与 Home.vue 中保持一致
-          var BG_VERSION = '3.0';
-          var savedBgVersion = localStorage.getItem('nav_background_version');
-          if (savedBgVersion !== BG_VERSION) {
-            localStorage.removeItem('nav_background');
-            localStorage.setItem('nav_background_version', BG_VERSION);
-          }
+          var BG_VERSION = '4.0';
+          var BG_STORAGE_KEY = 'nav_bg_settings';
           
-          var savedBg = localStorage.getItem('nav_background');
-          if (savedBg) {
-            // 添加内联样式，覆盖 CSS 默认背景
-            var style = document.createElement('style');
-            style.textContent = '.home-container { background-image: url(' + savedBg + ') !important; }';
-            document.head.appendChild(style);
+          // 清理旧版本的背景数据
+          localStorage.removeItem('nav_background');
+          localStorage.removeItem('nav_background_version');
+          
+          var savedSettings = localStorage.getItem(BG_STORAGE_KEY);
+          if (savedSettings) {
+            var settings = JSON.parse(savedSettings);
+            if (settings.version === BG_VERSION && settings.url) {
+              // 添加内联样式，覆盖 CSS 默认背景
+              var style = document.createElement('style');
+              style.id = 'dynamic-bg-style';
+              style.textContent = '.home-container { background-image: url(' + settings.url + ') !important; }';
+              document.head.appendChild(style);
+            }
           }
         } catch (e) {
           console.error('Failed to load saved background:', e);

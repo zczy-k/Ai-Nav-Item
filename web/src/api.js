@@ -70,7 +70,8 @@ export const batchAddCards = (menuId, subMenuId, cards) => axios.post(`${BASE}/b
 export const batchCheckUrls = (urls) => axios.post(`${BASE}/batch/check-urls`, { urls }, { headers: authHeaders() });
 
 // 壁纸API
-export const getRandomWallpaper = () => axios.get(`${BASE}/wallpaper/random`);
+export const getRandomWallpaper = (source = 'auto') => axios.get(`${BASE}/wallpaper/random`, { params: { source } });
+export const getBuiltinBackgrounds = () => axios.get(`${BASE}/wallpaper/builtin`);
 
 // 搜索引擎API
 export const getSearchEngines = () => axios.get(`${BASE}/search-engines`);

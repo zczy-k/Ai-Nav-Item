@@ -217,17 +217,88 @@
       @click.stop
     />
     
+    <!-- 背景选择面板 -->
+    <transition name="bg-panel">
+      <div v-if="showBgPanel" class="bg-panel-overlay" @click="showBgPanel = false">
+        <div class="bg-panel" @click.stop>
+          <div class="bg-panel-header">
+            <h4>选择背景</h4>
+            <div class="bg-source-toggle" @click="toggleBgSource" :title="'当前模式: ' + getBgSourceLabel()">
+              <span class="bg-source-label">{{ getBgSourceLabel() }}</span>
+            </div>
+            <button class="panel-close-btn" @click="showBgPanel = false">×</button>
+          </div>
+          <div class="bg-panel-content">
+            <!-- 内置背景 -->
+            <div class="bg-section">
+              <div class="bg-section-title">内置背景</div>
+              <div class="bg-grid">
+                <div 
+                  v-for="bg in builtinBackgrounds" 
+                  :key="bg.id" 
+                  class="bg-item"
+                  :class="{ active: currentBgName === bg.name }"
+                  @click="selectBackground(bg)"
+                >
+                  <img :src="bg.url" :alt="bg.name" loading="lazy" />
+                  <span class="bg-item-name">{{ bg.name }}</span>
+                </div>
+              </div>
+            </div>
+            <!-- 随机切换 -->
+            <div class="bg-section">
+              <div class="bg-section-title">随机切换</div>
+              <div class="bg-random-btns">
+                <button @click="changeBackground" class="bg-random-btn" :disabled="bgLoading">
+                  <svg v-if="!bgLoading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                  </svg>
+                  <svg v-else class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                  </svg>
+                  {{ bgLoading ? '加载中...' : '随机切换' }}
+                </button>
+              </div>
+              <div class="bg-source-hint">
+                当前模式: {{ getBgSourceLabel() }} 
+                <span v-if="bgSource === 'auto'">（优先在线，失败时使用本地）</span>
+                <span v-else-if="bgSource === 'local'">（仅使用本地背景）</span>
+                <span v-else>（仅使用在线壁纸）</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+    
     <!-- 浮动操作按钮菜单 -->
     <div class="fab-container" @click.stop>
       <!-- 切换背景按钮 -->
       <transition name="fab-item">
-        <button v-show="showFabMenu" @click="changeBackground" class="change-bg-btn" title="切换背景" :disabled="bgLoading">
-          <svg v-if="!bgLoading" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button v-show="showFabMenu" @click="showBgPanel = true" class="change-bg-btn" title="背景设置">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
             <circle cx="8.5" cy="8.5" r="1.5"></circle>
             <path d="M21 15l-5-5L5 21"></path>
           </svg>
-          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        </button>
+      </transition>
+      
+      <!-- 快速切换背景按钮（长按打开面板） -->
+      <transition name="fab-item">
+        <button 
+          v-show="showFabMenu" 
+          @click="changeBackground" 
+          class="quick-bg-btn" 
+          title="快速切换背景"
+          :disabled="bgLoading"
+        >
+          <svg v-if="!bgLoading" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          <svg v-else class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
           </svg>
         </button>
@@ -834,7 +905,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeMount, computed, defineAsyncComponent, onUnmounted } from 'vue';
-import { getMenus, getCards, getAllCards, getPromos, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags, getDataVersion, addMenu, updateMenu, deleteMenu, addSubMenu, updateSubMenu, deleteSubMenu } from '../api';
+import { getMenus, getCards, getAllCards, getPromos, getFriends, verifyPassword, batchParseUrls, batchAddCards, getRandomWallpaper, getBuiltinBackgrounds, batchUpdateCards, deleteCard, updateCard, getSearchEngines, parseSearchEngine, addSearchEngine, deleteSearchEngine, getTags, getDataVersion, addMenu, updateMenu, deleteMenu, addSubMenu, updateSubMenu, deleteSubMenu } from '../api';
 import axios from 'axios';
 
 // AI API 辅助函数
@@ -938,6 +1009,10 @@ function closeFabMenu() {
 
 // 背景切换相关
 const bgLoading = ref(false);
+const bgSource = ref('auto'); // 'auto' | 'local' | 'online'
+const showBgPanel = ref(false); // 背景选择面板
+const builtinBackgrounds = ref([]); // 内置背景列表
+const currentBgName = ref(''); // 当前背景名称
 
 const selectedCardsCount = computed(() => {
   return parsedCards.value.filter(card => card.selected).length;
@@ -1264,30 +1339,72 @@ const filteredCards = computed(() => {
 });
 
 // 背景版本号 - 修改此值会清除用户保存的背景，显示新的默认背景
-const BG_VERSION = '3.0';
+const BG_VERSION = '4.0';
+
+// 背景存储键名
+const BG_STORAGE_KEY = 'nav_bg_settings';
+
+// 获取保存的背景设置
+function getSavedBgSettings() {
+  try {
+    const saved = localStorage.getItem(BG_STORAGE_KEY);
+    if (saved) {
+      const settings = JSON.parse(saved);
+      if (settings.version === BG_VERSION) {
+        return settings;
+      }
+    }
+  } catch (e) {
+    console.warn('读取背景设置失败:', e);
+  }
+  return null;
+}
+
+// 保存背景设置
+function saveBgSettings(url, name = '', source = 'local') {
+  try {
+    localStorage.setItem(BG_STORAGE_KEY, JSON.stringify({
+      version: BG_VERSION,
+      url,
+      name,
+      source,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    console.warn('保存背景设置失败:', e);
+  }
+}
+
+// 应用背景到页面
+function applyBackground(url) {
+  if (!url) return;
+  
+  // 使用 CSS 变量方式应用背景，更优雅
+  let bgStyle = document.getElementById('dynamic-bg-style');
+  if (!bgStyle) {
+    bgStyle = document.createElement('style');
+    bgStyle.id = 'dynamic-bg-style';
+    document.head.appendChild(bgStyle);
+  }
+  bgStyle.textContent = `.home-container { background-image: url(${url}) !important; }`;
+}
 
 // 在组件渲染前应用保存的背景，避免闪烁
 onBeforeMount(() => {
-  // 检查背景版本，如果版本不匹配则清除旧背景
-  const savedBgVersion = localStorage.getItem('nav_background_version');
-  if (savedBgVersion !== BG_VERSION) {
-    localStorage.removeItem('nav_background');
-    localStorage.setItem('nav_background_version', BG_VERSION);
-  }
-  
-  const savedBg = localStorage.getItem('nav_background');
-  if (savedBg) {
-    // 在 nextTick 中应用，确保 DOM 元素存在
+  const settings = getSavedBgSettings();
+  if (settings && settings.url) {
+    currentBgName.value = settings.name || '';
+    bgSource.value = settings.source || 'local';
+    
+    // 立即应用背景
     document.addEventListener('DOMContentLoaded', () => {
-      const homeContainer = document.querySelector('.home-container');
-      if (homeContainer) {
-        homeContainer.style.backgroundImage = `url(${savedBg})`;
-        homeContainer.style.backgroundSize = 'cover';
-        homeContainer.style.backgroundPosition = 'center';
-        homeContainer.style.backgroundRepeat = 'no-repeat';
-        homeContainer.style.backgroundAttachment = 'fixed';
-      }
+      applyBackground(settings.url);
     });
+    
+    // 如果 DOM 已经加载完成，直接应用
+    if (document.readyState !== 'loading') {
+      applyBackground(settings.url);
+    }
   }
 });
 
@@ -1516,17 +1633,14 @@ onMounted(async () => {
   }
   
   // 再次检查并应用背景（防止 onBeforeMount 没有执行）
-  const savedBg = localStorage.getItem('nav_background');
-  if (savedBg) {
-    const homeContainer = document.querySelector('.home-container');
-    if (homeContainer && !homeContainer.style.backgroundImage.includes(savedBg)) {
-      homeContainer.style.backgroundImage = `url(${savedBg})`;
-      homeContainer.style.backgroundSize = 'cover';
-      homeContainer.style.backgroundPosition = 'center';
-      homeContainer.style.backgroundRepeat = 'no-repeat';
-      homeContainer.style.backgroundAttachment = 'fixed';
-    }
+  const settings = getSavedBgSettings();
+  if (settings && settings.url) {
+    applyBackground(settings.url);
+    currentBgName.value = settings.name || '';
   }
+  
+  // 预加载内置背景列表
+  loadBuiltinBackgrounds();
   
   // 检查是否有保存的密码token
   checkSavedPassword();
@@ -2570,90 +2684,134 @@ async function autoGenerateAIForNewCards(cardIds) {
   }
 }
 
-// 切换背景壁纸
+// 加载内置背景列表
+async function loadBuiltinBackgrounds() {
+  try {
+    const response = await getBuiltinBackgrounds();
+    if (response.data.success) {
+      builtinBackgrounds.value = response.data.backgrounds;
+    }
+  } catch (e) {
+    console.warn('加载内置背景列表失败:', e);
+    // 失败时使用默认背景
+    builtinBackgrounds.value = [{ id: 1, name: '默认', url: '/background.webp' }];
+  }
+}
+
+// 切换背景壁纸（随机切换）
 async function changeBackground() {
   if (bgLoading.value) return;
   
   bgLoading.value = true;
   
   try {
-    const response = await getRandomWallpaper();
-    const wallpaperUrl = response.data.url;
+    const response = await getRandomWallpaper(bgSource.value);
+    const data = response.data;
     
-    // 将图片转换为 Base64 存储，实现秒加载
-    const base64Data = await convertImageToBase64(wallpaperUrl);
-    
-    // 更新背景 - 直接更新或创建 <style> 标签，使用 !important 覆盖
-    let bgStyle = document.getElementById('dynamic-bg-style');
-    if (!bgStyle) {
-      bgStyle = document.createElement('style');
-      bgStyle.id = 'dynamic-bg-style';
-      document.head.appendChild(bgStyle);
+    if (data.success && data.url) {
+      // 预加载图片
+      await preloadImage(data.url);
+      
+      // 应用背景
+      applyBackground(data.url);
+      
+      // 保存设置
+      const name = data.name || (data.source === 'online' ? '在线壁纸' : '本地背景');
+      saveBgSettings(data.url, name, data.source);
+      currentBgName.value = name;
+    } else {
+      throw new Error(data.error || '获取壁纸失败');
     }
-    bgStyle.textContent = `.home-container { background-image: url(${base64Data}) !important; }`;
-    
-    // 保存 Base64 到 localStorage，下次刷新时秒加载
-    localStorage.setItem('nav_background', base64Data);
   } catch (error) {
-    console.error('获取壁纸失败:', error);
-    alert('获取壁纸失败，请稍后重试');
+    console.error('切换背景失败:', error);
+    
+    // 网络失败时，尝试使用本地背景
+    if (bgSource.value !== 'local') {
+      try {
+        const localResponse = await getRandomWallpaper('local');
+        if (localResponse.data.success && localResponse.data.url) {
+          applyBackground(localResponse.data.url);
+          saveBgSettings(localResponse.data.url, localResponse.data.name || '本地背景', 'local');
+          currentBgName.value = localResponse.data.name || '本地背景';
+          return;
+        }
+      } catch (e) {
+        // 本地也失败，使用默认背景
+      }
+    }
+    
+    // 最终降级：使用默认背景
+    applyBackground('/background.webp');
+    saveBgSettings('/background.webp', '默认', 'local');
+    currentBgName.value = '默认';
   } finally {
     bgLoading.value = false;
   }
 }
 
-// 将远程图片转换为 Base64
-async function convertImageToBase64(url) {
+// 选择指定背景
+async function selectBackground(bg) {
+  if (bgLoading.value) return;
+  
+  bgLoading.value = true;
+  
+  try {
+    // 预加载图片
+    await preloadImage(bg.url);
+    
+    // 应用背景
+    applyBackground(bg.url);
+    
+    // 保存设置
+    saveBgSettings(bg.url, bg.name, 'local');
+    currentBgName.value = bg.name;
+    
+    // 关闭面板
+    showBgPanel.value = false;
+  } catch (error) {
+    console.error('选择背景失败:', error);
+    alert('加载背景图片失败，请重试');
+  } finally {
+    bgLoading.value = false;
+  }
+}
+
+// 预加载图片
+function preloadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(url);
+    img.onerror = () => reject(new Error('图片加载失败'));
     
-    // 添加时间戳防止浏览器缓存
-    const cacheBuster = `_cb=${Date.now()}`;
-    const finalUrl = url.includes('?') ? `${url}&${cacheBuster}` : `${url}?${cacheBuster}`;
+    // 设置超时
+    const timeout = setTimeout(() => {
+      reject(new Error('图片加载超时'));
+    }, 10000);
     
     img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        // 限制最大尺寸以控制 Base64 大小
-        const maxSize = 1920;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = Math.round(height * maxSize / width);
-            width = maxSize;
-          } else {
-            width = Math.round(width * maxSize / height);
-            height = maxSize;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        // 使用 JPEG 格式，质量 0.8，平衡大小和质量
-        const base64 = canvas.toDataURL('image/jpeg', 0.8);
-        resolve(base64);
-      } catch (e) {
-        // 如果转换失败，返回原始 URL
-        console.warn('Base64 转换失败，使用原始 URL:', e);
-        resolve(url);
-      }
-    };
-    
-    img.onerror = () => {
-      // 加载失败时返回原始 URL
-      console.warn('图片加载失败，使用原始 URL');
+      clearTimeout(timeout);
       resolve(url);
     };
     
-    img.src = finalUrl;
+    img.src = url;
   });
+}
+
+// 切换背景源模式
+function toggleBgSource() {
+  const sources = ['auto', 'local', 'online'];
+  const currentIndex = sources.indexOf(bgSource.value);
+  bgSource.value = sources[(currentIndex + 1) % sources.length];
+}
+
+// 获取背景源显示名称
+function getBgSourceLabel() {
+  const labels = {
+    'auto': '自动',
+    'local': '本地',
+    'online': '在线'
+  };
+  return labels[bgSource.value] || '自动';
 }
 
 // ========== 编辑模式相关函数 ==========
@@ -4722,7 +4880,8 @@ async function saveCardEdit() {
 }
 
 .batch-add-btn,
-.change-bg-btn {
+.change-bg-btn,
+.quick-bg-btn {
   position: relative;
   width: 40px;
   height: 40px;
@@ -4746,22 +4905,206 @@ async function saveCardEdit() {
   background: linear-gradient(135deg, #722ed1 0%, #9254de 100%);
 }
 
+.quick-bg-btn {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+}
+
 .batch-add-btn:hover,
-.change-bg-btn:hover:not(:disabled) {
+.change-bg-btn:hover:not(:disabled),
+.quick-bg-btn:hover:not(:disabled) {
   transform: scale(1.12) translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.change-bg-btn:disabled {
+.change-bg-btn:disabled,
+.quick-bg-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
-.change-bg-btn:disabled svg {
+.change-bg-btn:disabled svg,
+.quick-bg-btn:disabled svg {
   animation: spin 1s linear infinite;
 }
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* 背景选择面板样式 */
+.bg-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.bg-panel {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.bg-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.bg-panel-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.bg-source-toggle {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bg-source-toggle:hover {
+  transform: scale(1.05);
+}
+
+.bg-panel-content {
+  padding: 16px 20px;
+  max-height: calc(80vh - 60px);
+  overflow-y: auto;
+}
+
+.bg-section {
+  margin-bottom: 20px;
+}
+
+.bg-section:last-child {
+  margin-bottom: 0;
+}
+
+.bg-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.bg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.bg-item {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.bg-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.bg-item.active {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+}
+
+.bg-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bg-item-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: white;
+  font-size: 11px;
+  text-align: center;
+}
+
+.bg-random-btns {
+  display: flex;
+  gap: 12px;
+}
+
+.bg-random-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bg-random-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.bg-random-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bg-source-hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+}
+
+/* 背景面板动画 */
+.bg-panel-enter-active,
+.bg-panel-leave-active {
+  transition: all 0.3s ease;
+}
+
+.bg-panel-enter-from,
+.bg-panel-leave-to {
+  opacity: 0;
+}
+
+.bg-panel-enter-from .bg-panel,
+.bg-panel-leave-to .bg-panel {
+  transform: scale(0.9) translateY(20px);
 }
 
 /* Transitions for FAB items */
