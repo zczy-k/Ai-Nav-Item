@@ -227,6 +227,16 @@
           <span class="current-item">{{ batchProgress.currentCard }}</span>
           <span class="eta" v-if="estimatedTime">预计剩余 {{ estimatedTime }}</span>
         </div>
+        <!-- 并发状态指示器 -->
+        <div class="concurrency-status">
+          <span class="concurrency-label">
+            <span class="concurrency-icon">{{ batchProgress.isRateLimited ? '🐢' : '🚀' }}</span>
+            {{ concurrencyText }}
+          </span>
+          <span class="concurrency-badge" :class="concurrencyClass">
+            并发 {{ batchProgress.concurrency || 1 }}
+          </span>
+        </div>
         <button class="btn btn-danger btn-sm" @click="stopBatch" :disabled="stopping">
           {{ stopping ? '停止中...' : '⏹️ 停止任务' }}
         </button>
@@ -492,7 +502,7 @@ export default {
       batchRunning: false,
       batchType: '',
       batchMode: '',
-      batchProgress: { current: 0, total: 0, currentCard: '' },
+      batchProgress: { current: 0, total: 0, currentCard: '', concurrency: 3, isRateLimited: false },
       batchStartTime: null,
       pollTimer: null,
       message: '',
@@ -553,6 +563,22 @@ export default {
     messageIcon() {
       const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
       return icons[this.messageType] || 'ℹ️';
+    },
+    concurrencyText() {
+      if (this.batchProgress.isRateLimited) {
+        return '检测到限流，已降速';
+      }
+      const c = this.batchProgress.concurrency || 1;
+      if (c >= 4) return '高速并行处理中';
+      if (c >= 2) return '并行处理中';
+      return '串行处理中';
+    },
+    concurrencyClass() {
+      if (this.batchProgress.isRateLimited) return 'rate-limited';
+      const c = this.batchProgress.concurrency || 1;
+      if (c >= 4) return 'high';
+      if (c >= 2) return 'medium';
+      return 'low';
     }
   },
   async mounted() {
@@ -782,6 +808,8 @@ export default {
             this.batchProgress.current = res.data.current || 0;
             this.batchProgress.total = res.data.total;
             this.batchProgress.currentCard = res.data.currentCard || '';
+            this.batchProgress.concurrency = res.data.concurrency || 1;
+            this.batchProgress.isRateLimited = res.data.isRateLimited || false;
           }
           
           if (res.data.running) {
@@ -1401,7 +1429,7 @@ export default {
 .progress-detail {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-size: 13px;
   color: var(--text-secondary, #6b7280);
 }
@@ -1415,6 +1443,56 @@ export default {
 
 .eta {
   color: var(--primary-color, #3b82f6);
+}
+
+/* 并发状态 */
+.concurrency-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: var(--card-bg, #fff);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.concurrency-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.concurrency-icon {
+  font-size: 16px;
+}
+
+.concurrency-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.concurrency-badge.high {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.concurrency-badge.medium {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.concurrency-badge.low {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.concurrency-badge.rate-limited {
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 /* 批量操作 */

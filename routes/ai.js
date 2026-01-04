@@ -1,6 +1,7 @@
 /**
  * AI 功能路由
  * 提供 AI 配置管理、批量生成任务等功能
+ * 支持自适应并发处理策略
  */
 const express = require('express');
 const router = express.Router();
@@ -9,11 +10,15 @@ const db = require('../db');
 const { AI_PROVIDERS, callAI } = require('../utils/aiProvider');
 const { encrypt, decrypt } = require('../utils/crypto');
 
-// ==================== 批量任务管理器 ====================
+// ==================== 自适应并发批量任务管理器 ====================
 class BatchTaskManager {
   constructor() {
     this.task = null;
     this.abortController = null;
+    // 并发控制参数
+    this.minConcurrency = 1;
+    this.maxConcurrency = 5;
+    this.initialConcurrency = 3;
   }
 
   // 获取任务状态
@@ -31,7 +36,9 @@ class BatchTaskManager {
       failCount: this.task.failCount,
       currentCard: this.task.currentCard,
       startTime: this.task.startTime,
-      errors: this.task.errors.slice(-5) // 只返回最近5个错误
+      concurrency: this.task.concurrency,
+      isRateLimited: this.task.isRateLimited,
+      errors: this.task.errors.slice(-5)
     };
   }
 
@@ -57,12 +64,16 @@ class BatchTaskManager {
       failCount: 0,
       currentCard: '',
       startTime: Date.now(),
-      errors: []
+      errors: [],
+      // 自适应并发状态
+      concurrency: this.initialConcurrency,
+      isRateLimited: false,
+      consecutiveSuccesses: 0,
+      rateLimitCount: 0
     };
 
     // 异步执行任务
     this.runTask(config, cards, type).catch(() => {
-      // 任务异常结束
       if (this.task) {
         this.task.running = false;
       }
@@ -82,42 +93,85 @@ class BatchTaskManager {
     return { stopped: true };
   }
 
-  // 执行任务
+
+  // 执行任务（自适应并发）
   async runTask(config, cards, type) {
     const { notifyDataChange } = require('../utils/autoBackup');
     const existingTags = type === 'tags' ? await db.getAllTagNames() : [];
     const rawConfig = await db.getAIConfig();
-    const delay = Math.max(500, Math.min(10000, parseInt(rawConfig.requestDelay) || 1500));
+    const baseDelay = Math.max(500, Math.min(10000, parseInt(rawConfig.requestDelay) || 1500));
 
-    for (let i = 0; i < cards.length; i++) {
+    let index = 0;
+    const totalCards = cards.length;
+
+    while (index < totalCards) {
       // 检查是否被中止
       if (this.abortController?.signal.aborted || !this.task?.running) {
         break;
       }
 
-      const card = cards[i];
-      this.task.current = i + 1;
-      this.task.currentCard = card.title || extractDomain(card.url);
+      const currentConcurrency = this.task.concurrency;
+      const batch = cards.slice(index, index + currentConcurrency);
+      
+      // 更新当前处理信息
+      this.task.currentCard = batch.map(c => c.title || extractDomain(c.url)).join(', ');
 
-      try {
-        const updated = await this.processCard(config, card, type, existingTags);
-        if (updated) {
-          this.task.successCount++;
-          // 每处理成功一个就通知前端
-          notifyDataChange();
+      // 并行处理当前批次
+      const results = await Promise.allSettled(
+        batch.map(card => this.processCardWithRetry(config, card, type, existingTags))
+      );
+
+      // 分析结果，调整并发策略
+      let batchSuccess = 0;
+      let batchFail = 0;
+      let hasRateLimit = false;
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const card = batch[i];
+        this.task.current++;
+
+        if (result.status === 'fulfilled') {
+          if (result.value.success) {
+            batchSuccess++;
+            this.task.successCount++;
+            notifyDataChange();
+          } else if (result.value.rateLimited) {
+            hasRateLimit = true;
+            batchFail++;
+            this.task.failCount++;
+          } else {
+            batchFail++;
+            this.task.failCount++;
+            if (result.value.error) {
+              this.task.errors.push({
+                cardId: card.id,
+                cardTitle: card.title || card.url,
+                error: result.value.error,
+                time: Date.now()
+              });
+            }
+          }
+        } else {
+          batchFail++;
+          this.task.failCount++;
+          this.task.errors.push({
+            cardId: card.id,
+            cardTitle: card.title || card.url,
+            error: result.reason?.message || '未知错误',
+            time: Date.now()
+          });
         }
-      } catch (error) {
-        this.task.failCount++;
-        this.task.errors.push({
-          cardId: card.id,
-          cardTitle: card.title || card.url,
-          error: error.message,
-          time: Date.now()
-        });
       }
 
-      // 延迟（避免 API 限流），最后一个不延迟
-      if (i < cards.length - 1 && this.task?.running) {
+      // 自适应调整并发数
+      this.adjustConcurrency(batchSuccess, batchFail, hasRateLimit);
+
+      index += batch.length;
+
+      // 延迟处理
+      if (index < totalCards && this.task?.running) {
+        const delay = this.calculateDelay(baseDelay, hasRateLimit);
         await this.sleep(delay);
       }
     }
@@ -127,6 +181,99 @@ class BatchTaskManager {
       this.task.running = false;
       this.task.currentCard = '';
     }
+  }
+
+  // 自适应调整并发数
+  adjustConcurrency(successCount, failCount, hasRateLimit) {
+    if (!this.task) return;
+
+    if (hasRateLimit) {
+      // 触发限流，降低并发
+      this.task.rateLimitCount++;
+      this.task.consecutiveSuccesses = 0;
+      this.task.isRateLimited = true;
+      
+      // 每次限流降低一半并发，最低为1
+      this.task.concurrency = Math.max(
+        this.minConcurrency,
+        Math.floor(this.task.concurrency / 2)
+      );
+    } else if (successCount > 0 && failCount === 0) {
+      // 全部成功，尝试增加并发
+      this.task.consecutiveSuccesses++;
+      this.task.isRateLimited = false;
+      
+      // 连续3批成功后尝试增加并发
+      if (this.task.consecutiveSuccesses >= 3 && this.task.concurrency < this.maxConcurrency) {
+        this.task.concurrency = Math.min(this.maxConcurrency, this.task.concurrency + 1);
+        this.task.consecutiveSuccesses = 0;
+      }
+    } else {
+      // 有失败但非限流，保持当前并发
+      this.task.consecutiveSuccesses = 0;
+    }
+  }
+
+  // 计算延迟时间
+  calculateDelay(baseDelay, hasRateLimit) {
+    if (!this.task) return baseDelay;
+
+    if (hasRateLimit) {
+      // 限流时增加延迟：基础延迟 * (2 ^ 限流次数)，最大30秒
+      const multiplier = Math.pow(2, Math.min(this.task.rateLimitCount, 4));
+      return Math.min(baseDelay * multiplier, 30000);
+    }
+
+    if (this.task.concurrency === 1) {
+      // 串行模式，使用基础延迟
+      return baseDelay;
+    }
+
+    // 并行模式，延迟可以稍短
+    return Math.max(200, baseDelay / 2);
+  }
+
+
+  // 带重试的卡片处理
+  async processCardWithRetry(config, card, type, existingTags, retryCount = 0) {
+    const maxRetries = 2;
+    
+    try {
+      const updated = await this.processCard(config, card, type, existingTags);
+      return { success: updated, rateLimited: false };
+    } catch (error) {
+      const isRateLimit = this.isRateLimitError(error);
+      
+      if (isRateLimit && retryCount < maxRetries) {
+        // 限流错误，等待后重试
+        const retryDelay = Math.pow(2, retryCount + 1) * 1000; // 2s, 4s
+        await this.sleep(retryDelay);
+        return this.processCardWithRetry(config, card, type, existingTags, retryCount + 1);
+      }
+      
+      return { 
+        success: false, 
+        rateLimited: isRateLimit,
+        error: error.message 
+      };
+    }
+  }
+
+  // 检测是否为限流错误
+  isRateLimitError(error) {
+    if (!error) return false;
+    const message = error.message || '';
+    const status = error.status || error.statusCode;
+    
+    // HTTP 429 或包含限流关键词
+    return status === 429 || 
+           message.includes('429') ||
+           message.includes('rate limit') ||
+           message.includes('Rate limit') ||
+           message.includes('too many requests') ||
+           message.includes('Too Many Requests') ||
+           message.includes('quota exceeded') ||
+           message.includes('请求过于频繁');
   }
 
   // 处理单个卡片
@@ -174,7 +321,6 @@ class BatchTaskManager {
   sleep(ms) {
     return new Promise(resolve => {
       const timer = setTimeout(resolve, ms);
-      // 支持中止
       this.abortController?.signal.addEventListener('abort', () => {
         clearTimeout(timer);
         resolve();
@@ -188,7 +334,6 @@ const taskManager = new BatchTaskManager();
 
 // ==================== 辅助函数 ====================
 
-// 提取域名
 function extractDomain(url) {
   try {
     return new URL(url).hostname.replace('www.', '');
@@ -197,7 +342,6 @@ function extractDomain(url) {
   }
 }
 
-// 获取解密后的 AI 配置
 async function getDecryptedAIConfig() {
   const config = await db.getAIConfig();
   
@@ -213,7 +357,6 @@ async function getDecryptedAIConfig() {
   return config;
 }
 
-// 验证 AI 配置
 function validateAIConfig(config) {
   if (!config.provider) {
     return { valid: false, message: '请先配置 AI 服务' };
@@ -234,6 +377,7 @@ function validateAIConfig(config) {
   
   return { valid: true };
 }
+
 
 // ==================== Prompt 构建函数 ====================
 
@@ -391,6 +535,7 @@ function parseTagsResponse(text, existingTags) {
   return { tags: [], newTags: [] };
 }
 
+
 // ==================== API 路由 ====================
 
 // 获取 AI 配置
@@ -418,14 +563,12 @@ router.post('/config', authMiddleware, async (req, res) => {
   try {
     const { provider, apiKey, baseUrl, model, requestDelay, autoGenerate } = req.body;
     
-    // 验证提供商
     if (!provider || !AI_PROVIDERS[provider]) {
       return res.status(400).json({ success: false, message: '无效的 AI 提供商' });
     }
     
     const providerConfig = AI_PROVIDERS[provider];
     
-    // 验证 API Key
     if (providerConfig.needsApiKey && !apiKey) {
       const existingConfig = await db.getAIConfig();
       if (!existingConfig.apiKey) {
@@ -433,12 +576,10 @@ router.post('/config', authMiddleware, async (req, res) => {
       }
     }
     
-    // 验证 Base URL
     if (providerConfig.needsBaseUrl && !baseUrl) {
       return res.status(400).json({ success: false, message: 'Base URL 不能为空' });
     }
     
-    // 加密 API Key
     let encryptedApiKey = null;
     if (apiKey) {
       const encrypted = encrypt(apiKey);
@@ -549,6 +690,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
   }
 });
 
+
 // ==================== 批量任务 API ====================
 
 // 获取任务状态
@@ -561,7 +703,6 @@ router.post('/batch-task/start', authMiddleware, async (req, res) => {
   try {
     const { type, mode } = req.body;
     
-    // 参数验证
     if (!type || !['name', 'description', 'tags'].includes(type)) {
       return res.status(400).json({ success: false, message: '无效的任务类型' });
     }
@@ -570,12 +711,10 @@ router.post('/batch-task/start', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: '无效的任务模式' });
     }
     
-    // 检查是否已有任务运行
     if (taskManager.isRunning()) {
       return res.status(409).json({ success: false, message: '已有任务在运行中' });
     }
     
-    // 验证 AI 配置
     const config = await getDecryptedAIConfig();
     const validation = validateAIConfig(config);
     
@@ -583,7 +722,6 @@ router.post('/batch-task/start', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: validation.message });
     }
     
-    // 获取待处理卡片
     const cards = mode === 'all' 
       ? await db.getAllCards() 
       : await db.getCardsNeedingAI(type);
@@ -592,13 +730,13 @@ router.post('/batch-task/start', authMiddleware, async (req, res) => {
       return res.json({ success: true, message: '没有需要处理的卡片', total: 0 });
     }
     
-    // 启动任务
     const result = await taskManager.start(config, cards, type, mode);
     
     res.json({ 
       success: true, 
-      message: '任务已启动',
-      total: result.total
+      message: '任务已启动（自适应并发模式）',
+      total: result.total,
+      initialConcurrency: taskManager.initialConcurrency
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -684,27 +822,23 @@ async function autoGenerateForCards(cardIds) {
         let updatedTitle = null;
         let updatedDesc = null;
         
-        // 生成名称
         try {
           const prompt = buildNamePrompt(card);
           const result = await callAI(config, prompt);
           updatedTitle = cleanName(result);
         } catch { /* 忽略 */ }
         
-        // 生成描述
         try {
           const prompt = buildDescriptionPrompt({ ...card, title: updatedTitle || card.title });
           const result = await callAI(config, prompt);
           updatedDesc = cleanDescription(result);
         } catch { /* 忽略 */ }
         
-        // 更新名称和描述
         if (updatedTitle || updatedDesc) {
           await db.updateCardNameAndDescription(cardId, updatedTitle, updatedDesc);
           hasUpdates = true;
         }
         
-        // 生成标签
         try {
           const prompt = buildTagsPrompt({ 
             ...card, 
@@ -720,7 +854,6 @@ async function autoGenerateForCards(cardIds) {
           }
         } catch { /* 忽略 */ }
         
-        // 延迟
         if (i < cardIds.length - 1) {
           await new Promise(r => setTimeout(r, delay));
         }
