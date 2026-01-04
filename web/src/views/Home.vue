@@ -2608,6 +2608,10 @@ async function convertImageToBase64(url) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     
+    // 添加时间戳防止浏览器缓存
+    const cacheBuster = `_cb=${Date.now()}`;
+    const finalUrl = url.includes('?') ? `${url}&${cacheBuster}` : `${url}?${cacheBuster}`;
+    
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -2648,7 +2652,7 @@ async function convertImageToBase64(url) {
       resolve(url);
     };
     
-    img.src = url;
+    img.src = finalUrl;
   });
 }
 

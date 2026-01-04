@@ -19,8 +19,10 @@ const NATURE_PHOTO_IDS = [
 // 获取随机壁纸（每分钟最多15次）- 限制为自然风景类
 router.get('/random', wallpaperLimiter, async (req, res) => {
   try {
+    // 添加时间戳防止缓存
+    const timestamp = Date.now();
     // 使用 Unsplash 获取自然风景壁纸
-    const response = await axios.get(`https://source.unsplash.com/random/1920x1080?${NATURE_KEYWORDS}`, {
+    const response = await axios.get(`https://source.unsplash.com/random/1920x1080?${NATURE_KEYWORDS}&t=${timestamp}`, {
       maxRedirects: 0,
       validateStatus: (status) => status === 302 || status === 200,
       timeout: 8000,
@@ -29,9 +31,11 @@ router.get('/random', wallpaperLimiter, async (req, res) => {
     const imageUrl = response.headers.location;
 
     if (imageUrl) {
+      // 添加时间戳到返回的 URL 防止浏览器缓存
+      const finalUrl = imageUrl.includes('?') ? `${imageUrl}&_t=${timestamp}` : `${imageUrl}?_t=${timestamp}`;
       res.json({ 
         success: true,
-        url: imageUrl 
+        url: finalUrl 
       });
     } else {
       throw new Error('Unsplash did not provide a redirect location.');
@@ -41,7 +45,8 @@ router.get('/random', wallpaperLimiter, async (req, res) => {
     try {
       // 备用方案：从预选的自然风景图片 ID 中随机选择
       const randomId = NATURE_PHOTO_IDS[Math.floor(Math.random() * NATURE_PHOTO_IDS.length)];
-      const fallbackUrl = `https://picsum.photos/id/${randomId}/1920/1080`;
+      const timestamp = Date.now();
+      const fallbackUrl = `https://picsum.photos/id/${randomId}/1920/1080?_t=${timestamp}`;
       
       res.json({ 
         success: true,
@@ -49,9 +54,10 @@ router.get('/random', wallpaperLimiter, async (req, res) => {
       });
     } catch (e) {
       // 最后的备用：返回预选列表中的第一张
+      const timestamp = Date.now();
       res.json({ 
         success: true,
-        url: `https://picsum.photos/id/${NATURE_PHOTO_IDS[0]}/1920/1080` 
+        url: `https://picsum.photos/id/${NATURE_PHOTO_IDS[0]}/1920/1080?_t=${timestamp}` 
       });
     }
   }
