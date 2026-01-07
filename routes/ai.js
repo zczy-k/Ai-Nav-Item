@@ -909,8 +909,12 @@ router.get('/batch-task/stream', authMiddleware, (req, res) => {
   });
   res.flushHeaders();
   res.write(`data: ${JSON.stringify(taskManager.getStatus())}\n\n`);
+  if (res.flush) res.flush();
 
-  const onUpdate = (status) => res.write(`data: ${JSON.stringify(status)}\n\n`);
+  const onUpdate = (status) => {
+    res.write(`data: ${JSON.stringify(status)}\n\n`);
+    if (res.flush) res.flush();
+  };
   taskManager.on('update', onUpdate);
   req.on('close', () => taskManager.removeListener('update', onUpdate));
 });

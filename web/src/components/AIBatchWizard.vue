@@ -181,8 +181,11 @@ import { getMenus, getTags, aiFilterCards, aiPreview, aiStartBatchTask, aiStopTa
 
 export default {
   name: 'AIBatchWizard',
-  props: { visible: Boolean },
-  emits: ['close'],
+  props: { 
+    visible: Boolean,
+    activeTask: { type: Object, default: () => ({ running: false }) }
+  },
+  emits: ['close', 'start'],
   data() {
     return {
       step: 0,
@@ -211,35 +214,37 @@ export default {
       if (this.step === 1) return this.strategy.types.length > 0;
       return true;
     },
+    taskStatus() {
+      // 优先使用父组件传递的任务状态，否则使用本地状态（用于非运行状态下的最后一次快照）
+      return this.activeTask.running ? this.activeTask : this.localTaskStatus;
+    },
+    taskRunning() {
+      return this.activeTask.running;
+    },
     progressPercent() {
-      return this.taskStatus.total ? Math.round((this.taskStatus.current / this.taskStatus.total) * 100) : 0;
+      const s = this.taskStatus;
+      return s.total ? Math.round((s.current / s.total) * 100) : 0;
     }
   },
   watch: {
     visible(v) {
       if (v) this.init();
-      else this.cleanup();
+      // 不再在 visible 改变时清理 SSE，由父组件管理
     }
-  },
-  beforeUnmount() {
-    this.cleanup();
   },
   methods: {
     async init() {
       this.step = 0;
       this.previews = [];
-      this.taskRunning = false;
       this.taskDone = false;
-      this.taskStatus = { current: 0, total: 0, successCount: 0, failCount: 0, currentCard: '', errors: [] };
+      this.localTaskStatus = { current: 0, total: 0, successCount: 0, failCount: 0, currentCard: '', errors: [] };
+
       try {
         const [menuRes, tagRes] = await Promise.all([getMenus(), getTags()]);
         this.menus = menuRes.data || [];
         this.tags = tagRes.data || [];
       } catch {}
       this.applyFilter();
-    },
-    cleanup() {
-      this.closeEventSource();
     },
     async onMenuChange() {
       this.filters.subMenuId = '';
@@ -277,89 +282,31 @@ export default {
       }
       this.previewing = false;
     },
-      // 初始化实时更新 (SSE)
-      initRealtimeUpdates() {
-        this.closeEventSource();
-        
-        const token = localStorage.getItem('token');
-        const url = `/api/ai/batch-task/stream${token ? '?token=' + encodeURIComponent(token) : ''}`;
-        
-        this.eventSource = new EventSource(url);
-      
-      this.eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.updateTaskState(data);
-        } catch (e) {
-          console.error('Failed to parse SSE data:', e);
-        }
-      };
-      
-      this.eventSource.onerror = () => {
-        this.closeEventSource();
-      };
-    },
-    closeEventSource() {
-      if (this.eventSource) {
-        this.eventSource.close();
-        this.eventSource = null;
-      }
-    },
-      updateTaskState(data) {
-        if (!data) return;
-        
-        const status = { ...data };
-        
-        // 计算 ETA
-        if (status.startTime && status.current > 1) {
-          const elapsed = Date.now() - status.startTime;
-          const avg = elapsed / status.current;
-          const remain = (status.total - status.current) * avg;
-          status.eta = remain < 60000 ? `${Math.round(remain / 1000)}秒` : `${Math.round(remain / 60000)}分钟`;
-        }
-  
-        // 如果任务刚刚结束
-        if (this.taskRunning && !status.running) {
-          this.taskStatus = { ...status, current: status.total };
-          
-          // 延迟关闭，让用户看清结果
-          setTimeout(() => {
-            this.taskRunning = false;
-            this.taskDone = true;
-            this.closeEventSource();
-          }, 1500);
-          return;
-        }
-
-        if (status.running) {
-          this.taskStatus = status;
-          this.taskRunning = true;
-        } else if (!this.taskRunning) {
-          this.taskStatus = status;
-        }
-      },
     async startTask() {
       this.starting = true;
       try {
-        // 立即展示运行状态
-        this.taskRunning = true;
-        this.taskDone = false;
-        this.taskStatus = { current: 0, total: this.filteredCards.length, successCount: 0, failCount: 0, currentCard: '准备启动...', errors: [] };
-
-        const { data } = await aiStartBatchTask({
+        const payload = {
           cardIds: this.filteredCards.map(c => c.id),
           types: this.strategy.types,
           strategy: { mode: this.strategy.mode, style: this.strategy.style, customPrompt: this.strategy.customPrompt }
+        };
+
+        // 立即向父组件发送启动信号
+        this.$emit('start', {
+          total: payload.cardIds.length,
+          types: payload.types,
+          mode: payload.strategy.mode,
+          current: 0,
+          currentCard: '启动中...'
         });
+
+        const { data } = await aiStartBatchTask(payload);
         
-        if (data.success && data.total > 0) {
-          this.initRealtimeUpdates();
-        } else {
-          this.taskRunning = false;
+        if (!data.success || data.total === 0) {
           alert(data.message || '没有需要处理的卡片');
+          this.$emit('close'); // 启动失败则关闭
         }
       } catch (e) {
-        this.taskRunning = false;
         alert('启动失败: ' + (e.response?.data?.message || e.message));
       }
       this.starting = false;

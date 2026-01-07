@@ -120,22 +120,22 @@
       </div>
     </div>
 
-    <!-- 批量生成 -->
-    <div class="section">
-      <div class="section-header">
-        <h3>批量生成</h3>
-        <button class="icon-btn" @click="refreshStats" :disabled="refreshing">
-          {{ refreshing ? '⏳' : '🔄' }}
-        </button>
-      </div>
+      <!-- 批量生成 -->
+      <div class="section">
+        <div class="section-header">
+          <h3>批量生成</h3>
+          <button class="icon-btn" @click="refreshStats" :disabled="refreshing">
+            {{ refreshing ? '⏳' : '🔄' }}
+          </button>
+        </div>
 
-      <!-- 统计 -->
-      <div class="stats" v-if="stats">
-        <div class="stat"><span>{{ stats.total }}</span>总数</div>
-        <div class="stat" :class="{ warn: stats.emptyName }"><span>{{ stats.emptyName }}</span>缺名称</div>
-        <div class="stat" :class="{ warn: stats.emptyDesc }"><span>{{ stats.emptyDesc }}</span>缺描述</div>
-        <div class="stat" :class="{ warn: stats.emptyTags }"><span>{{ stats.emptyTags }}</span>缺标签</div>
-      </div>
+        <!-- 统计 -->
+        <div class="stats" v-if="stats">
+          <div class="stat"><span>{{ stats.total }}</span>总数</div>
+          <div class="stat" :class="{ warn: stats.emptyName }"><span>{{ stats.emptyName }}</span>缺名称</div>
+          <div class="stat" :class="{ warn: stats.emptyDesc }"><span>{{ stats.emptyDesc }}</span>缺描述</div>
+          <div class="stat" :class="{ warn: stats.emptyTags }"><span>{{ stats.emptyTags }}</span>缺标签</div>
+        </div>
 
         <!-- 任务进度 -->
         <div class="task-panel" v-if="task.running">
@@ -180,53 +180,38 @@
           </div>
         </div>
 
-      <!-- 操作按钮 -->
-      <div class="batch-actions" v-else>
-        <!-- 高级向导入口 -->
-        <button class="btn primary lg wizard-btn" @click="showWizard = true" :disabled="!config.hasApiKey">
-          🎯 高级批量生成向导
-        </button>
-
-          <div class="quick-actions">
-            <span class="quick-label">快捷操作：</span>
+        <!-- 操作按钮 (优化后) -->
+        <div class="batch-actions" v-else>
+          <div class="action-bar">
             <button 
-              class="btn" 
-              v-if="totalMissing > 0"
+              class="btn primary lg main-action" 
               @click="startTask('all', 'empty')"
-              :disabled="!config.hasApiKey || starting"
+              :disabled="!config.hasApiKey || starting || totalMissing === 0"
             >
-              ✨ 一键补全 ({{ totalMissing }})
+              ✨ 智能补全缺失内容 ({{ totalMissing }})
+            </button>
+            <button 
+              class="btn lg outline wizard-action" 
+              @click="showWizard = true" 
+              :disabled="!config.hasApiKey"
+            >
+              🎯 高级批量生成向导
             </button>
           </div>
-
-        <div class="action-grid">
-          <div class="action-card" v-for="item in actionItems" :key="item.type">
-            <div class="action-header">
-              <span>{{ item.icon }} {{ item.label }}</span>
-            </div>
-            <div class="action-btns">
-              <button 
-                class="btn sm" 
-                @click="startTask(item.type, 'empty')"
-                :disabled="!item.emptyCount || !config.hasApiKey || starting"
-              >
-                补充 ({{ item.emptyCount }})
-              </button>
-              <button 
-                class="btn sm outline" 
-                @click="startTask(item.type, 'all')"
-                :disabled="!stats?.total || !config.hasApiKey || starting"
-              >
-                全部重生成
-              </button>
-            </div>
-          </div>
+          <p class="action-hint" v-if="totalMissing > 0">
+            补全将自动分析 URL 并生成缺失的名称、描述和标签。
+          </p>
         </div>
       </div>
-    </div>
 
-    <!-- AI 批量生成向导 -->
-    <AIBatchWizard :visible="showWizard" @close="onWizardClose" />
+      <!-- AI 批量生成向导 (传递任务状态) -->
+      <AIBatchWizard 
+        :visible="showWizard" 
+        :active-task="task"
+        @close="onWizardClose" 
+        @start="onWizardStart"
+      />
+
 
     <!-- Toast -->
     <div class="toast" :class="[toast.type, { show: toast.show }]">
@@ -236,36 +221,20 @@
 </template>
 
 <script>
-import axios from 'axios';
-import AIBatchWizard from '../../components/AIBatchWizard.vue';
-
-const authHeaders = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-const api = {
-  get: url => axios.get(url, { headers: authHeaders() }),
-  post: (url, data) => axios.post(url, data, { headers: authHeaders() })
-};
-
-const PROVIDERS = {
-  deepseek: { name: 'DeepSeek', icon: '🔮', recommended: true, needsApiKey: true, needsBaseUrl: false, defaultModel: 'deepseek-chat', models: ['deepseek-chat', 'deepseek-coder'], defaultBaseUrl: 'https://api.deepseek.com', docsUrl: 'https://platform.deepseek.com/api_keys' },
-  openai: { name: 'OpenAI', icon: '🤖', needsApiKey: true, needsBaseUrl: false, defaultModel: 'gpt-4o-mini', models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'], defaultBaseUrl: 'https://api.openai.com', docsUrl: 'https://platform.openai.com/api-keys' },
-  anthropic: { name: 'Claude', icon: '🧠', needsApiKey: true, needsBaseUrl: false, defaultModel: 'claude-3-haiku-20240307', models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'], docsUrl: 'https://console.anthropic.com/settings/keys' },
-  gemini: { name: 'Gemini', icon: '💎', needsApiKey: true, needsBaseUrl: false, defaultModel: 'gemini-1.5-flash', models: ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'], docsUrl: 'https://aistudio.google.com/app/apikey' },
-  zhipu: { name: '智谱 GLM', icon: '🇨🇳', needsApiKey: true, needsBaseUrl: false, defaultModel: 'glm-4-flash', models: ['glm-4-flash', 'glm-4-air', 'glm-4'], docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys' },
-  qwen: { name: '通义千问', icon: '☁️', needsApiKey: true, needsBaseUrl: false, defaultModel: 'qwen-turbo', models: ['qwen-turbo', 'qwen-plus', 'qwen-max'], docsUrl: 'https://dashscope.console.aliyun.com/apiKey' },
-  moonshot: { name: 'Kimi', icon: '🌙', needsApiKey: true, needsBaseUrl: false, defaultModel: 'moonshot-v1-8k', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'], docsUrl: 'https://platform.moonshot.cn/console/api-keys' },
-  groq: { name: 'Groq', icon: '⚡', needsApiKey: true, needsBaseUrl: false, defaultModel: 'llama-3.1-8b-instant', models: ['llama-3.1-8b-instant', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'], docsUrl: 'https://console.groq.com/keys' },
-  doubao: { name: '豆包', icon: '🫘', needsApiKey: true, needsBaseUrl: false, defaultModel: 'doubao-lite-4k', models: ['doubao-lite-4k', 'doubao-pro-4k'], docsUrl: 'https://console.volcengine.com/ark' },
-  ollama: { name: 'Ollama', icon: '🦙', local: true, needsApiKey: false, needsBaseUrl: true, defaultModel: 'llama3.2', models: ['llama3.2', 'llama3.1', 'mistral', 'qwen2.5'], defaultBaseUrl: 'http://localhost:11434', docsUrl: 'https://ollama.com/' },
-  custom: { name: '自定义', icon: '⚙️', needsApiKey: true, needsBaseUrl: true, defaultModel: '', models: [], defaultBaseUrl: '' }
-};
+import { 
+  aiGetConfig,
+  aiUpdateConfig,
+  aiTestConnection,
+  aiGetStats,
+  aiStartBatchTask, 
+  aiStopTask, 
+  getTags 
+} from '../../api';
 
 export default {
   name: 'AISettings',
   components: { AIBatchWizard },
+
   data() {
     return {
       providers: PROVIDERS,
@@ -353,61 +322,61 @@ export default {
         this.config.model = this.modelSelect;
       }
     },
-    async loadConfig() {
-      try {
-        const { data } = await api.get('/api/ai/config');
-        if (data.success) {
-          const c = data.config;
-          this.config.provider = c.provider || 'deepseek';
-          this.config.hasApiKey = c.hasApiKey;
-          this.config.baseUrl = c.baseUrl || '';
-          this.config.model = c.model || this.currentProvider.defaultModel;
-          this.modelSelect = this.currentProvider.models?.includes(this.config.model) ? this.config.model : '';
-          this.config.autoGenerate = c.autoGenerate || false;
+      async loadConfig() {
+        try {
+          const { data } = await aiGetConfig();
+          if (data.success) {
+            const c = data.config;
+            this.config.provider = c.provider || 'deepseek';
+            this.config.hasApiKey = c.hasApiKey;
+            this.config.baseUrl = c.baseUrl || '';
+            this.config.model = c.model || this.currentProvider.defaultModel;
+            this.modelSelect = this.currentProvider.models?.includes(this.config.model) ? this.config.model : '';
+            this.config.autoGenerate = c.autoGenerate || false;
+          }
+        } catch {}
+      },
+      async saveConfig() {
+        this.saving = true;
+        try {
+          const { data } = await aiUpdateConfig({
+            provider: this.config.provider,
+            apiKey: this.config.apiKey || undefined,
+            baseUrl: this.config.baseUrl || this.currentProvider.defaultBaseUrl,
+            model: this.config.model,
+            autoGenerate: this.config.autoGenerate
+          });
+          if (data.success) {
+            this.showToast('配置已保存', 'success');
+            this.config.hasApiKey = true;
+            this.config.apiKey = '';
+            this.testConnection();
+          } else {
+            this.showToast(data.message, 'error');
+          }
+        } catch (e) {
+          this.showToast(e.response?.data?.message || '保存失败', 'error');
         }
-      } catch {}
-    },
-    async saveConfig() {
-      this.saving = true;
-      try {
-        const { data } = await api.post('/api/ai/config', {
-          provider: this.config.provider,
-          apiKey: this.config.apiKey || undefined,
-          baseUrl: this.config.baseUrl || this.currentProvider.defaultBaseUrl,
-          model: this.config.model,
-          autoGenerate: this.config.autoGenerate
-        });
-        if (data.success) {
-          this.showToast('配置已保存', 'success');
-          this.config.hasApiKey = true;
-          this.config.apiKey = '';
-          this.testConnection();
-        } else {
-          this.showToast(data.message, 'error');
+        this.saving = false;
+      },
+      async testConnection() {
+        this.testing = true;
+        try {
+          const { data } = await aiTestConnection();
+          this.connectionTested = true;
+          this.connectionOk = data.success;
+          this.showToast(data.success ? '连接成功' : data.message, data.success ? 'success' : 'error');
+        } catch (e) {
+          this.connectionTested = true;
+          this.connectionOk = false;
+          this.showToast('连接失败', 'error');
         }
-      } catch (e) {
-        this.showToast(e.response?.data?.message || '保存失败', 'error');
-      }
-      this.saving = false;
-    },
-    async testConnection() {
-      this.testing = true;
-      try {
-        const { data } = await api.post('/api/ai/test');
-        this.connectionTested = true;
-        this.connectionOk = data.success;
-        this.showToast(data.success ? '连接成功' : data.message, data.success ? 'success' : 'error');
-      } catch (e) {
-        this.connectionTested = true;
-        this.connectionOk = false;
-        this.showToast('连接失败', 'error');
-      }
-      this.testing = false;
-    },
+        this.testing = false;
+      },
       async refreshStats() {
         this.refreshing = true;
         try {
-          const { data } = await api.get('/api/ai/stats');
+          const { data } = await aiGetStats();
           if (data.success) {
             this.stats = data.stats;
           }
@@ -425,27 +394,26 @@ export default {
         
         this.eventSource = new EventSource(url);
       
-      this.eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.updateTaskState(data);
-        } catch (e) {
-          console.error('Failed to parse SSE data:', e);
+        this.eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            this.updateTaskState(data);
+          } catch (e) {
+            console.error('Failed to parse SSE data:', e);
+          }
+        };
+        
+        this.eventSource.onerror = (err) => {
+          console.warn('SSE connection error, falling back to polling...', err);
+          this.closeEventSource();
+        };
+      },
+      closeEventSource() {
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
         }
-      };
-      
-      this.eventSource.onerror = (err) => {
-        console.warn('SSE connection error, falling back to polling...', err);
-        this.closeEventSource();
-        // 如果 SSE 失败，降级到轮询（可选，这里由于已经重构了后端，暂不实现轮询 fallback，SSE 应该很稳定）
-      };
-    },
-    closeEventSource() {
-      if (this.eventSource) {
-        this.eventSource.close();
-        this.eventSource = null;
-      }
-    },
+      },
       updateTaskState(data) {
         if (!data) return;
         
@@ -453,15 +421,18 @@ export default {
         if (this.task.running && !data.running) {
           // 确保进度条到 100%
           this.task.current = this.task.total;
-          if (this.task.total > 0) {
+          if (this.task.total > 0 && data.successCount !== undefined) {
             this.showToast(`任务结束！成功 ${data.successCount || 0}，失败 ${data.failCount || 0}`, data.failCount > 0 ? 'info' : 'success');
           }
           
+          // 更新最终状态
+          Object.assign(this.task, { ...data, running: true }); // 保持 running 为 true 直到延迟结束
+  
           // 延迟关闭，让用户看清结果
           setTimeout(() => {
             this.task.running = false;
             this.refreshStats();
-          }, 1500);
+          }, 2000);
           return;
         }
         
@@ -469,77 +440,69 @@ export default {
         if (data.running) {
           this.task = {
             ...this.task,
+            ...data,
             running: true,
-            types: data.types || [],
-            current: data.current || 0,
-            total: data.total || 0,
-            successCount: data.successCount || 0,
-            failCount: data.failCount || 0,
-            currentCard: data.currentCard || '',
-            errors: data.errors || [],
-            concurrency: data.concurrency,
-            isRateLimited: data.isRateLimited,
             startTime: data.startTime || this.task.startTime || Date.now()
           };
         } else if (!this.task.running) {
           // 如果后端不运行且本地也不运行，同步一下状态即可（比如失败数等）
-          // 但不要把 running 设为 true，防止干扰延迟关闭逻辑
           Object.assign(this.task, { ...data, running: false });
         }
       },
-    async startTask(type, mode) {
-      if (this.starting || this.task.running) return;
-      if (mode === 'all' && !confirm(`确定要重新生成所有卡片的${type === 'name' ? '名称' : type === 'description' ? '描述' : '标签'}吗？`)) return;
-      
-      this.starting = true;
-      try {
-        // 立即显示进度条面板
-        this.task = {
-          running: true,
-          type,
-          mode,
-          current: 0,
-          total: 0,
-          successCount: 0,
-          failCount: 0,
-          currentCard: '准备中...',
-          startTime: Date.now(),
-          errors: [],
-          types: type === 'all' ? ['name', 'description', 'tags'] : [type]
-        };
+      async startTask(type, mode) {
+        if (this.starting || this.task.running) return;
+        if (mode === 'all' && !confirm(`确定要重新生成所有卡片的${type === 'name' ? '名称' : type === 'description' ? '描述' : '标签'}吗？`)) return;
+        
+        this.starting = true;
+        try {
+          // 立即显示进度条面板
+          this.task = {
+            running: true,
+            type,
+            mode,
+            current: 0,
+            total: 0,
+            successCount: 0,
+            failCount: 0,
+            currentCard: '准备中...',
+            startTime: Date.now(),
+            errors: [],
+            types: type === 'all' ? ['name', 'description', 'tags'] : [type]
+          };
+  
+          const { data } = await aiStartBatchTask({ type, mode });
+          if (!data.success) {
+            this.showToast(data.message || '启动失败', 'error');
+            this.task.running = false;
+            return;
+          }
+          if (data.total === 0) {
+            this.showToast('没有需要处理的卡片', 'info');
+            this.task.running = false;
+            return;
+          }
+          
+          this.task.total = data.total;
+          this.showToast(`任务已启动，正在处理 ${data.total} 个卡片`, 'success');
+          
+          // 重新初始化 SSE 确保连接处于最新状态
+          this.initRealtimeUpdates();
+        } catch (e) {
+          this.showToast(e.response?.data?.message || '启动失败', 'error');
+          this.task.running = false;
+        } finally {
+          this.starting = false;
+        }
+      },
+      async stopTask() {
+        this.stopping = true;
+        try {
+          await aiStopTask();
+          this.showToast('正在停止...', 'info');
+        } catch {}
+        setTimeout(() => { this.stopping = false; }, 2000);
+      },
 
-        const { data } = await api.post('/api/ai/batch-task/start', { type, mode });
-        if (!data.success) {
-          this.showToast(data.message || '启动失败', 'error');
-          this.task.running = false;
-          return;
-        }
-        if (data.total === 0) {
-          this.showToast('没有需要处理的卡片', 'info');
-          this.task.running = false;
-          return;
-        }
-        
-        this.task.total = data.total;
-        this.showToast(`任务已启动，正在处理 ${data.total} 个卡片`, 'success');
-        
-        // 重新初始化 SSE 确保连接处于最新状态
-        this.initRealtimeUpdates();
-      } catch (e) {
-        this.showToast(e.response?.data?.message || '启动失败', 'error');
-        this.task.running = false;
-      } finally {
-        this.starting = false;
-      }
-    },
-    async stopTask() {
-      this.stopping = true;
-      try {
-        await api.post('/api/ai/batch-task/stop');
-        this.showToast('正在停止...', 'info');
-      } catch {}
-      setTimeout(() => { this.stopping = false; }, 2000);
-    },
     showToast(msg, type = 'info') {
       this.toast = { show: true, msg, type };
       setTimeout(() => { this.toast.show = false; }, 3000);
@@ -547,6 +510,19 @@ export default {
     onWizardClose() {
       this.showWizard = false;
       this.refreshStats();
+      // 保持 SSE 连接，除非明确知道没有任务在运行
+      if (!this.task.running) {
+        this.initRealtimeUpdates();
+      }
+    },
+    onWizardStart(taskInfo) {
+      // 当向导开始任务时，同步主页面的任务状态
+      this.task = {
+        ...this.task,
+        ...taskInfo,
+        running: true,
+        startTime: Date.now()
+      };
       this.initRealtimeUpdates();
     }
   }
@@ -671,15 +647,11 @@ export default {
 }
 
 /* Batch Actions */
-.batch-actions { display: flex; flex-direction: column; gap: 16px; }
-.wizard-btn { margin-bottom: 8px; }
-.quick-actions { display: flex; align-items: center; gap: 10px; padding: 12px; background: #f9fafb; border-radius: 8px; }
-.quick-label { font-size: 13px; color: #6b7280; }
-.action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.action-card { padding: 14px; background: #f9fafb; border-radius: 10px; }
-.action-header { font-size: 14px; font-weight: 500; margin-bottom: 10px; }
-.action-btns { display: flex; flex-direction: column; gap: 6px; }
-.action-btns .btn { width: 100%; }
+.batch-actions { display: flex; flex-direction: column; gap: 12px; }
+.action-bar { display: flex; gap: 12px; }
+.main-action { flex: 2; }
+.wizard-action { flex: 1; }
+.action-hint { font-size: 13px; color: #6b7280; margin: 0; text-align: center; }
 
 /* Toast */
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 12px 24px; border-radius: 10px; font-size: 14px; color: #fff; background: #3b82f6; opacity: 0; transition: all 0.3s; z-index: 1000; }

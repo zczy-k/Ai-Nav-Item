@@ -164,8 +164,10 @@ app.get('/api/sse/data-sync', async (req, res) => {
   try {
     const version = await db.getDataVersion();
     res.write(`data: ${JSON.stringify({ type: 'connected', version })}\n\n`);
+    if (res.flush) res.flush();
   } catch (e) {
     res.write(`data: ${JSON.stringify({ type: 'connected', version: 1 })}\n\n`);
+    if (res.flush) res.flush();
   }
   
   // 添加到客户端列表
@@ -174,6 +176,7 @@ app.get('/api/sse/data-sync', async (req, res) => {
   // 保持连接（心跳）
   const heartbeat = setInterval(() => {
     res.write(': heartbeat\n\n');
+    if (res.flush) res.flush();
   }, 30000);
   
   // 清理
