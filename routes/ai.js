@@ -37,7 +37,7 @@ class BatchTaskManager {
       startTime: this.task.startTime,
       concurrency: this.task.concurrency,
       isRateLimited: this.task.isRateLimited,
-      errors: this.task.errors.slice(-5)
+      errors: this.task.errors.slice(-20)
     };
   }
 
@@ -282,27 +282,62 @@ class BatchTaskManager {
     let updated = false;
     const isFillMode = strategy.mode !== 'overwrite';
 
-    for (const type of types) {
+    // 过滤出需要处理的类型
+    const neededTypes = types.filter(type => {
+      if (type === 'name') {
+        return !(isFillMode && card.title && !card.title.includes('://') && !card.title.startsWith('www.'));
+      }
+      if (type === 'description') {
+        return !(isFillMode && card.desc);
+      }
+      return true; // tags 总是可以补充
+    });
+
+    if (neededTypes.length === 0) return false;
+
+    // 如果需要处理多个类型，使用统一 Prompt
+    if (neededTypes.length > 1) {
+      try {
+        const prompt = buildPromptWithStrategy(buildUnifiedPrompt(card, neededTypes, existingTags), strategy);
+        const result = await callAI(config, prompt);
+        const data = parseUnifiedResponse(result, neededTypes, existingTags);
+
+        if (data.name && data.name !== card.title) {
+          await db.updateCardName(card.id, data.name);
+          card.title = data.name;
+          updated = true;
+        }
+        if (data.description && data.description !== card.desc) {
+          await db.updateCardDescription(card.id, data.description);
+          card.desc = data.description;
+          updated = true;
+        }
+        if (data.tags && data.tags.length > 0) {
+          await db.updateCardTags(card.id, data.tags);
+          updated = true;
+        }
+        return updated;
+      } catch (e) {
+        // 如果统一 Prompt 失败，降级到逐个生成
+        console.warn('Unified prompt failed, falling back to individual calls:', e.message);
+      }
+    }
+
+    // 逐个处理（原有逻辑或降级逻辑）
+    for (const type of neededTypes) {
       switch (type) {
         case 'name': {
-          // fill 模式下跳过已有名称的卡片
-          if (isFillMode && card.title && !card.title.includes('://') && !card.title.startsWith('www.')) {
-            continue;
-          }
           const prompt = buildPromptWithStrategy(buildNamePrompt(card), strategy);
           const result = await callAI(config, prompt);
           const name = cleanName(result);
           if (name && name !== card.title) {
             await db.updateCardName(card.id, name);
-            card.title = name; // 更新本地引用，供后续类型使用
+            card.title = name;
             updated = true;
           }
           break;
         }
         case 'description': {
-          if (isFillMode && card.desc) {
-            continue;
-          }
           const prompt = buildPromptWithStrategy(buildDescriptionPrompt(card), strategy);
           const result = await callAI(config, prompt);
           const desc = cleanDescription(result);
@@ -314,7 +349,6 @@ class BatchTaskManager {
           break;
         }
         case 'tags': {
-          // tags 总是可以补充
           const prompt = buildPromptWithStrategy(buildTagsPrompt(card, existingTags), strategy);
           const result = await callAI(config, prompt);
           const { tags, newTags } = parseTagsResponse(result, existingTags);
@@ -394,6 +428,77 @@ function validateAIConfig(config) {
 
 
 // ==================== Prompt 构建函数 ====================
+
+function buildUnifiedPrompt(card, types, existingTags) {
+  const domain = extractDomain(card.url);
+  const tagsStr = existingTags.length > 0 
+    ? existingTags.slice(0, 25).join('、')
+    : '暂无';
+  
+  const rules = [];
+  if (types.includes('name')) rules.push('- name: 简洁名称，优先官方品牌名，不加"官网/首页"后缀');
+  if (types.includes('description')) rules.push('- description: 10-25字简洁功能描述');
+  if (types.includes('tags')) rules.push('- tags: 2-4个标签数组，优先用现有标签');
+
+  return [
+    {
+      role: 'system',
+      content: `你是网站分析专家。请根据提供的信息，严格按 JSON 格式输出以下字段：
+${rules.join('\n')}
+
+输出格式示例：
+{
+  ${types.includes('name') ? '"name": "GitHub",' : ''}
+  ${types.includes('description') ? '"description": "全球最大的代码托管和协作平台",' : ''}
+  ${types.includes('tags') ? '"tags": ["代码托管", "开源"]' : ''}
+}`
+    },
+    {
+      role: 'user',
+      content: `网站地址：${card.url}
+当前名称：${card.title || domain}
+当前描述：${card.desc || '无'}
+现有可用标签：${tagsStr}`
+    }
+  ];
+}
+
+function parseUnifiedResponse(text, types, existingTags) {
+  const result = { name: '', description: '', tags: [] };
+  if (!text) return result;
+
+  try {
+    // 增强的 JSON 提取逻辑
+    const cleanText = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (types.includes('name') && parsed.name) result.name = cleanName(parsed.name);
+      if (types.includes('description') && parsed.description) result.description = cleanDescription(parsed.description);
+      if (types.includes('tags') && Array.isArray(parsed.tags)) {
+        // 自动合并现有标签和新标签的逻辑
+        const tags = parsed.tags.filter(t => typeof t === 'string' && t.length > 0 && t.length <= 15);
+        result.tags = tags;
+      }
+      return result;
+    }
+  } catch (e) {
+    console.error('Failed to parse unified response:', e.message);
+  }
+
+  // 降级：如果 JSON 解析完全失败，尝试正则提取
+  if (types.includes('name')) {
+    const nameMatch = text.match(/"name":\s*"([^"]+)"/);
+    if (nameMatch) result.name = cleanName(nameMatch[1]);
+  }
+  if (types.includes('description')) {
+    const descMatch = text.match(/"description":\s*"([^"]+)"/);
+    if (descMatch) result.description = cleanDescription(descMatch[1]);
+  }
+
+  return result;
+}
 
 function buildNamePrompt(card) {
   const domain = extractDomain(card.url);
@@ -488,7 +593,10 @@ function cleanName(text) {
     .replace(/^(名称[：:]\s*|网站名[：:]\s*|Name[：:]\s*)/i, '')
     .replace(/[\r\n]+/g, '')
     .replace(/\s+/g, ' ')
-    .replace(/(官网|首页|官方网站|Official|Home)$/i, '')
+    .replace(/(官网|首页|官方网站|Official|Home)$/i, (match, p1) => {
+      // 如果原名就很短（比如 3 个字以内），保留后缀
+      return text.length <= 4 ? match : '';
+    })
     .trim()
     .substring(0, 20);
 }
@@ -894,14 +1002,22 @@ router.post('/batch-task/start', authMiddleware, async (req, res) => {
     } 
     // 兼容旧模式
     else if (type && mode) {
-      if (!['name', 'description', 'tags'].includes(type)) {
+      const validTypes = ['name', 'description', 'tags', 'all'];
+      if (!validTypes.includes(type)) {
         return res.status(400).json({ success: false, message: '无效的任务类型' });
       }
       if (!['empty', 'all'].includes(mode)) {
         return res.status(400).json({ success: false, message: '无效的任务模式' });
       }
-      cards = mode === 'all' ? await db.getAllCards() : await db.getCardsNeedingAI(type);
-      taskTypes = [type];
+      
+      if (type === 'all') {
+        taskTypes = ['name', 'description', 'tags'];
+        cards = mode === 'all' ? await db.getAllCards() : await db.getCardsNeedingAI('all');
+      } else {
+        taskTypes = [type];
+        cards = mode === 'all' ? await db.getAllCards() : await db.getCardsNeedingAI(type);
+      }
+      
       taskStrategy.mode = mode === 'all' ? 'overwrite' : 'fill';
     } else {
       return res.status(400).json({ success: false, message: '参数不完整' });

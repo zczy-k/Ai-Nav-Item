@@ -137,26 +137,48 @@
         <div class="stat" :class="{ warn: stats.emptyTags }"><span>{{ stats.emptyTags }}</span>缺标签</div>
       </div>
 
-      <!-- 任务进度 -->
-      <div class="task-panel" v-if="task.running">
-        <div class="task-header">
-          <span class="task-title">{{ taskTitle }}</span>
-          <span class="task-count">{{ task.current }} / {{ task.total }}</span>
-        </div>
-        <div class="progress-wrap">
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: taskPercent + '%' }"></div>
+        <!-- 任务进度 -->
+        <div class="task-panel" v-if="task.running">
+          <div class="task-header">
+            <span class="task-title">{{ taskTitle }}</span>
+            <div class="task-counts">
+              <span class="count-item success">成功: {{ task.successCount || 0 }}</span>
+              <span class="count-item fail" v-if="task.failCount">失败: {{ task.failCount }}</span>
+              <span class="count-item total">{{ task.current }} / {{ task.total }}</span>
+            </div>
           </div>
-          <span class="progress-text">{{ taskPercent }}%</span>
+          <div class="progress-wrap">
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: taskPercent + '%' }"></div>
+            </div>
+            <span class="progress-text">{{ taskPercent }}%</span>
+          </div>
+          <div class="task-info">
+            <span class="task-current" v-if="task.currentCard" :title="task.currentCard">正在处理: {{ task.currentCard }}</span>
+            <span class="task-eta" v-if="taskEta">剩余约 {{ taskEta }}</span>
+          </div>
+
+          <!-- 错误日志 -->
+          <div class="task-errors" v-if="task.errors && task.errors.length > 0">
+            <div class="error-header">最近错误:</div>
+            <div class="error-list">
+              <div v-for="(err, idx) in task.errors.slice(-3)" :key="idx" class="error-item">
+                <span class="err-title">{{ err.cardTitle }}:</span>
+                <span class="err-msg">{{ err.error }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="task-actions">
+            <div class="task-concurrency" v-if="task.concurrency">
+              并发数: {{ task.concurrency }}
+              <span v-if="task.isRateLimited" class="rate-limit-tag">限流中</span>
+            </div>
+            <button class="btn danger sm" @click="stopTask" :disabled="stopping">
+              {{ stopping ? '停止中...' : '⏹️ 停止任务' }}
+            </button>
+          </div>
         </div>
-        <div class="task-info">
-          <span class="task-current" v-if="task.currentCard">{{ task.currentCard }}</span>
-          <span class="task-eta" v-if="taskEta">剩余 {{ taskEta }}</span>
-        </div>
-        <button class="btn danger sm" @click="stopTask" :disabled="stopping">
-          {{ stopping ? '停止中...' : '⏹️ 停止' }}
-        </button>
-      </div>
 
       <!-- 操作按钮 -->
       <div class="batch-actions" v-else>
@@ -165,17 +187,17 @@
           🎯 高级批量生成向导
         </button>
 
-        <div class="quick-actions">
-          <span class="quick-label">快捷操作：</span>
-          <button 
-            class="btn" 
-            v-if="totalMissing > 0"
-            @click="startTask('name', 'empty')"
-            :disabled="!config.hasApiKey || starting"
-          >
-            ✨ 一键补全 ({{ totalMissing }})
-          </button>
-        </div>
+          <div class="quick-actions">
+            <span class="quick-label">快捷操作：</span>
+            <button 
+              class="btn" 
+              v-if="totalMissing > 0"
+              @click="startTask('all', 'empty')"
+              :disabled="!config.hasApiKey || starting"
+            >
+              ✨ 一键补全 ({{ totalMissing }})
+            </button>
+          </div>
 
         <div class="action-grid">
           <div class="action-card" v-for="item in actionItems" :key="item.type">
@@ -400,23 +422,27 @@ export default {
       } catch {}
       this.refreshing = false;
     },
-    async checkTask() {
-      try {
-        const { data } = await api.get('/api/ai/batch-task/status');
-        if (data.success && data.running) {
-          this.task = {
-            running: true,
-            type: data.type,
-            mode: data.mode,
-            current: data.current || 0,
-            total: data.total || 0,
-            currentCard: data.currentCard || '',
-            startTime: Date.now() - (data.current * 2000)
-          };
-          this.startPoll();
-        }
-      } catch {}
-    },
+      async checkTask() {
+        try {
+          const { data } = await api.get('/api/ai/batch-task/status');
+          if (data.success && data.running) {
+            this.task = {
+              running: true,
+              types: data.types || [],
+              current: data.current || 0,
+              total: data.total || 0,
+              successCount: data.successCount || 0,
+              failCount: data.failCount || 0,
+              currentCard: data.currentCard || '',
+              errors: data.errors || [],
+              concurrency: data.concurrency,
+              isRateLimited: data.isRateLimited,
+              startTime: data.startTime || Date.now()
+            };
+            this.startPoll();
+          }
+        } catch {}
+      },
     async startTask(type, mode) {
       if (this.starting || this.task.running) return;
       if (mode === 'all' && !confirm(`确定要重新生成所有卡片的${type === 'name' ? '名称' : type === 'description' ? '描述' : '标签'}吗？`)) return;
@@ -469,16 +495,22 @@ export default {
         const { data } = await api.get('/api/ai/batch-task/status');
         if (!data.success) return;
         
-        // 更新进度
+        // 更新详细进度
         this.task.current = data.current || 0;
         this.task.total = data.total || this.task.total;
+        this.task.successCount = data.successCount || 0;
+        this.task.failCount = data.failCount || 0;
         this.task.currentCard = data.currentCard || '';
+        this.task.errors = data.errors || [];
+        this.task.concurrency = data.concurrency;
+        this.task.isRateLimited = data.isRateLimited;
+        this.task.types = data.types || [];
         
         // 检查是否完成
         if (!data.running) {
           this.stopPoll();
           this.task.running = false;
-          this.showToast(`完成！成功 ${data.successCount || 0} / ${data.total || 0}`, 'success');
+          this.showToast(`任务结束！成功 ${data.successCount || 0}，失败 ${data.failCount || 0}`, data.failCount > 0 ? 'info' : 'success');
           this.refreshStats();
         }
       } catch {}
@@ -591,14 +623,35 @@ export default {
 .task-panel { padding: 20px; background: linear-gradient(135deg, #eff6ff, #f5f3ff); border: 2px solid #3b82f6; border-radius: 12px; }
 .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .task-title { font-weight: 600; font-size: 15px; }
-.task-count { font-size: 14px; color: #3b82f6; font-weight: 600; }
+.task-counts { display: flex; gap: 10px; font-size: 13px; font-weight: 500; }
+.count-item.success { color: #10b981; }
+.count-item.fail { color: #ef4444; }
+.count-item.total { color: #6b7280; }
+
 .progress-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .progress-bar { flex: 1; height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 5px; transition: width 0.3s; }
 .progress-text { font-size: 14px; font-weight: 600; color: #3b82f6; min-width: 45px; text-align: right; }
+
 .task-info { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px; color: #6b7280; }
 .task-current { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-eta { color: #3b82f6; }
+
+.task-errors { margin-bottom: 16px; padding: 10px; background: rgba(239, 68, 68, 0.05); border-radius: 8px; border: 1px dashed rgba(239, 68, 68, 0.2); }
+.error-header { font-size: 12px; font-weight: 600; color: #ef4444; margin-bottom: 6px; }
+.error-list { display: flex; flex-direction: column; gap: 4px; }
+.error-item { font-size: 12px; display: flex; gap: 6px; }
+.err-title { font-weight: 600; white-space: nowrap; }
+.err-msg { color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.task-actions { display: flex; justify-content: space-between; align-items: center; }
+.task-concurrency { font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 6px; }
+.rate-limit-tag { padding: 2px 6px; background: #fef3c7; color: #92400e; border-radius: 4px; font-size: 11px; font-weight: 600; animation: blink 1s infinite; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 
 /* Batch Actions */
 .batch-actions { display: flex; flex-direction: column; gap: 16px; }

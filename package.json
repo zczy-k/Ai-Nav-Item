@@ -6,12 +6,15 @@
   "repository": "https://github.com/zczy-k/Con-Nav-Item",
   "license": "MIT",
   "main": "app.js",
-  "scripts": {
-    "dev": "node app.js",
-    "start": "node app.js",
-    "start:https": "node start-with-https.js",
-    "build": "cd web && npm run build && cd .."
-  },
+    "scripts": {
+      "dev": "concurrently \"npm run server\" \"npm run web:dev\"",
+      "server": "node app.js",
+      "start": "node app.js",
+      "start:https": "node start-with-https.js",
+      "build": "npm run build --prefix web",
+      "web:dev": "npm run dev --prefix web",
+      "install:all": "npm install && npm install --prefix web"
+    },
   "dependencies": {
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
@@ -38,5 +41,8 @@
   "engines": {
     "node": ">=14",
     "npm": ">=6"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

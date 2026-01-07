@@ -148,7 +148,9 @@ async function callOpenAICompatible(config, messages) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`API 请求失败 (${response.status}): ${errText}`);
+    const error = new Error(`API 请求失败 (${response.status}): ${errText}`);
+    error.status = response.status;
+    throw error;
   }
 
   const data = await response.json();
@@ -190,7 +192,9 @@ async function callGemini(config, messages) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Gemini API 错误 (${response.status}): ${errText}`);
+    const error = new Error(`Gemini API 错误 (${response.status}): ${errText}`);
+    error.status = response.status;
+    throw error;
   }
 
   const data = await response.json();
@@ -232,7 +236,9 @@ async function callAnthropic(config, messages) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Claude API 错误 (${response.status}): ${errText}`);
+    const error = new Error(`Claude API 错误 (${response.status}): ${errText}`);
+    error.status = response.status;
+    throw error;
   }
 
   const data = await response.json();
@@ -262,7 +268,9 @@ async function callOllama(config, messages) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Ollama API 错误 (${response.status}): ${errText}`);
+    const error = new Error(`Ollama API 错误 (${response.status}): ${errText}`);
+    error.status = response.status;
+    throw error;
   }
 
   const data = await response.json();

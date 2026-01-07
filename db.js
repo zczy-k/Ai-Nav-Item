@@ -591,19 +591,21 @@ async function saveAIConfig(config) {
 // 获取需要 AI 处理的卡片
 async function getCardsNeedingAI(type) {
   let sql = 'SELECT c.id, c.title, c.url, c.desc FROM cards c';
+  const nameCond = "(c.title IS NULL OR c.title = '' OR c.title LIKE '%://%' OR c.title LIKE 'www.%')";
+  const descCond = "(c.desc IS NULL OR c.desc = '')";
+  const tagsCond = "c.id NOT IN (SELECT DISTINCT card_id FROM card_tags)";
   
   if (type === 'description') {
-    sql += " WHERE c.desc IS NULL OR c.desc = ''";
+    sql += ` WHERE ${descCond}`;
   } else if (type === 'tags') {
-    sql += ` WHERE c.id NOT IN (SELECT DISTINCT card_id FROM card_tags)`;
+    sql += ` WHERE ${tagsCond}`;
   } else if (type === 'name') {
-    // 缺少名称：名称为空，或名称是完整URL（包含://或以www.开头）
-    sql += ` WHERE c.title IS NULL OR c.title = '' 
-             OR c.title LIKE '%://%' OR c.title LIKE 'www.%'`;
+    sql += ` WHERE ${nameCond}`;
+  } else if (type === 'all') {
+    sql += ` WHERE ${nameCond} OR ${descCond} OR ${tagsCond}`;
   } else {
     // both - 缺少描述或标签的
-    sql += ` WHERE (c.desc IS NULL OR c.desc = '') 
-             OR c.id NOT IN (SELECT DISTINCT card_id FROM card_tags)`;
+    sql += ` WHERE ${descCond} OR ${tagsCond}`;
   }
   
   return await dbAll(sql);
