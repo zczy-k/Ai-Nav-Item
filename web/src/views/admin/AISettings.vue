@@ -674,13 +674,17 @@ export default {
     },
     onWizardStart(taskInfo) {
       // 当向导开始任务时，同步主页面的任务状态
+      // 如果 taskInfo 明确指定 running: false，则表示任务启动失败
+      const isRunning = taskInfo.running !== false;
       this.task = {
         ...this.task,
         ...taskInfo,
-        running: true,
-        startTime: Date.now()
+        running: isRunning,
+        startTime: isRunning ? Date.now() : this.task.startTime
       };
-      this.initRealtimeUpdates();
+      if (isRunning) {
+        this.initRealtimeUpdates();
+      }
     }
   }
 };

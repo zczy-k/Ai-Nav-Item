@@ -937,7 +937,7 @@ router.post('/filter-cards', authMiddleware, async (req, res) => {
   }
 });
 
-// AI 预览生成（不保存）
+// AI 预览生成（不保存，仅展示 AI 将生成的内容）
 router.post('/preview', authMiddleware, async (req, res) => {
   try {
     const { cardIds, types = ['name', 'description', 'tags'], strategy = {} } = req.body;
@@ -953,28 +953,41 @@ router.post('/preview', authMiddleware, async (req, res) => {
     
     for (const card of cards) {
       const preview = { cardId: card.id, title: card.title, url: card.url, fields: {} };
-      try {
-        // 使用 generateCardFields 但不更新数据库的逻辑通过临时对象模拟
-        const tempCard = { ...card };
-        // 覆盖模式下强制生成
-        const localStrategy = { ...strategy };
-        
-        for (const type of types) {
-          try {
-            const { data } = await generateCardFields(config, tempCard, [type], existingTags, localStrategy);
-            if (type === 'name') preview.fields.name = { original: card.title, generated: data.name };
-            if (type === 'description') preview.fields.description = { original: card.desc, generated: data.description };
-            if (type === 'tags') preview.fields.tags = { original: [], generated: data.tags || [] };
-          } catch (e) {
-            preview.fields[type] = { error: e.message };
+      
+      // 预览时强制使用 overwrite 模式，确保总是展示 AI 将生成的内容
+      const previewStrategy = { ...strategy, mode: 'overwrite' };
+      
+      for (const type of types) {
+        try {
+          // 直接调用 AI 生成，但不保存到数据库
+          let generated = null;
+          
+          if (type === 'name') {
+            const prompt = buildPromptWithStrategy(buildNamePrompt(card), previewStrategy);
+            const aiResponse = await callAI(config, prompt);
+            generated = cleanName(aiResponse);
+            preview.fields.name = { original: card.title || '', generated };
+          } else if (type === 'description') {
+            const prompt = buildPromptWithStrategy(buildDescriptionPrompt(card), previewStrategy);
+            const aiResponse = await callAI(config, prompt);
+            generated = cleanDescription(aiResponse);
+            preview.fields.description = { original: card.desc || '', generated };
+          } else if (type === 'tags') {
+            const prompt = buildPromptWithStrategy(buildTagsPrompt(card, existingTags), previewStrategy);
+            const aiResponse = await callAI(config, prompt);
+            const { tags, newTags } = parseTagsResponse(aiResponse, existingTags);
+            generated = [...tags, ...newTags];
+            preview.fields.tags = { original: [], generated };
           }
+        } catch (e) {
+          preview.fields[type] = { original: '', generated: '', error: e.message };
         }
-      } catch (e) { /* 忽略单个卡片预览失败 */ }
+      }
       previews.push(preview);
     }
     res.json({ success: true, previews });
   } catch (error) {
-    res.status(500).json({ success: false, message: '预览失败' });
+    res.status(500).json({ success: false, message: '预览失败: ' + error.message });
   }
 });
 

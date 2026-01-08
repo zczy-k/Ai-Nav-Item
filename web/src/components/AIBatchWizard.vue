@@ -104,9 +104,9 @@
               <div v-for="(field, key) in p.fields" :key="key" class="preview-field">
                 <span class="field-label">{{ fieldLabels[key] }}</span>
                 <div class="diff-view">
-                  <div class="diff-old">{{ field.original || '(空)' }}</div>
+                  <div class="diff-old">{{ formatFieldValue(field.original, key) }}</div>
                   <div class="diff-arrow">→</div>
-                  <div class="diff-new" :class="{ error: field.error }">{{ field.error || field.generated || '(空)' }}</div>
+                  <div class="diff-new" :class="{ error: field.error }">{{ field.error || formatFieldValue(field.generated, key) }}</div>
                 </div>
               </div>
             </div>
@@ -227,7 +227,6 @@ export default {
       previews: [],
       previewing: false,
       taskDone: false,
-      isExecuting: false, // 本地执行状态，点击开始后立即为true
       localTaskStatus: { current: 0, total: 0, successCount: 0, failCount: 0, currentCard: '', errors: [] },
       starting: false,
       stopping: false,
@@ -245,8 +244,7 @@ export default {
       return this.activeTask.running ? this.activeTask : this.localTaskStatus;
     },
     taskRunning() {
-      // 本地执行状态或父组件任务状态，任一为true则显示进度界面
-      return this.isExecuting || this.activeTask.running;
+      return this.activeTask.running;
     },
     progressPercent() {
       const s = this.taskStatus;
@@ -256,17 +254,17 @@ export default {
   watch: {
     visible(v) {
       if (v) this.init();
-      // 不再在 visible 改变时清理 SSE，由父组件管理
     },
     'activeTask.running'(newVal, oldVal) {
-      // 当父组件任务开始时，重置完成状态
+      // 当任务开始时，重置完成状态
       if (newVal === true) {
         this.taskDone = false;
       }
       // 当任务从运行中变为停止，且当前在执行步骤时，标记为完成
       if (oldVal === true && newVal === false && this.step === 3) {
         this.taskDone = true;
-        this.isExecuting = false; // 同步关闭本地执行状态
+        // 任务完成后刷新筛选结果，确保重试时使用最新数据
+        this.applyFilter();
       }
     },
     // 实时同步任务状态到本地，用于任务结束后的显示
@@ -284,7 +282,6 @@ export default {
       this.step = 0;
       this.previews = [];
       this.taskDone = false;
-      this.isExecuting = false;
       this.localTaskStatus = { current: 0, total: 0, successCount: 0, failCount: 0, currentCard: '', errors: [] };
 
       try {
@@ -356,48 +353,35 @@ export default {
     async doStartTask(cardIds) {
       this.starting = true;
       this.taskDone = false;
-      this.isExecuting = true; // 立即设置本地执行状态，确保界面切换到进度显示
       
-      // 初始化本地状态用于立即显示
-      this.localTaskStatus = {
-        current: 0,
-        total: cardIds.length,
-        successCount: 0,
-        failCount: 0,
-        currentCard: '启动中...',
-        errors: []
+      const payload = {
+        cardIds: cardIds,
+        types: this.strategy.types,
+        strategy: { mode: this.strategy.mode, style: this.strategy.style, customPrompt: this.strategy.customPrompt }
       };
-      
+
       try {
-        const payload = {
-          cardIds: cardIds,
-          types: this.strategy.types,
-          strategy: { mode: this.strategy.mode, style: this.strategy.style, customPrompt: this.strategy.customPrompt }
-        };
-
-        // 向父组件发送启动信号
-        this.$emit('start', {
-          total: payload.cardIds.length,
-          types: payload.types,
-          mode: payload.strategy.mode,
-          current: 0,
-          currentCard: '启动中...',
-          errors: []
-        });
-
         const { data } = await aiStartBatchTask(payload);
         
         if (!data.success || data.total === 0) {
           alert(data.message || '没有需要处理的卡片');
-          this.isExecuting = false;
-          // 如果是主任务启动失败则关闭，重试失败则保持
-          if (cardIds.length === this.filteredCards.length) {
-            this.$emit('close'); 
-          }
+          this.starting = false;
+          return;
         }
+        
+        // API 成功后，通知父组件启动任务状态，切换到进度界面
+        this.$emit('start', {
+          total: data.total || payload.cardIds.length,
+          types: payload.types,
+          mode: payload.strategy.mode,
+          current: 0,
+          successCount: 0,
+          failCount: 0,
+          currentCard: '任务已启动...',
+          errors: []
+        });
       } catch (e) {
         alert('启动失败: ' + (e.response?.data?.message || e.message));
-        this.isExecuting = false;
       }
       this.starting = false;
     },
@@ -408,6 +392,13 @@ export default {
     },
     extractDomain(url) {
       try { return new URL(url).hostname.replace('www.', ''); } catch { return url; }
+    },
+    formatFieldValue(value, fieldKey) {
+      if (!value || (Array.isArray(value) && value.length === 0)) return '(空)';
+      if (fieldKey === 'tags' && Array.isArray(value)) {
+        return value.join('、');
+      }
+      return value;
     },
     formatTime(timestamp) {
       if (!timestamp) return '';
