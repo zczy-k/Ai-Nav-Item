@@ -227,8 +227,7 @@ import {
   aiTestConnection,
   aiGetStats,
   aiStartBatchTask, 
-  aiStopTask, 
-  getTags 
+  aiStopTask
 } from '../../api';
 import AIBatchWizard from '../../components/AIBatchWizard.vue';
 
@@ -368,15 +367,28 @@ export default {
       ];
     }
   },
-  async mounted() {
-    await this.loadConfig();
-    await this.refreshStats();
-    await this.initRealtimeUpdates();
-  },
-  beforeUnmount() {
-    this.closeEventSource();
-  },
-  methods: {
+    async mounted() {
+      await this.loadConfig();
+      await this.refreshStats();
+      await this.initRealtimeUpdates();
+      
+      // 添加页面可见性监听，当用户切回标签页时自动刷新统计
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    },
+    beforeUnmount() {
+      this.closeEventSource();
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    },
+    methods: {
+      handleVisibilityChange() {
+        if (document.visibilityState === 'visible') {
+          this.refreshStats();
+          // 如果连接断开了，尝试重新初始化
+          if (!this.eventSource) {
+            this.initRealtimeUpdates();
+          }
+        }
+      },
     selectProvider(key) {
       this.config.provider = key;
       this.config.model = this.currentProvider.defaultModel;
@@ -492,44 +504,50 @@ export default {
           this.eventSource = null;
         }
       },
-      updateTaskState(data) {
-        if (!data) return;
-        
+        updateTaskState(data) {
+          if (!data) return;
+          
           // 如果任务刚刚从运行变为不运行 (data.running 由 true 变为 false)
           if (this.task.running && !data.running) {
-            // 确保进度条到 100%
+            // 确保进度显示完整
             this.task.current = this.task.total;
             if (this.task.total > 0 && data.successCount !== undefined) {
               this.showToast(`任务结束！成功 ${data.successCount || 0}，失败 ${data.failCount || 0}`, data.failCount > 0 ? 'info' : 'success');
             }
             
-            // 立即刷新统计，确保用户能看到最新结果
+            // 立即刷新统计（第一次刷新）
             this.refreshStats();
 
-            // 更新最终状态
-            Object.assign(this.task, { ...data, running: true }); // 保持 running 为 true 直到延迟结束
+            // 更新任务快照，但保持本地 running 为 true 2秒钟，以便用户看到“已完成”状态
+            this.task = { ...this.task, ...data, running: true };
     
-            // 延迟关闭，让用户看清结果
+            // 延迟关闭任务面板
             setTimeout(() => {
               this.task.running = false;
-              this.refreshStats(); // 再次刷新确保数据最终一致性
+              // 彻底结束时再次刷新统计（第二次刷新，确保最终一致性）
+              this.refreshStats();
             }, 2000);
             return;
           }
-        
-        // 如果后端传回的任务状态是运行中，则更新本地状态
-        if (data.running) {
-          this.task = {
-            ...this.task,
-            ...data,
-            running: true,
-            startTime: data.startTime || this.task.startTime || Date.now()
-          };
-        } else if (!this.task.running) {
-          // 如果后端不运行且本地也不运行，同步一下状态即可（比如失败数等）
-          Object.assign(this.task, { ...data, running: false });
-        }
-      },
+          
+          // 如果后端传回的任务状态是运行中，或者本地已经是运行中（处于延迟关闭期），则同步数据
+          if (data.running || this.task.running) {
+            // 如果处于延迟关闭期（this.task.running=true 但 data.running=false），不覆盖 running 状态
+            const isClosing = this.task.running && !data.running;
+            
+            this.task = {
+              ...this.task,
+              ...data,
+              running: isClosing ? true : !!data.running,
+              startTime: data.startTime || this.task.startTime || Date.now()
+            };
+            
+            // 如果是运行中且有进度更新，可以考虑按需刷新统计（可选，但通常 SSE 就够了）
+          } else {
+            // 完全不在运行状态，同步状态
+            this.task = { ...this.task, ...data, running: false };
+          }
+        },
       async startTask(type, mode) {
         if (this.starting || this.task.running) return;
         if (mode === 'all' && !confirm(`确定要重新生成所有卡片的${type === 'name' ? '名称' : type === 'description' ? '描述' : '标签'}吗？`)) return;

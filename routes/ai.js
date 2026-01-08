@@ -309,17 +309,24 @@ class BatchTaskManager extends EventEmitter {
       if (this.task) {
         this.task.errors.push({ cardId: 0, cardTitle: '系统', error: err.message, time: Date.now() });
       }
-    } finally {
-      // 任务结束
-      if (this.task) {
-        // 增加一个极短的延迟确保前端能获取到最后的 100% 状态
-        await new Promise(r => setTimeout(r, 500));
-        this.task.running = false;
-        this.task.currentCard = '';
-        this.task.current = this.task.total;
-        this.emitUpdate();
+      } finally {
+        // 任务结束
+        if (this.task) {
+          // 增加一个极短的延迟确保前端能获取到最后的 100% 状态
+          await new Promise(r => setTimeout(r, 500));
+          this.task.running = false;
+          this.task.currentCard = '';
+          this.task.current = this.task.total;
+          this.emitUpdate();
+          
+          // 任务完全结束后，最后触发一次全局数据变更通知
+          try {
+            notifyDataChange();
+          } catch (e) {
+            console.warn('Final notifyDataChange failed:', e.message);
+          }
+        }
       }
-    }
   }
 
   // 自适应调整并发数

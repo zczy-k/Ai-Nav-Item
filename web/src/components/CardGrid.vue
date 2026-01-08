@@ -132,15 +132,6 @@ function getCardStyle(index) {
   return {};
 }
 
-// 提取域名
-function getDomain(url) {
-  try {
-    return new URL(url).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
 //获取完整的origin URL
 function getOriginUrl(url) {
   try {
