@@ -144,11 +144,21 @@
             <div class="task-stats">
               <span class="stat success">✓ 成功 {{ taskStatus.successCount || 0 }}</span>
               <span class="stat fail">✗ 失败 {{ taskStatus.failCount || 0 }}</span>
+              <button v-if="taskDone && taskStatus.failCount > 0" class="btn sm outline retry-all-btn" @click="retryAllFailed" :disabled="starting">
+                🔄 重试全部失败
+              </button>
             </div>
 
-            <div v-if="taskStatus.errors?.length" class="error-log">
-              <div v-for="(err, i) in taskStatus.errors.slice(-5)" :key="i" class="error-item">
-                [失败] {{ err.cardTitle }}: {{ err.error }}
+            <div v-if="taskStatus.errors?.length" class="error-log-container">
+              <div class="error-log-header">失败列表 ({{ taskStatus.errors.length }})</div>
+              <div class="error-log">
+                <div v-for="(err, i) in taskStatus.errors" :key="i" class="error-item">
+                  <div class="error-info">
+                    <span class="error-title" :title="err.cardTitle">{{ err.cardTitle }}</span>
+                    <span class="error-msg" :title="err.error">{{ err.error }}</span>
+                  </div>
+                  <button class="btn xs outline retry-btn" @click="retryCard(err)" :disabled="starting || taskRunning">重试</button>
+                </div>
               </div>
             </div>
 
@@ -163,7 +173,7 @@
 
       <!-- 底部按钮 -->
       <div class="wizard-footer">
-        <button class="btn" @click="$emit('close')">取消</button>
+        <button class="btn" @click="$emit('close')" :disabled="taskRunning">取消</button>
         <div class="footer-right">
           <button class="btn" v-if="step > 0 && !taskRunning" @click="step--">上一步</button>
           <button class="btn primary" v-if="step < 3" @click="nextStep" :disabled="!canNext">
@@ -297,10 +307,25 @@ export default {
       this.previewing = false;
     },
     async startTask() {
+      await this.doStartTask(this.filteredCards.map(c => c.id));
+    },
+    async retryCard(errItem) {
+      if (!errItem.cardId) return;
+      await this.doStartTask([errItem.cardId]);
+    },
+    async retryAllFailed() {
+      const failedIds = this.taskStatus.errors
+        .map(e => e.cardId)
+        .filter(id => !!id);
+      if (failedIds.length === 0) return;
+      await this.doStartTask(failedIds);
+    },
+    async doStartTask(cardIds) {
       this.starting = true;
+      this.taskDone = false;
       try {
         const payload = {
-          cardIds: this.filteredCards.map(c => c.id),
+          cardIds: cardIds,
           types: this.strategy.types,
           strategy: { mode: this.strategy.mode, style: this.strategy.style, customPrompt: this.strategy.customPrompt }
         };
@@ -311,14 +336,18 @@ export default {
           types: payload.types,
           mode: payload.strategy.mode,
           current: 0,
-          currentCard: '启动中...'
+          currentCard: '启动中...',
+          errors: []
         });
 
         const { data } = await aiStartBatchTask(payload);
         
         if (!data.success || data.total === 0) {
           alert(data.message || '没有需要处理的卡片');
-          this.$emit('close'); // 启动失败则关闭
+          // 如果是主任务启动失败则关闭，重试失败则保持
+          if (cardIds.length === this.filteredCards.length) {
+            this.$emit('close'); 
+          }
         }
       } catch (e) {
         alert('启动失败: ' + (e.response?.data?.message || e.message));
@@ -395,12 +424,23 @@ textarea.input { resize: vertical; }
 .progress-bar { height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s; }
 .progress-info { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: #6b7280; }
-.task-stats { display: flex; gap: 16px; margin-top: 12px; }
+
+.task-stats { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
 .stat { font-size: 14px; }
 .stat.success { color: #10b981; }
 .stat.fail { color: #ef4444; }
-.error-log { margin-top: 12px; max-height: 100px; overflow-y: auto; background: #fef2f2; border-radius: 8px; padding: 8px; }
-.error-item { font-size: 12px; color: #b91c1c; padding: 4px 0; }
+.retry-all-btn { margin-left: auto; }
+
+.error-log-container { margin-top: 16px; border: 1px solid #fee2e2; border-radius: 10px; overflow: hidden; }
+.error-log-header { padding: 8px 12px; background: #fef2f2; font-size: 13px; font-weight: 600; color: #b91c1c; border-bottom: 1px solid #fee2e2; }
+.error-log { max-height: 200px; overflow-y: auto; padding: 0; background: #fff; }
+.error-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #fef2f2; gap: 12px; }
+.error-item:last-child { border-bottom: none; }
+.error-info { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.error-item .error-title { font-size: 13px; font-weight: 600; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.error-item .error-msg { font-size: 12px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retry-btn { flex-shrink: 0; }
+
 .task-actions { margin-top: 16px; text-align: center; }
 
 .wizard-footer { display: flex; justify-content: space-between; padding: 16px 20px; border-top: 1px solid #e5e7eb; }
@@ -412,7 +452,9 @@ textarea.input { resize: vertical; }
 .btn.primary { background: #3b82f6; border-color: #3b82f6; color: #fff; }
 .btn.primary:hover:not(:disabled) { background: #2563eb; }
 .btn.danger { background: #ef4444; border-color: #ef4444; color: #fff; }
+.btn.outline { background: transparent; }
 .btn.sm { padding: 6px 12px; font-size: 13px; }
+.btn.xs { padding: 4px 8px; font-size: 11px; border-radius: 4px; }
 .btn.lg { padding: 14px 28px; font-size: 16px; }
 
 :root.dark .wizard-modal { background: #1f2937; }
@@ -423,4 +465,11 @@ textarea.input { resize: vertical; }
 :root.dark .filter-result, :root.dark .more-hint { background: #374151; }
 :root.dark .card-preview-list, :root.dark .preview-card { border-color: #374151; }
 :root.dark .card-preview-item { border-color: #374151; }
+:root.dark .error-log-container { border-color: #450a0a; }
+:root.dark .error-log-header { background: #450a0a; color: #fecaca; border-color: #450a0a; }
+:root.dark .error-log { background: #1f2937; }
+:root.dark .error-item { border-color: #374151; }
+:root.dark .error-item .error-title { color: #e5e7eb; }
+:root.dark .error-item .error-msg { color: #9ca3af; }
 </style>
+

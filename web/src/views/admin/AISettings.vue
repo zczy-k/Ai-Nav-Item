@@ -160,11 +160,19 @@
 
           <!-- 错误日志 -->
           <div class="task-errors" v-if="task.errors && task.errors.length > 0">
-            <div class="error-header">最近错误:</div>
+            <div class="error-header">
+              <span>失败列表 ({{ task.errors.length }})</span>
+              <button v-if="!task.running && task.failCount > 0" class="btn xs outline retry-all-btn" @click="retryAllFailed" :disabled="starting">
+                🔄 重试全部失败
+              </button>
+            </div>
             <div class="error-list">
-              <div v-for="(err, idx) in task.errors.slice(-3)" :key="idx" class="error-item">
-                <span class="err-title">{{ err.cardTitle }}:</span>
-                <span class="err-msg">{{ err.error }}</span>
+              <div v-for="(err, idx) in task.errors" :key="idx" class="error-item">
+                <div class="err-info">
+                  <span class="err-title" :title="err.cardTitle">{{ err.cardTitle }}:</span>
+                  <span class="err-msg" :title="err.error">{{ err.error }}</span>
+                </div>
+                <button class="btn xs outline" @click="retryCard(err)" :disabled="starting || task.running">重试</button>
               </div>
             </div>
           </div>
@@ -594,16 +602,60 @@ export default {
           this.starting = false;
         }
       },
-      async stopTask() {
-        this.stopping = true;
-        try {
-          await aiStopTask();
-          this.showToast('正在停止...', 'info');
-          // 立即触发一次统计刷新
-          this.refreshStats();
-        } catch {}
-        setTimeout(() => { this.stopping = false; }, 2000);
-      },
+        async stopTask() {
+          this.stopping = true;
+          try {
+            await aiStopTask();
+            this.showToast('正在停止...', 'info');
+            // 立即触发一次统计刷新
+            this.refreshStats();
+          } catch {}
+          setTimeout(() => { this.stopping = false; }, 2000);
+        },
+        async retryCard(errItem) {
+          if (!errItem.cardId) return;
+          await this.doStartBatchTask([errItem.cardId], this.task.types || ['name', 'description', 'tags']);
+        },
+        async retryAllFailed() {
+          const failedIds = this.task.errors
+            .map(e => e.cardId)
+            .filter(id => !!id);
+          if (failedIds.length === 0) return;
+          await this.doStartBatchTask(failedIds, this.task.types || ['name', 'description', 'tags']);
+        },
+        async doStartBatchTask(cardIds, types) {
+          if (this.starting || this.task.running) return;
+          this.starting = true;
+          try {
+            // 立即显示进度条面板
+            this.task = {
+              running: true,
+              current: 0,
+              total: cardIds.length,
+              successCount: 0,
+              failCount: 0,
+              currentCard: '准备中...',
+              startTime: Date.now(),
+              errors: [],
+              types: types
+            };
+
+            const { data } = await aiStartBatchTask({ cardIds, types });
+            if (!data.success) {
+              this.showToast(data.message || '启动失败', 'error');
+              this.task.running = false;
+              return;
+            }
+            this.showToast(`重试任务已启动`, 'success');
+            this.initRealtimeUpdates();
+          } catch (e) {
+            this.showToast(e.response?.data?.message || '启动失败', 'error');
+            this.task.running = false;
+          } finally {
+            this.starting = false;
+          }
+        },
+
 
     showToast(msg, type = 'info') {
       this.toast = { show: true, msg, type };
@@ -732,12 +784,15 @@ export default {
 .task-current { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-eta { color: #3b82f6; }
 
-.task-errors { margin-bottom: 16px; padding: 10px; background: rgba(239, 68, 68, 0.05); border-radius: 8px; border: 1px dashed rgba(239, 68, 68, 0.2); }
-.error-header { font-size: 12px; font-weight: 600; color: #ef4444; margin-bottom: 6px; }
-.error-list { display: flex; flex-direction: column; gap: 4px; }
-.error-item { font-size: 12px; display: flex; gap: 6px; }
-.err-title { font-weight: 600; white-space: nowrap; }
-.err-msg { color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-errors { margin-bottom: 16px; padding: 0; background: #fff; border-radius: 10px; border: 1px solid #fee2e2; overflow: hidden; }
+.error-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #fef2f2; font-size: 13px; font-weight: 600; color: #b91c1c; border-bottom: 1px solid #fee2e2; }
+.error-list { display: flex; flex-direction: column; max-height: 200px; overflow-y: auto; }
+.error-item { padding: 8px 12px; border-bottom: 1px solid #fef2f2; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.error-item:last-child { border-bottom: none; }
+.err-info { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.err-title { font-weight: 600; color: #374151; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.err-msg { color: #6b7280; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retry-all-btn { flex-shrink: 0; }
 
 .task-actions { display: flex; justify-content: space-between; align-items: center; }
 .task-concurrency { font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 6px; }
