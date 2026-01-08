@@ -228,6 +228,9 @@ export default {
       previewing: false,
       taskDone: false,
       localTaskStatus: { current: 0, total: 0, successCount: 0, failCount: 0, currentCard: '', errors: [] },
+      // 用于保存重试前的失败记录，避免被 SSE 覆盖
+      pendingRetryErrors: [],
+      isRetrying: false,
       starting: false,
       stopping: false,
       eventSource: null
@@ -241,7 +244,25 @@ export default {
     },
     taskStatus() {
       // 优先使用父组件传递的任务状态，否则使用本地状态（用于非运行状态下的最后一次快照）
-      return this.activeTask.running ? this.activeTask : this.localTaskStatus;
+      const baseStatus = this.activeTask.running ? this.activeTask : this.localTaskStatus;
+      
+      // 如果正在重试单个卡片，合并保留的错误记录
+      if (this.isRetrying && this.pendingRetryErrors.length > 0) {
+        const currentErrors = baseStatus.errors || [];
+        const retryingIds = new Set(currentErrors.map(e => e.cardId));
+        // 合并：当前错误 + 未被重试的旧错误
+        const mergedErrors = [
+          ...currentErrors,
+          ...this.pendingRetryErrors.filter(e => !retryingIds.has(e.cardId))
+        ];
+        return {
+          ...baseStatus,
+          errors: mergedErrors,
+          failCount: mergedErrors.length
+        };
+      }
+      
+      return baseStatus;
     },
     taskRunning() {
       return this.activeTask.running;
@@ -263,6 +284,9 @@ export default {
       // 当任务从运行中变为停止，且当前在执行步骤时，标记为完成
       if (oldVal === true && newVal === false && this.step === 3) {
         this.taskDone = true;
+        // 任务完成后清理重试状态
+        this.isRetrying = false;
+        this.pendingRetryErrors = [];
         // 任务完成后刷新筛选结果，确保重试时使用最新数据
         this.applyFilter();
       }
@@ -283,6 +307,8 @@ export default {
       this.previews = [];
       this.taskDone = false;
       this.localTaskStatus = { current: 0, total: 0, successCount: 0, failCount: 0, currentCard: '', errors: [] };
+      this.pendingRetryErrors = [];
+      this.isRetrying = false;
 
       try {
         const [menuRes, tagRes] = await Promise.all([getMenus(), getTags()]);
@@ -328,6 +354,9 @@ export default {
       this.previewing = false;
     },
     async startTask() {
+      // 启动全新任务时，清理重试状态
+      this.pendingRetryErrors = [];
+      this.isRetrying = false;
       await this.doStartTask(this.filteredCards.map(c => c.id));
     },
     async retryCard(errItem) {
@@ -335,7 +364,13 @@ export default {
         alert('无法重试：该错误没有关联的卡片 ID');
         return;
       }
-      await this.doStartTask([errItem.cardId]);
+      
+      // 保存当前所有错误记录（排除要重试的卡片）
+      const cardIdToRetry = errItem.cardId;
+      this.pendingRetryErrors = (this.taskStatus.errors || []).filter(e => e.cardId !== cardIdToRetry);
+      this.isRetrying = true;
+      
+      await this.doStartTask([cardIdToRetry]);
     },
     async retryAllFailed() {
       if (!this.taskStatus.errors || this.taskStatus.errors.length === 0) return;
@@ -348,11 +383,19 @@ export default {
         alert('没有可重试的卡片（部分系统错误无法直接重试）');
         return;
       }
+      
+      // 重试全部时，清空保留的错误记录
+      this.pendingRetryErrors = [];
+      this.isRetrying = false;
+      
       await this.doStartTask(failedIds);
     },
     async doStartTask(cardIds) {
       this.starting = true;
       this.taskDone = false;
+      
+      // 重试时清空本地错误记录
+      this.localTaskStatus.errors = [];
       
       const payload = {
         cardIds: cardIds,
@@ -370,6 +413,7 @@ export default {
         }
         
         // API 成功后，通知父组件启动任务状态，切换到进度界面
+        // 注意：errors 设为空数组，后端会通过 SSE 实时推送新的错误
         this.$emit('start', {
           total: data.total || payload.cardIds.length,
           types: payload.types,
