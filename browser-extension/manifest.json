@@ -9,17 +9,18 @@
       "strict_min_version": "127.0"
     }
   },
-  "permissions": [
-    "storage",
-    "tabs",
-    "bookmarks",
-    "history",
-    "contextMenus",
-    "notifications",
-    "activeTab",
-    "scripting",
-    "alarms"
-  ],
+    "permissions": [
+      "storage",
+      "tabs",
+      "bookmarks",
+      "history",
+      "contextMenus",
+      "notifications",
+      "activeTab",
+      "scripting",
+      "alarms",
+      "favicon"
+    ],
   "host_permissions": [
     "http://*/",
     "https://*/"

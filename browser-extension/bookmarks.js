@@ -1700,7 +1700,7 @@ async function renderBookmarkListByFolder() {
         section.innerHTML = `
             <div class="folder-section-header" data-folder-id="${group.id}">
                 <div class="folder-section-left">
-                    <label class="folder-select-all" onclick="event.stopPropagation()">
+                    <label class="folder-select-all">
                         <input type="checkbox" data-folder-id="${group.id}">
                         <span>全选</span>
                     </label>
@@ -1723,6 +1723,11 @@ async function renderBookmarkListByFolder() {
         }
         
         // 分组全选
+        const selectAllLabel = section.querySelector('.folder-select-all');
+        selectAllLabel.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
         const selectAllCheckbox = section.querySelector('.folder-select-all input');
         selectAllCheckbox.addEventListener('change', (e) => {
             e.stopPropagation();
@@ -2827,7 +2832,7 @@ async function showHealthDashboard() {
                         <div style="font-weight: 600; color: #991b1b;">重复书签</div>
                         <div style="font-size: 12px; color: #b91c1c; margin-top: 4px;">相同网址在不同位置</div>
                     </div>
-                    <button class="btn btn-small" onclick="closeResultModal(); findDuplicates();" style="background: white; border: 1px solid #fecaca; color: #dc2626;">查看并处理</button>
+                    <button class="btn btn-small" id="healthBtnDuplicates" style="background: white; border: 1px solid #fecaca; color: #dc2626;">查看并处理</button>
                 </div>
                 
                 <!-- 无效链接 -->
@@ -2840,7 +2845,7 @@ async function showHealthDashboard() {
                         <div style="font-weight: 600; color: #92400e;">失效链接</div>
                         <div style="font-size: 12px; color: #a16207; margin-top: 4px;">${invalidCount > 0 ? '发现已知失效链接' : '尚未进行全面检测'}</div>
                     </div>
-                    <button class="btn btn-small" onclick="closeResultModal(); showCheckOptions();" style="background: white; border: 1px solid #fef3c7; color: #d97706;">开始深度检测</button>
+                    <button class="btn btn-small" id="healthBtnCheck" style="background: white; border: 1px solid #fef3c7; color: #d97706;">开始深度检测</button>
                 </div>
                 
                 <!-- 空文件夹 -->
@@ -2853,7 +2858,7 @@ async function showHealthDashboard() {
                         <div style="font-weight: 600; color: #374151;">空文件夹</div>
                         <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">不含任何书签的目录</div>
                     </div>
-                    <button class="btn btn-small" onclick="closeResultModal(); findEmptyFolders();" style="background: white; border: 1px solid #e5e7eb; color: #4b5563;">清理空文件夹</button>
+                    <button class="btn btn-small" id="healthBtnEmpty" style="background: white; border: 1px solid #e5e7eb; color: #4b5563;">清理空文件夹</button>
                 </div>
                 
                 <!-- 无标签书签 -->
@@ -2866,7 +2871,7 @@ async function showHealthDashboard() {
                         <div style="font-weight: 600; color: #1e40af;">未分类书签</div>
                         <div style="font-size: 12px; color: #1d4ed8; margin-top: 4px;">尚未添加任何标签</div>
                     </div>
-                    <button class="btn btn-small" onclick="closeResultModal(); filterNoTag=true; renderBookmarkList();" style="background: white; border: 1px solid #dbeafe; color: #2563eb;">去打标签</button>
+                    <button class="btn btn-small" id="healthBtnNoTag" style="background: white; border: 1px solid #dbeafe; color: #2563eb;">去打标签</button>
                 </div>
             </div>
             
@@ -2877,14 +2882,46 @@ async function showHealthDashboard() {
                     检测到 ${duplicateCount + emptyFolderCount} 个可安全清理的项目。使用自动标签可以帮助您更好地管理书签。
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn" onclick="closeResultModal(); autoTagAllBookmarks();" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">批量自动打标签</button>
-                    <button class="btn" onclick="closeResultModal(); analyzeUsage();" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">分析吃灰书签</button>
+                    <button class="btn" id="healthBtnAutoTag" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">批量自动打标签</button>
+                    <button class="btn" id="healthBtnUsage" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">分析吃灰书签</button>
                 </div>
             </div>
         </div>
     `;
     
     resultList.innerHTML = html;
+    
+    // 绑定按钮事件
+    document.getElementById('healthBtnDuplicates').addEventListener('click', () => {
+        closeResultModal();
+        findDuplicates();
+    });
+    
+    document.getElementById('healthBtnCheck').addEventListener('click', () => {
+        closeResultModal();
+        showCheckOptions();
+    });
+    
+    document.getElementById('healthBtnEmpty').addEventListener('click', () => {
+        closeResultModal();
+        findEmptyFolders();
+    });
+    
+    document.getElementById('healthBtnNoTag').addEventListener('click', () => {
+        closeResultModal();
+        filterNoTag = true;
+        renderBookmarkList();
+    });
+    
+    document.getElementById('healthBtnAutoTag').addEventListener('click', () => {
+        closeResultModal();
+        autoTagAllBookmarks();
+    });
+    
+    document.getElementById('healthBtnUsage').addEventListener('click', () => {
+        closeResultModal();
+        analyzeUsage();
+    });
 }
 async function deleteBookmark(id) {
     if (!confirm('确定要删除这个书签吗？')) return;
@@ -4377,11 +4414,13 @@ function showStatisticsResult(stats) {
 // ==================== 工具函数 ====================
 function getFaviconUrl(url) {
     try {
-        const urlObj = new URL(url);
-        const domain = urlObj.hostname;
-        // 使用 Google Favicon 服务（更可靠，有缓存，减少404错误）
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-    } catch {
+        // 使用 Chrome 内置 Favicon 服务 (Manifest V3 推荐方式)
+        // 这可以从本地缓存加载图标，如果不成功则自动回退，且不会在控制台产生 404 错误
+        const faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'));
+        faviconUrl.searchParams.set('pageUrl', url);
+        faviconUrl.searchParams.set('size', '32');
+        return faviconUrl.toString();
+    } catch (e) {
         return 'icons/icon16.png';
     }
 }

@@ -492,10 +492,12 @@ async function togglePin(bookmarkId) {
 // 工具函数
 function getFaviconUrl(url) {
     try {
-        const urlObj = new URL(url);
-        // 直接从网站获取 favicon（最快最可靠）
-        return `${urlObj.protocol}//${urlObj.hostname}/favicon.ico`;
-    } catch {
+        // 使用 Chrome 内置 Favicon 服务 (Manifest V3 推荐方式)
+        const faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'));
+        faviconUrl.searchParams.set('pageUrl', url);
+        faviconUrl.searchParams.set('size', '32');
+        return faviconUrl.toString();
+    } catch (e) {
         return 'icons/icon48.png';
     }
 }
