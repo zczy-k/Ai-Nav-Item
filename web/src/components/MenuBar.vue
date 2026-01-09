@@ -209,6 +209,7 @@ onUnmounted(() => {
   padding: 0 1rem;
   position: relative;
   gap: 4px;
+  pointer-events: auto; /* 恢复子元素的交互 */
 }
 
 .menu-item {
@@ -224,14 +225,14 @@ onUnmounted(() => {
   padding: 0.75rem 1.5rem;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   box-shadow: none;
-  border-radius: 10px;
+  border-radius: 12px;
   position: relative;
   overflow: hidden;
   letter-spacing: 0.02em;
-  outline: none; /* 移除焦点外框 */
-  -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .menu-bar button::before {
@@ -250,7 +251,7 @@ onUnmounted(() => {
 .menu-bar button:hover {
   color: #40a9ff;
   background: rgba(64, 169, 255, 0.12);
-  box-shadow: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .menu-bar button:focus,
@@ -261,7 +262,7 @@ onUnmounted(() => {
 
 .menu-bar button.active {
   color: #40a9ff;
-  background: rgba(64, 169, 255, 0.1);
+  background: rgba(64, 169, 255, 0.15);
 }
 
 .menu-bar button.active::before {
@@ -270,8 +271,8 @@ onUnmounted(() => {
 
 /* 编辑模式样式 */
 .menu-bar.edit-mode .menu-item:not(.add-menu-item) {
-  border: 1px dashed rgba(99, 179, 237, 0.4);
-  border-radius: 8px;
+  border: 1px dashed rgba(64, 169, 255, 0.4);
+  border-radius: 12px;
   margin: 0 2px;
   cursor: grab;
 }
@@ -286,24 +287,27 @@ onUnmounted(() => {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(30, 30, 35, 0.98);
-  border-radius: 12px;
+  background: rgba(25, 25, 30, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 14px;
   min-width: max-content;
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: 6px;
-  padding: 10px 0;
+  padding: 12px 0;
+  will-change: transform, opacity;
 }
 
 .menu-dropdown.show {
   opacity: 1;
   visibility: visible;
-  transform: translateX(-50%) translateY(4px);
+  transform: translateX(-50%) translateY(8px);
 }
 
 /* 菜单操作行 */
@@ -465,24 +469,27 @@ onUnmounted(() => {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(30, 30, 35, 0.98);
-  border-radius: 12px;
+  background: rgba(25, 25, 30, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 14px;
   min-width: max-content;
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: 0;
-  padding: 6px 0;
+  padding: 8px 0;
+  will-change: transform, opacity;
 }
 
 .sub-menu.show {
   opacity: 1;
   visibility: visible;
-  transform: translateX(-50%) translateY(4px);
+  transform: translateX(-50%) translateY(8px);
 }
 
 /* 添加菜单按钮 */

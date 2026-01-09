@@ -4,7 +4,7 @@
   "description": "个人导航页面，提供常用网站链接和工具集合",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#222222",
+  "background_color": "#1a1a1a",
   "theme_color": "#1a1a1a",
   "orientation": "portrait-primary",
   "icons": [

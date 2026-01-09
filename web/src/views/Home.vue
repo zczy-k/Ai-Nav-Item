@@ -3538,6 +3538,7 @@ async function saveCardEdit() {
   left: 0;
   width: 100vw;
   z-index: 200;
+  pointer-events: none; /* 关键：防止固定容器遮挡下方交互或产生背景渲染问题 */
   /* PC端默认透明背景 */
 }
 
