@@ -231,6 +231,7 @@ onUnmounted(() => {
   overflow: hidden;
   letter-spacing: 0.02em;
   outline: none; /* 移除焦点外框 */
+  -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
 }
 
 .menu-bar button::before {
@@ -248,8 +249,15 @@ onUnmounted(() => {
 
 .menu-bar button:hover {
   color: #40a9ff;
-  background: rgba(64, 169, 255, 0.12); /* 更改为浅蓝色调，避免白色边框感 */
+  background: rgba(64, 169, 255, 0.15);
   transform: translateY(-1px);
+  box-shadow: none;
+}
+
+.menu-bar button:focus,
+.menu-bar button:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .menu-bar button.active {
@@ -384,6 +392,12 @@ onUnmounted(() => {
   background: rgba(57, 157, 255, 0.25) !important;
   color: #399dff !important;
   transform: none !important;
+}
+
+.sub-menu-item:focus,
+.sub-menu-item:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .sub-menu-item.active {
