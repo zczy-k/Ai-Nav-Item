@@ -249,8 +249,7 @@ onUnmounted(() => {
 
 .menu-bar button:hover {
   color: #40a9ff;
-  background: rgba(64, 169, 255, 0.15);
-  transform: translateY(-1px);
+  background: rgba(64, 169, 255, 0.12);
   box-shadow: none;
 }
 
@@ -298,7 +297,7 @@ onUnmounted(() => {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   margin-top: 6px;
   padding: 10px 0;
 }
@@ -479,7 +478,7 @@ onUnmounted(() => {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1000;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   margin-top: 0;
   padding: 6px 0;
 }
