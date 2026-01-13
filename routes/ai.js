@@ -545,9 +545,9 @@ function buildUnifiedPrompt(card, types, existingTags) {
     : '暂无';
   
   const rules = [];
-  if (types.includes('name')) rules.push('- name: 简洁名称，优先官方品牌名，不加"官网/首页"后缀');
-  if (types.includes('description')) rules.push('- description: 10-25字简洁功能描述');
-  if (types.includes('tags')) rules.push('- tags: 2-4个标签数组，优先用现有标签');
+  if (types.includes('name')) rules.push('- name: 简洁名称（中文2-8字，英文2-15字符），优先官方品牌名或大众熟知名称，不加"官网/首页"后缀。示例：github.com→GitHub, baidu.com→百度, bilibili.com→B站');
+  if (types.includes('description')) rules.push('- description: 10-25字简洁功能描述，突出核心功能或独特价值。示例：GitHub→全球最大的代码托管和协作平台');
+  if (types.includes('tags')) rules.push('- tags: 2-4个标签数组，优先用现有标签（完全匹配），必要时才建议新标签（2-4字）');
 
   const commonRules = `
 注意：

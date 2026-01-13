@@ -1642,22 +1642,49 @@ async function handleVersionChange(newVersion) {
   isRefreshing = true;
   
   try {
-    // 清除缓存
-    clearAllCardsCache();
+    // 保存当前显示的数据（避免刷新时闪烁）
+    const currentCards = cards.value;
+    const currentMenuId = activeMenu.value?.id;
+    const currentSubMenuId = activeSubMenu.value?.id;
     
     // 刷新菜单数据
     const menusRes = await getMenus(true);
     const newMenus = menusRes.data;
     menus.value = newMenus;
     
-    // 如果当前选中的菜单被删除，切换到第一个
-    if (activeMenu.value && !newMenus.find(m => m.id === activeMenu.value.id)) {
-      activeMenu.value = newMenus[0] || null;
-      activeSubMenu.value = null;
+    // 尝试恢复之前选中的菜单
+    if (currentMenuId) {
+      const restoredMenu = newMenus.find(m => m.id === currentMenuId);
+      if (restoredMenu) {
+        activeMenu.value = restoredMenu;
+        // 如果之前选中了子菜单，尝试恢复
+        if (currentSubMenuId && restoredMenu.subMenus) {
+          const restoredSubMenu = restoredMenu.subMenus.find(s => s.id === currentSubMenuId);
+          activeSubMenu.value = restoredSubMenu || null;
+        }
+      } else {
+        // 菜单被删除，切换到第一个
+        activeMenu.value = newMenus[0] || null;
+        activeSubMenu.value = null;
+      }
     }
     
-    // 刷新卡片
+    // 刷新当前显示的卡片
     await loadCards(true);
+    
+    // 清除其他分类的缓存（后台静默清除）
+    setTimeout(() => {
+      const currentKey = getCardsCacheKey(
+        activeMenu.value?.id, 
+        activeSubMenu.value?.id || null
+      );
+      Object.keys(cardsCache.value).forEach(key => {
+        if (key !== currentKey) {
+          delete cardsCache.value[key];
+        }
+      });
+      saveCardsCache();
+    }, 100);
     
     // 更新本地版本号
     saveDataVersion(newVersion);
@@ -1941,97 +1968,104 @@ async function loadCards(forceRefresh = false) {
       }
     }
   } else {
-    // 选择主菜单时，加载该主菜单下所有卡片（包括子菜单中的卡片）
+    // 选择主菜单时的逻辑
     const subMenus = activeMenu.value.subMenus || [];
-    const mainCacheKey = getCardsCacheKey(activeMenu.value.id, null);
     
-    // 非编辑模式下，检查是否所有分类都有缓存
-    if (!forceRefresh && !editMode.value) {
-      const cachedCards = [];
-      let allCached = true;
-      
-      // 检查主菜单缓存
-      if (cardsCache.value[mainCacheKey]) {
-        cachedCards.push(...cardsCache.value[mainCacheKey]);
-      } else {
-        allCached = false;
-      }
-      
-      // 检查子菜单缓存
-      for (const subMenu of subMenus) {
-        const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
-        if (cardsCache.value[subCacheKey]) {
-          cachedCards.push(...cardsCache.value[subCacheKey]);
-        } else {
-          allCached = false;
+    // 如果主菜单有子菜单，只加载子菜单的卡片（不加载直接挂在主菜单下的）
+    if (subMenus.length > 0) {
+      // 非编辑模式下，检查是否所有子菜单都有缓存
+      if (!forceRefresh && !editMode.value) {
+        const cachedCards = [];
+        let allCached = true;
+        
+        // 检查所有子菜单缓存
+        for (const subMenu of subMenus) {
+          const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
+          if (cardsCache.value[subCacheKey]) {
+            cachedCards.push(...cardsCache.value[subCacheKey]);
+          } else {
+            allCached = false;
+          }
+        }
+        
+        // 如果所有子菜单都有缓存，直接使用缓存
+        if (allCached && cachedCards.length > 0) {
+          cards.value = cachedCards;
+          return;
         }
       }
       
-      // 如果所有分类都有缓存，直接使用缓存
-      if (allCached && cachedCards.length > 0) {
-        cards.value = cachedCards;
-        return;
+      // 1. 先立即显示所有缓存的子菜单卡片
+      if (!forceRefresh) {
+        const cachedCards = [];
+        subMenus.forEach(subMenu => {
+          const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
+          if (cardsCache.value[subCacheKey]) {
+            cachedCards.push(...cardsCache.value[subCacheKey]);
+          }
+        });
+        if (cachedCards.length > 0) {
+          cards.value = cachedCards;
+        }
       }
-    }
-    
-    // 1. 先立即显示所有缓存的卡片（实现秒切换）
-    if (!forceRefresh) {
-      const cachedCards = [];
-      if (cardsCache.value[mainCacheKey]) {
-        cachedCards.push(...cardsCache.value[mainCacheKey]);
-      }
+      
+      // 2. 后台并行加载所有子菜单数据
+      const allPromises = [];
+      const allKeys = [];
+      
       subMenus.forEach(subMenu => {
         const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
-        if (cardsCache.value[subCacheKey]) {
-          cachedCards.push(...cardsCache.value[subCacheKey]);
-        }
+        allKeys.push(subCacheKey);
+        allPromises.push(
+          getCards(activeMenu.value.id, subMenu.id, true)
+            .then(res => res.data)
+            .catch(error => {
+              console.error(`加载子菜单 ${subMenu.name} 卡片失败:`, error);
+              return cardsCache.value[subCacheKey] || [];
+            })
+        );
       });
-      if (cachedCards.length > 0) {
-        cards.value = cachedCards;
+      
+      // 等待所有请求完成
+      const results = await Promise.all(allPromises);
+      
+      // 更新缓存并合并结果
+      const allCardsInMenu = [];
+      results.forEach((data, index) => {
+        cardsCache.value[allKeys[index]] = data;
+        allCardsInMenu.push(...data);
+      });
+      
+      cards.value = allCardsInMenu;
+      saveCardsCache();
+    } else {
+      // 主菜单没有子菜单，加载直接挂在主菜单下的卡片
+      const mainCacheKey = getCardsCacheKey(activeMenu.value.id, null);
+      
+      // 非编辑模式下，如果有缓存直接使用
+      if (!forceRefresh && !editMode.value && cardsCache.value[mainCacheKey]) {
+        cards.value = cardsCache.value[mainCacheKey];
+        return;
+      }
+      
+      // 优先显示缓存
+      if (!forceRefresh && cardsCache.value[mainCacheKey]) {
+        cards.value = cardsCache.value[mainCacheKey];
+      }
+      
+      // 从服务器获取最新数据
+      try {
+        const res = await getCards(activeMenu.value.id, null, true);
+        cards.value = res.data;
+        cardsCache.value[mainCacheKey] = res.data;
+        saveCardsCache();
+      } catch (error) {
+        console.error('加载卡片失败:', error);
+        if (!cardsCache.value[mainCacheKey]) {
+          cards.value = [];
+        }
       }
     }
-    
-    // 2. 后台并行加载所有数据（始终绕过浏览器HTTP缓存）
-    const allPromises = [];
-    const allKeys = [];
-    
-    // 主菜单请求
-    allKeys.push(mainCacheKey);
-    allPromises.push(
-      getCards(activeMenu.value.id, null, true)
-        .then(res => res.data)
-        .catch(error => {
-          console.error('加载主菜单卡片失败:', error);
-          return cardsCache.value[mainCacheKey] || [];
-        })
-    );
-    
-    // 所有子菜单请求（并行）
-    subMenus.forEach(subMenu => {
-      const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
-      allKeys.push(subCacheKey);
-      allPromises.push(
-        getCards(activeMenu.value.id, subMenu.id, true)
-          .then(res => res.data)
-          .catch(error => {
-            console.error(`加载子菜单 ${subMenu.name} 卡片失败:`, error);
-            return cardsCache.value[subCacheKey] || [];
-          })
-      );
-    });
-    
-    // 等待所有请求完成
-    const results = await Promise.all(allPromises);
-    
-    // 更新缓存并合并结果
-    const allCardsInMenu = [];
-    results.forEach((data, index) => {
-      cardsCache.value[allKeys[index]] = data;
-      allCardsInMenu.push(...data);
-    });
-    
-    cards.value = allCardsInMenu;
-    saveCardsCache();
   }
 }
 
