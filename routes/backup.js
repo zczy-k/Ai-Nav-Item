@@ -705,13 +705,8 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
       preRestoreFiles.push('config/.jwt-secret');
     }
     
-    // 备份当前WebDAV配置
-    const webdavConfigPath = path.join(projectRoot, 'config', '.webdav-config.json');
-    if (fs.existsSync(webdavConfigPath)) {
-      const backupWebdavPath = path.join(preRestoreBackupDir, `.webdav-config.json.pre-restore-${timestamp}`);
-      fs.copyFileSync(webdavConfigPath, backupWebdavPath);
-      preRestoreFiles.push('config/.webdav-config.json');
-    }
+    // 注意：WebDAV配置不再单独备份，因为它会随备份一起恢复
+    // 这样可以确保加密的密码与crypto_secret保持一致
     
     if (preRestoreFiles.length > 0) {
       console.log(`✓ 恢复前已备份关键配置: ${preRestoreFiles.join(', ')}`);
@@ -817,11 +812,8 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
               skippedFiles.push('config/.jwt-secret (保护当前JWT密钥)');
               continue;
             }
-            // 保护WebDAV配置
-            if (configFile === '.webdav-config.json') {
-              skippedFiles.push('config/.webdav-config.json (保护当前WebDAV配置)');
-              continue;
-            }
+            // WebDAV配置随备份一起恢复（因为密码是用备份中的crypto_secret加密的）
+            // 不再跳过，确保加密数据与密钥的一致性
             const srcFile = path.join(sourcePath, configFile);
             const destFile = path.join(destPath, configFile);
             if (fs.statSync(srcFile).isDirectory()) {
