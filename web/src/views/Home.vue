@@ -359,7 +359,7 @@
             <div class="remember-password-wrapper">
               <label>
                 <input type="checkbox" v-model="rememberPassword" />
-                <span>记住密码（2小时）</span>
+                <span>记住密码（30天）</span>
               </label>
             </div>
             <p v-if="batchError" class="batch-error">{{ batchError }}</p>
@@ -525,7 +525,7 @@
           <div class="remember-password-wrapper">
             <label>
               <input type="checkbox" v-model="rememberEditPassword" />
-              <span>记住密码（2小时）</span>
+              <span>记住密码（30天）</span>
             </label>
           </div>
           <p v-if="editError" class="batch-error">{{ editError }}</p>
@@ -2361,9 +2361,9 @@ async function verifyBatchPassword() {
       throw new Error('验证成功，但未收到 token');
     }
     
-    // 如果选择了记住密码，保存到2小时
-    if (rememberPassword.value) {
-      const expiry = Date.now() + 2 * 60 * 60 * 1000; // 2小时
+      // 如果选择了记住密码，保存到30天
+      if (rememberPassword.value) {
+        const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30天
       localStorage.setItem('nav_password_token', JSON.stringify({
         password: batchPassword.value,
         token: response.data.token,
@@ -2792,9 +2792,9 @@ async function verifyEditPassword() {
     const res = await verifyPassword(editPassword.value);
     localStorage.setItem('token', res.data.token);
     
-    // 如果选择了记住密码，保存到2小时
-    if (rememberEditPassword.value) {
-      const expiry = Date.now() + 2 * 60 * 60 * 1000; // 2小时
+      // 如果选择了记住密码，保存到30天
+      if (rememberEditPassword.value) {
+        const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30天
       localStorage.setItem('nav_password_token', JSON.stringify({
         password: editPassword.value,
         token: res.data.token,
