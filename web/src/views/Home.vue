@@ -112,16 +112,16 @@
             <span v-if="selectedTagIds.length > 0" class="toolbar-badge">{{ selectedTagIds.length }}</span>
           </button>
           
-          <div class="global-sort-wrapper">
-            <button class="toolbar-icon-btn" @click="toggleGlobalSortMenu" :title="'排序: ' + getSortLabel(globalSortType)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="4" y1="6" x2="16" y2="6"></line>
-                <line x1="4" y1="12" x2="12" y2="12"></line>
-                <line x1="4" y1="18" x2="8" y2="18"></line>
-              </svg>
-            </button>
-            <transition name="dropdown">
-              <div v-if="showGlobalSortMenu" class="global-sort-dropdown" @click.stop>
+            <div class="global-sort-wrapper" @click.stop>
+              <button class="toolbar-icon-btn" @click="toggleGlobalSortMenu" :title="'排序: ' + getSortLabel(globalSortType)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="4" y1="6" x2="16" y2="6"></line>
+                  <line x1="4" y1="12" x2="12" y2="12"></line>
+                  <line x1="4" y1="18" x2="8" y2="18"></line>
+                </svg>
+              </button>
+              <transition name="dropdown">
+                <div v-if="showGlobalSortMenu" class="global-sort-dropdown">
                 <div 
                   v-for="option in sortOptions" 
                   :key="option.value" 
@@ -922,7 +922,6 @@ const api = {
 };
 import MenuBar from '../components/MenuBar.vue';
 import MobileDrawer from '../components/MobileDrawer.vue';
-import SortDropdown from '../components/SortDropdown.vue';
 import { filterCardsWithPinyin } from '../utils/pinyin';
 import { isDuplicateCard } from '../utils/urlNormalizer';
 const CardGrid = defineAsyncComponent(() => import('../components/CardGrid.vue'));
@@ -1476,8 +1475,6 @@ const filteredCards = computed(() => {
   return result;
 });
 
-const groupSortSettings = ref({});
-const currentSortSetting = ref('time_desc');
 const globalSortType = ref('time_desc');
 const showGlobalSortMenu = ref(false);
 
@@ -1510,93 +1507,6 @@ function initGlobalSort() {
   const saved = localStorage.getItem('global_sort_type');
   if (saved) {
     globalSortType.value = saved;
-  }
-}
-
-const currentSortStorageKey = computed(() => {
-  if (!activeMenu.value) return '';
-  return `sort_${activeMenu.value.id}_${activeSubMenu.value?.id || 'single'}`;
-});
-
-function sortCards(cardList, sortType) {
-  if (!cardList || cardList.length === 0) return [];
-  
-  const sorted = [...cardList];
-  
-  switch (sortType) {
-    case 'time_desc':
-      sorted.sort((a, b) => {
-        const timeA = new Date(a.created_at || a.updated_at || 0).getTime();
-        const timeB = new Date(b.created_at || b.updated_at || 0).getTime();
-        return timeB - timeA;
-      });
-      break;
-    case 'time_asc':
-      sorted.sort((a, b) => {
-        const timeA = new Date(a.created_at || a.updated_at || 0).getTime();
-        const timeB = new Date(b.created_at || b.updated_at || 0).getTime();
-        return timeA - timeB;
-      });
-      break;
-    case 'freq_desc':
-      sorted.sort((a, b) => (b.click_count || 0) - (a.click_count || 0));
-      break;
-    case 'freq_asc':
-      sorted.sort((a, b) => (a.click_count || 0) - (b.click_count || 0));
-      break;
-    case 'name_asc':
-      sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-CN'));
-      break;
-    case 'name_desc':
-      sorted.sort((a, b) => (b.title || '').localeCompare(a.title || '', 'zh-CN'));
-      break;
-    default:
-      sorted.sort((a, b) => (a.order || 0) - (b.order || 0));
-  }
-  
-  return sorted;
-}
-
-function handleSortChange(groupKey, sortValue) {
-  groupSortSettings.value[groupKey] = sortValue;
-}
-
-function handleCurrentSortChange(sortValue) {
-  currentSortSetting.value = sortValue;
-}
-
-function initSortSettings() {
-  initGlobalSort();
-  if (activeMenu.value) {
-    const mainKey = `sort_${activeMenu.value.id}_main`;
-    const savedMain = localStorage.getItem(mainKey);
-    if (savedMain) {
-      groupSortSettings.value['main'] = savedMain;
-    } else {
-      groupSortSettings.value['main'] = 'time_desc';
-    }
-    
-    const subMenus = activeMenu.value.subMenus || [];
-    subMenus.forEach(sub => {
-      const subKey = `sort_${activeMenu.value.id}_${sub.id}`;
-      const saved = localStorage.getItem(subKey);
-      const groupKey = `sub_${sub.id}`;
-      if (saved) {
-        groupSortSettings.value[groupKey] = saved;
-      } else {
-        groupSortSettings.value[groupKey] = 'time_desc';
-      }
-    });
-    
-    const singleKey = currentSortStorageKey.value;
-    if (singleKey) {
-      const savedSingle = localStorage.getItem(singleKey);
-      if (savedSingle) {
-        currentSortSetting.value = savedSingle;
-      } else {
-        currentSortSetting.value = 'time_desc';
-      }
-    }
   }
 }
 
@@ -2162,7 +2072,7 @@ async function selectMenu(menu, parentMenu = null) {
   }
   
   await loadCards(forceRefresh);
-  initSortSettings();
+  initGlobalSort();
   
   preloadAdjacentCategories();
 }
@@ -2171,14 +2081,12 @@ function handleDrawerMenuSelect(menu) {
   activeMenu.value = menu;
   activeSubMenu.value = null;
   loadCards();
-  initSortSettings();
 }
 
 function handleDrawerSubMenuSelect(subMenu, parentMenu) {
   activeMenu.value = parentMenu;
   activeSubMenu.value = subMenu;
   loadCards();
-  initSortSettings();
 }
 
 function toggleGroupCollapse(groupKey) {
