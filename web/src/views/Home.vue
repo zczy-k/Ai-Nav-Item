@@ -338,21 +338,7 @@
       </div>
     </transition>
     
-    <!-- 顶部工具按钮组 -->
-    <div class="top-toolbar" @click.stop>
-      <button v-if="activeMenu" @click="openBatchAddModal" class="toolbar-icon-btn" title="批量添加网站">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 5v14M5 12h14"/>
-        </svg>
-      </button>
-      <button @click="showBgPanel = true" class="toolbar-icon-btn" title="更换背景">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-          <path d="M21 15l-5-5L5 21"></path>
-        </svg>
-      </button>
-    </div>
+
     
     <!-- 批量添加弹窗 -->
     <div v-if="showBatchAddModal" class="modal-overlay">
@@ -510,13 +496,34 @@
     
     <footer class="footer">
       <div class="footer-content">
-        <button @click="showFriendLinks = true" class="friend-link-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-          </svg>
-          友情链接
-        </button>
+        <div class="footer-actions">
+          <button @click="showFriendLinks = true" class="friend-link-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+            友情链接
+          </button>
+          <span class="footer-divider"></span>
+          <div class="footer-tools">
+            <button v-if="activeMenu" @click="openBatchAddModal" class="footer-tool-btn" title="批量添加网站">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="2" width="6" height="6" rx="1"/>
+                <rect x="12" y="2" width="6" height="6" rx="1"/>
+                <rect x="2" y="12" width="6" height="6" rx="1"/>
+                <rect x="12" y="12" width="6" height="6" rx="1" opacity="0.4"/>
+                <path d="M15 13v5M12.5 15.5h5" stroke-width="1.8"/>
+              </svg>
+            </button>
+            <button @click="showBgPanel = true" class="footer-tool-btn" title="更换背景">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="3" width="16" height="14" rx="2"/>
+                <circle cx="6.5" cy="7.5" r="1.5" fill="currentColor"/>
+                <path d="M2 14l4-4 3 3 5-5 4 4v3a2 2 0 01-2 2H4a2 2 0 01-2-2v-1z" fill="currentColor" opacity="0.3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
         <p class="copyright">Copyright © 2025 Con-Nav-Item | <a href="https://github.com/zczy-k/Con-Nav-Item" target="_blank" class="footer-link">Powered by zczy-k</a></p>
       </div>
     </footer>
@@ -929,6 +936,92 @@ const activeSubMenu = ref(null);
 const cards = ref([]);
 const allCards = ref([]); // 存储所有菜单的卡片，用于搜索
 const searchQuery = ref('');
+
+// 排序和过滤后的卡片
+const sortedFilteredCards = computed(() => {
+  let result = [...cards.value];
+  
+  // 按标签过滤
+  if (selectedTagIds.value.length > 0) {
+    result = result.filter(card => {
+      if (!card.tags || card.tags.length === 0) return false;
+      return selectedTagIds.value.some(tagId => 
+        card.tags.some(t => t.id === tagId)
+      );
+    });
+  }
+  
+  // 按搜索词过滤
+  if (searchQuery.value.trim()) {
+    result = filterCardsWithPinyin(result, searchQuery.value.trim());
+  }
+  
+  // 应用排序
+  result = applySorting(result);
+  
+  return result;
+});
+
+// 应用排序逻辑
+function applySorting(cardList) {
+  if (!cardList || cardList.length === 0) return cardList;
+  
+  const sorted = [...cardList];
+  
+  switch (globalSortType.value) {
+    case 'name_asc':
+      sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-CN'));
+      break;
+    case 'name_desc':
+      sorted.sort((a, b) => (b.title || '').localeCompare(a.title || '', 'zh-CN'));
+      break;
+    case 'time_desc':
+      sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      break;
+    case 'time_asc':
+      sorted.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      break;
+    case 'freq_desc':
+      sorted.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+      break;
+    case 'freq_asc':
+      sorted.sort((a, b) => (a.clicks || 0) - (b.clicks || 0));
+      break;
+    case 'default':
+    default:
+      sorted.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      break;
+  }
+  
+  return sorted;
+}
+
+// 用于分组显示时的排序和过滤
+function sortAndFilterCards(cardList, subMenuId) {
+  if (!cardList) return [];
+  
+  let result = [...cardList];
+  
+  // 按标签过滤
+  if (selectedTagIds.value.length > 0) {
+    result = result.filter(card => {
+      if (!card.tags || card.tags.length === 0) return false;
+      return selectedTagIds.value.some(tagId => 
+        card.tags.some(t => t.id === tagId)
+      );
+    });
+  }
+  
+  // 按搜索词过滤
+  if (searchQuery.value.trim()) {
+    result = filterCardsWithPinyin(result, searchQuery.value.trim());
+  }
+  
+  // 应用排序
+  result = applySorting(result);
+  
+  return result;
+}
 const leftPromos = ref([]);
 const rightPromos = ref([]);
 const showFriendLinks = ref(false);
@@ -1464,24 +1557,6 @@ function sortCards(cardList, sortType) {
   return sorted;
 }
 
-function sortAndFilterCards(cardList, subMenuId) {
-  let result = cardList;
-  
-  if (selectedTagIds.value.length > 0) {
-    result = result.filter(card => 
-      card.tags && selectedTagIds.value.every(tagId => 
-        card.tags.some(tag => tag.id === tagId)
-      )
-    );
-  }
-  
-  return sortCards(result, globalSortType.value);
-}
-
-const sortedFilteredCards = computed(() => {
-  return sortCards(filteredCards.value, globalSortType.value);
-});
-
 function handleSortChange(groupKey, sortValue) {
   groupSortSettings.value[groupKey] = sortValue;
 }
@@ -1566,6 +1641,9 @@ const groupedCards = computed(() => {
 onMounted(async () => {
   // 加载保存的背景设置
   loadBgSetting();
+  
+  // 初始化全局排序设置
+  initGlobalSort();
   
   // 检查 AI 配置状态
   checkAIConfig();
@@ -1829,7 +1907,12 @@ onMounted(async () => {
   }
   
   document.addEventListener('click', closeEngineDropdown);
+  document.addEventListener('click', closeSortMenu);
 });
+
+function closeSortMenu() {
+  showGlobalSortMenu.value = false;
+}
 
 
 // 数据版本号（用于缓存同步）
@@ -3813,20 +3896,20 @@ async function saveCardEdit() {
   width: 44px;
   height: 44px;
   border: none;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 12px;
-  color: #fff;
+  color: #333;
   cursor: pointer;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .mobile-hamburger:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.98);
   transform: scale(1.05);
 }
 
@@ -4205,26 +4288,27 @@ async function saveCardEdit() {
   height: 42px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  color: rgba(255, 255, 255, 0.9);
+  color: #666;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
   position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 .toolbar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.95);
   transform: scale(1.05);
+  color: #1890ff;
 }
 
 .toolbar-icon-btn.active {
-  background: rgba(24, 144, 255, 0.8);
+  background: #1890ff;
   color: #fff;
 }
 
@@ -4289,18 +4373,20 @@ async function saveCardEdit() {
 }
 
 .clear-filters-btn {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.85);
   border: none;
-  color: rgba(255, 255, 255, 0.9);
+  color: #666;
   padding: 6px 12px;
   border-radius: 16px;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .clear-filters-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
 }
 
 /* 移动端搜索区域适配 */
@@ -4930,6 +5016,52 @@ async function saveCardEdit() {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.footer-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-tool-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.footer-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.footer-tool-btn:active {
+  transform: translateY(0);
+}
+
 /* 弹窗样式 */
 .modal-overlay {
   position: fixed;
@@ -5299,9 +5431,24 @@ async function saveCardEdit() {
     gap: 12px;
   }
   
+  .footer-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .footer-divider {
+    display: none;
+  }
+  
   .friend-link-btn {
     font-size: 13px;
     padding: 6px 14px;
+  }
+  
+  .footer-tool-btn {
+    width: 30px;
+    height: 30px;
   }
   
   .copyright {
@@ -6490,16 +6637,17 @@ async function saveCardEdit() {
   top: 80px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
-  color: white;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
   padding: 12px 24px;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   z-index: 10000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(10px);
   pointer-events: none;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .toast-enter-active,
@@ -7305,17 +7453,18 @@ async function saveCardEdit() {
   justify-content: space-between;
   padding: 10px 16px;
   margin: 0 0 10px 0;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .card-group-header:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .card-group-header.single-header {
@@ -7323,7 +7472,7 @@ async function saveCardEdit() {
 }
 
 .card-group-header.single-header:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .group-header-left {
@@ -7336,9 +7485,9 @@ async function saveCardEdit() {
   width: 24px;
   height: 24px;
   border: none;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 6px;
-  color: rgba(255, 255, 255, 0.8);
+  color: #666;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -7355,25 +7504,25 @@ async function saveCardEdit() {
 }
 
 .collapse-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.08);
+  color: #333;
 }
 
 .group-name {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  color: #333;
 }
 
 .main-category-name {
-  color: rgba(255, 255, 255, 0.7);
+  color: #666;
   font-weight: 500;
 }
 
 .group-count {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.15);
+  color: #666;
+  background: rgba(0, 0, 0, 0.04);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -7427,8 +7576,73 @@ async function saveCardEdit() {
   }
   
   .group-count {
-    font-size: 11px;
-    padding: 2px 6px;
+      font-size: 11px;
+      padding: 2px 6px;
+    }
+}
+
+/* ========== 全局排序下拉菜单 ========== */
+.global-sort-wrapper {
+  position: relative;
+}
+
+.global-sort-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  min-width: 160px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 12px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  z-index: 100;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.sort-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #333;
+  font-size: 13px;
+}
+
+.sort-option:hover {
+  background: rgba(24, 144, 255, 0.1);
+}
+
+.sort-option.active {
+  background: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.sort-option-icon {
+  font-size: 14px;
+}
+
+.sort-check {
+  margin-left: auto;
+  color: #1890ff;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .global-sort-dropdown {
+    min-width: 140px;
+  }
+  
+  .sort-option {
+    padding: 9px 12px;
+    font-size: 12px;
   }
 }
 </style>

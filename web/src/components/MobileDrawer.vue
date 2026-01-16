@@ -107,7 +107,7 @@ function handleSubMenuClick(subMenu, parentMenu) {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 9998;
@@ -120,13 +120,13 @@ function handleSubMenuClick(subMenu, parentMenu) {
   bottom: 0;
   width: 280px;
   max-width: 85vw;
-  background: linear-gradient(180deg, rgba(25, 28, 35, 0.98) 0%, rgba(18, 20, 26, 0.98) 100%);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.12);
 }
 
 .drawer-header {
@@ -134,22 +134,22 @@ function handleSubMenuClick(subMenu, parentMenu) {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .drawer-title {
   font-size: 16px;
   font-weight: 600;
-  color: #fff;
+  color: #1a1a1a;
 }
 
 .drawer-close {
   width: 36px;
   height: 36px;
   border: none;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 10px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #666;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -158,8 +158,8 @@ function handleSubMenuClick(subMenu, parentMenu) {
 }
 
 .drawer-close:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.08);
+  color: #333;
 }
 
 .drawer-content {
@@ -180,16 +180,16 @@ function handleSubMenuClick(subMenu, parentMenu) {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: rgba(255, 255, 255, 0.85);
+  color: #333;
 }
 
 .drawer-menu-header:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(24, 144, 255, 0.06);
 }
 
 .drawer-menu-header.active {
-  background: linear-gradient(135deg, rgba(24, 144, 255, 0.25) 0%, rgba(64, 169, 255, 0.15) 100%);
-  color: #40a9ff;
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.12) 0%, rgba(64, 169, 255, 0.08) 100%);
+  color: #1890ff;
 }
 
 .menu-name {
@@ -205,8 +205,8 @@ function handleSubMenuClick(subMenu, parentMenu) {
 
 .sub-count {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.08);
+  color: #999;
+  background: rgba(0, 0, 0, 0.04);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -216,7 +216,7 @@ function handleSubMenuClick(subMenu, parentMenu) {
   height: 28px;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  color: #999;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -226,8 +226,8 @@ function handleSubMenuClick(subMenu, parentMenu) {
 }
 
 .expand-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
 }
 
 .expand-btn svg {
@@ -242,13 +242,13 @@ function handleSubMenuClick(subMenu, parentMenu) {
   margin-top: 4px;
   margin-left: 16px;
   padding-left: 16px;
-  border-left: 2px solid rgba(64, 169, 255, 0.3);
+  border-left: 2px solid rgba(24, 144, 255, 0.2);
 }
 
 .drawer-submenu-item {
   padding: 12px 16px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #666;
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.2s ease;
@@ -256,13 +256,13 @@ function handleSubMenuClick(subMenu, parentMenu) {
 }
 
 .drawer-submenu-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  background: rgba(24, 144, 255, 0.06);
+  color: #333;
 }
 
 .drawer-submenu-item.active {
-  background: rgba(24, 144, 255, 0.2);
-  color: #40a9ff;
+  background: rgba(24, 144, 255, 0.1);
+  color: #1890ff;
   font-weight: 500;
 }
 

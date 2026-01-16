@@ -391,12 +391,12 @@ onUnmounted(() => {
 
 <style>
 .sub-menu-portal {
-  background: #2a2a30;
+  background: rgba(255, 255, 255, 0.98);
   border-radius: 10px;
   min-width: max-content;
   white-space: nowrap;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   padding: 6px 0;
   transform: translateX(-50%);
   animation: dropdownFadeIn 0.15s ease;
@@ -427,7 +427,7 @@ onUnmounted(() => {
   padding: 0.4rem 0.8rem;
   border: none;
   background: transparent;
-  color: #fff;
+  color: #333;
   font-size: 14px;
   font-weight: 400;
   cursor: pointer;
@@ -438,8 +438,8 @@ onUnmounted(() => {
 }
 
 .sub-menu-portal .sub-menu-item:hover {
-  background: rgba(57, 157, 255, 0.25);
-  color: #399dff;
+  background: rgba(24, 144, 255, 0.08);
+  color: #1890ff;
 }
 
 .sub-menu-portal .sub-menu-item:focus {
@@ -447,19 +447,19 @@ onUnmounted(() => {
 }
 
 .sub-menu-portal .sub-menu-item.active {
-  background: rgba(57, 157, 255, 0.35);
-  color: #399dff;
+  background: rgba(24, 144, 255, 0.12);
+  color: #1890ff;
   font-weight: 500;
 }
 
 .menu-context-menu {
   position: fixed;
-  background: rgba(30, 30, 30, 0.95);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   padding: 6px 0;
   min-width: 160px;
   z-index: 99999;
@@ -482,13 +482,13 @@ onUnmounted(() => {
   align-items: center;
   padding: 10px 16px;
   cursor: pointer;
-  color: #fff;
+  color: #333;
   font-size: 14px;
   transition: background 0.15s ease;
 }
 
 .menu-context-menu .context-menu-item:hover {
-  background: rgba(99, 179, 237, 0.3);
+  background: rgba(24, 144, 255, 0.08);
 }
 
 .menu-context-menu .context-menu-item.disabled {
@@ -507,7 +507,7 @@ onUnmounted(() => {
 
 .menu-context-menu .context-menu-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.06);
   margin: 4px 0;
 }
 
