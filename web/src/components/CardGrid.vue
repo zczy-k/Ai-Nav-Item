@@ -71,7 +71,8 @@ const emit = defineEmits([
   'contextDelete',
   'toggleCardSelection',
   'openMovePanel',
-  'requireAuth'
+  'requireAuth',
+  'cardClicked'
 ]);
 
 const cardGridRef = ref(null);
@@ -186,6 +187,7 @@ function handleLinkClick(event, card) {
 
 function recordCardClick(cardId) {
   fetch(`/api/cards/${cardId}/click`, { method: 'POST' }).catch(() => {});
+  emit('cardClicked', cardId);
 }
 
 onMounted(() => {

@@ -120,21 +120,24 @@
                   <line x1="4" y1="18" x2="8" y2="18"></line>
                 </svg>
               </button>
-              <transition name="dropdown">
-                <div v-if="showGlobalSortMenu" class="global-sort-dropdown">
-                <div 
-                  v-for="option in sortOptions" 
-                  :key="option.value" 
-                  class="sort-option"
-                  :class="{ active: globalSortType === option.value }"
-                  @click="selectGlobalSort(option.value)"
-                >
-                  <span class="sort-option-icon">{{ option.icon }}</span>
-                  <span>{{ option.label }}</span>
-                  <span v-if="globalSortType === option.value" class="sort-check">✓</span>
+<transition name="dropdown">
+                  <div v-if="showGlobalSortMenu" class="global-sort-dropdown">
+                  <div 
+                    v-for="option in sortOptions" 
+                    :key="option.type" 
+                    class="sort-option"
+                    :class="{ active: globalSortType.startsWith(option.type) }"
+                    @click="selectGlobalSort(option.type)"
+                  >
+                    <span class="sort-option-icon">{{ option.icon }}</span>
+                    <span>{{ option.label }}</span>
+                    <span v-if="getSortDirection(option.type)" class="sort-direction">
+                      {{ getSortDirection(option.type) === 'desc' ? '↓' : '↑' }}
+                    </span>
+                    <span v-if="globalSortType.startsWith(option.type)" class="sort-check">✓</span>
+                  </div>
                 </div>
-              </div>
-            </transition>
+              </transition>
           </div>
         </div>
       </div>
@@ -301,21 +304,22 @@
             </div>
           </div>
 <transition name="group-collapse">
-              <CardGrid
-                v-if="!isGroupCollapsed(group.key)"
-                :cards="sortAndFilterCards(group.cards, group.subMenuId)" 
-                :selectedCards="selectedCards"
-                :selectionMode="selectedCards.length > 0"
-                :categoryId="activeMenu?.id"
-                :subCategoryId="group.subMenuId"
-                @contextEdit="handleContextEdit"
-                @contextDelete="handleContextDelete"
-                @toggleCardSelection="handleToggleCardSelection"
-                @openMovePanel="openMovePanel"
-                @requireAuth="handleRequireAuth"
-                @click.stop
-              />
-            </transition>
+                <CardGrid
+                  v-if="!isGroupCollapsed(group.key)"
+                  :cards="sortAndFilterCards(group.cards, group.subMenuId)" 
+                  :selectedCards="selectedCards"
+                  :selectionMode="selectedCards.length > 0"
+                  :categoryId="activeMenu?.id"
+                  :subCategoryId="group.subMenuId"
+                  @contextEdit="handleContextEdit"
+                  @contextDelete="handleContextDelete"
+                  @toggleCardSelection="handleToggleCardSelection"
+                  @openMovePanel="openMovePanel"
+                  @requireAuth="handleRequireAuth"
+                  @cardClicked="handleCardClicked"
+                  @click.stop
+                />
+              </transition>
         </div>
       </template>
     </div>
@@ -328,18 +332,19 @@
         </div>
       </div>
 <CardGrid
-          :cards="sortedFilteredCards" 
-          :selectedCards="selectedCards"
-          :selectionMode="selectedCards.length > 0"
-          :categoryId="activeMenu?.id"
-          :subCategoryId="activeSubMenu?.id"
-          @contextEdit="handleContextEdit"
-          @contextDelete="handleContextDelete"
-          @toggleCardSelection="handleToggleCardSelection"
-          @openMovePanel="openMovePanel"
-          @requireAuth="handleRequireAuth"
-          @click.stop
-        />
+            :cards="sortedFilteredCards" 
+            :selectedCards="selectedCards"
+            :selectionMode="selectedCards.length > 0"
+            :categoryId="activeMenu?.id"
+            :subCategoryId="activeSubMenu?.id"
+            @contextEdit="handleContextEdit"
+            @contextDelete="handleContextDelete"
+            @toggleCardSelection="handleToggleCardSelection"
+            @openMovePanel="openMovePanel"
+            @requireAuth="handleRequireAuth"
+            @cardClicked="handleCardClicked"
+            @click.stop
+          />
     </div>
     
     <!-- 背景选择面板 -->
@@ -1511,37 +1516,63 @@ const globalSortType = ref('time_desc');
 const showGlobalSortMenu = ref(false);
 
 const sortOptions = [
-  { value: 'time_desc', label: '时间 ↓', icon: '🕐' },
-  { value: 'time_asc', label: '时间 ↑', icon: '🕐' },
-  { value: 'freq_desc', label: '频率 ↓', icon: '🔥' },
-  { value: 'freq_asc', label: '频率 ↑', icon: '🔥' },
-  { value: 'name_asc', label: '名称 ↑', icon: '🔤' },
-  { value: 'name_desc', label: '名称 ↓', icon: '🔤' },
-  { value: 'default', label: '默认', icon: '📋' }
+  { type: 'time', label: '时间', icon: '🕐' },
+  { type: 'freq', label: '频率', icon: '🔥' },
+  { type: 'name', label: '名称', icon: '🔤' }
 ];
 
 function getSortLabel(value) {
-  const option = sortOptions.find(o => o.value === value);
-  return option ? option.label : '排序';
+  if (value === 'default') return '默认';
+  const type = value.replace(/_asc|_desc/, '');
+  const isDesc = value.endsWith('_desc');
+  const option = sortOptions.find(o => o.type === type);
+  return option ? `${option.label} ${isDesc ? '↓' : '↑'}` : '排序';
+}
+
+function getSortDirection(type) {
+  if (globalSortType.value.startsWith(type)) {
+    return globalSortType.value.endsWith('_desc') ? 'desc' : 'asc';
+  }
+  return null;
 }
 
 function toggleGlobalSortMenu() {
   showGlobalSortMenu.value = !showGlobalSortMenu.value;
 }
 
-async function selectGlobalSort(value) {
-  globalSortType.value = value;
-  showGlobalSortMenu.value = false;
-  try {
-    await fetch('/api/cards/user-settings/sort', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sortType: value })
-    });
-  } catch (e) {
-    console.error('保存排序设置失败:', e);
+  async function selectGlobalSort(type) {
+    const currentType = globalSortType.value.replace(/_asc|_desc/, '');
+    const currentDir = globalSortType.value.endsWith('_desc') ? 'desc' : 'asc';
+    
+    let newValue;
+    if (currentType === type) {
+      // 循环切换：降序 -> 升序 -> 默认 -> 降序
+      if (currentDir === 'desc') {
+        newValue = `${type}_asc`;
+      } else {
+        // 如果已经是升序，则回到默认排序（或者根据用户喜好，只在增减之间切换）
+        // 这里我们遵循用户“3项”且“自动切换增减”的描述，但在逻辑上保留一个回到默认的可能（可选）
+        // 如果用户只想在增减之间切换：
+        newValue = `${type}_desc`;
+      }
+    } else {
+      newValue = `${type}_desc`;
+    }
+    
+    globalSortType.value = newValue;
+    // 不关闭菜单，让用户看到切换效果，或者根据体验决定是否关闭
+    // showGlobalSortMenu.value = false; 
+    
+    try {
+      await fetch('/api/cards/user-settings/sort', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortType: newValue })
+      });
+    } catch (e) {
+      console.error('保存排序设置失败:', e);
+    }
   }
-}
 
 async function initGlobalSort() {
   try {
@@ -2101,6 +2132,36 @@ function handleContainerClick(event) {
     clearSelection();
   }
 }
+
+  function handleCardClicked(cardId) {
+    // 1. 更新当前显示的卡片列表（触发即时重排）
+    const cardInView = cards.value.find(c => c.id === cardId);
+    if (cardInView) {
+      cardInView.click_count = (cardInView.click_count || 0) + 1;
+      // 触发计算属性重算：虽然修改了内部属性，但由于 sortedFilteredCards 是基于 cards.value 的浅拷贝 [...cards.value]
+      // 我们需要通过重新赋值来确保 Vue 追踪到这个变化，或者直接触发重算
+      cards.value = [...cards.value];
+    }
+    
+    // 2. 更新 allCards（用于搜索结果）
+    const cardInAll = allCards.value.find(c => c.id === cardId);
+    if (cardInAll) {
+      cardInAll.click_count = (cardInAll.click_count || 0) + 1;
+    }
+    
+    // 3. 更新缓存中的数据
+    for (const key of Object.keys(cardsCache.value)) {
+      const cachedCards = cardsCache.value[key];
+      const card = cachedCards.find(c => c.id === cardId);
+      if (card) {
+        if (!cardInView) { // 如果没在视图中（虽然不太可能）也更新一下
+          card.click_count = (card.click_count || 0) + 1;
+        }
+        break;
+      }
+    }
+    saveCardsCache();
+  }
 
 async function selectMenu(menu, parentMenu = null) {
   if (parentMenu) {
@@ -4617,17 +4678,18 @@ async function saveCardEdit() {
 .global-sort-dropdown {
   position: absolute;
   top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0;
   margin-top: 8px;
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  padding: 6px 0;
-  min-width: 140px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  min-width: 130px;
   z-index: 1000;
 }
 
@@ -4635,29 +4697,43 @@ async function saveCardEdit() {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
-  color: #fff;
+  padding: 10px 14px;
+  color: #4b5563;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease;
+  border-radius: 10px;
+  transition: all 0.2s ease;
 }
 
 .sort-option:hover {
-  background: rgba(99, 179, 237, 0.3);
+  background: rgba(24, 144, 255, 0.05);
+  color: #1890ff;
 }
 
 .sort-option.active {
-  background: rgba(24, 144, 255, 0.25);
+  background: rgba(24, 144, 255, 0.1);
+  color: #1890ff;
 }
 
 .sort-option-icon {
-  font-size: 14px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sort-direction {
+  font-size: 15px;
+  font-weight: bold;
+  margin-left: 2px;
 }
 
 .sort-check {
-  margin-left: auto;
-  color: #40a9ff;
+  color: #1890ff;
   font-weight: bold;
+  margin-left: auto;
+  font-size: 14px;
 }
 
 /* 标签选择浮层 */
