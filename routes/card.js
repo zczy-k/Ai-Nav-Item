@@ -415,4 +415,27 @@ router.post('/remove-duplicates', auth, (req, res) => {
   });
 });
 
+router.get('/user-settings/sort', (req, res) => {
+  db.get('SELECT value FROM settings WHERE key = ?', ['user_sort_type'], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ sortType: row?.value || 'default' });
+  });
+});
+
+router.post('/user-settings/sort', (req, res) => {
+  const { sortType } = req.body;
+  if (!sortType) {
+    return res.status(400).json({ error: '排序类型不能为空' });
+  }
+  
+  db.run(
+    'REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+    ['user_sort_type', sortType],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
 module.exports = router;

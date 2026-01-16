@@ -118,8 +118,8 @@ function handleSubMenuClick(subMenu, parentMenu) {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 280px;
-  max-width: 85vw;
+  width: 240px;
+  max-width: 65vw;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);

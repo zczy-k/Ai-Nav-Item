@@ -981,10 +981,10 @@ function applySorting(cardList) {
       sorted.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
       break;
     case 'freq_desc':
-      sorted.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+      sorted.sort((a, b) => (b.click_count || 0) - (a.click_count || 0));
       break;
     case 'freq_asc':
-      sorted.sort((a, b) => (a.clicks || 0) - (b.clicks || 0));
+      sorted.sort((a, b) => (a.click_count || 0) - (b.click_count || 0));
       break;
     case 'default':
     default:
@@ -1479,12 +1479,12 @@ const globalSortType = ref('time_desc');
 const showGlobalSortMenu = ref(false);
 
 const sortOptions = [
-  { value: 'time_desc', label: '最新', icon: '🕐' },
-  { value: 'time_asc', label: '最早', icon: '📅' },
-  { value: 'freq_desc', label: '最常用', icon: '🔥' },
-  { value: 'freq_asc', label: '最少用', icon: '💤' },
-  { value: 'name_asc', label: '名称 A-Z', icon: '🔤' },
-  { value: 'name_desc', label: '名称 Z-A', icon: '🔡' },
+  { value: 'time_desc', label: '时间 ↓', icon: '🕐' },
+  { value: 'time_asc', label: '时间 ↑', icon: '🕐' },
+  { value: 'freq_desc', label: '频率 ↓', icon: '🔥' },
+  { value: 'freq_asc', label: '频率 ↑', icon: '🔥' },
+  { value: 'name_asc', label: '名称 ↑', icon: '🔤' },
+  { value: 'name_desc', label: '名称 ↓', icon: '🔤' },
   { value: 'default', label: '默认', icon: '📋' }
 ];
 
@@ -1497,16 +1497,29 @@ function toggleGlobalSortMenu() {
   showGlobalSortMenu.value = !showGlobalSortMenu.value;
 }
 
-function selectGlobalSort(value) {
+async function selectGlobalSort(value) {
   globalSortType.value = value;
   showGlobalSortMenu.value = false;
-  localStorage.setItem('global_sort_type', value);
+  try {
+    await fetch('/api/cards/user-settings/sort', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sortType: value })
+    });
+  } catch (e) {
+    console.error('保存排序设置失败:', e);
+  }
 }
 
-function initGlobalSort() {
-  const saved = localStorage.getItem('global_sort_type');
-  if (saved) {
-    globalSortType.value = saved;
+async function initGlobalSort() {
+  try {
+    const res = await fetch('/api/cards/user-settings/sort');
+    const data = await res.json();
+    if (data.sortType) {
+      globalSortType.value = data.sortType;
+    }
+  } catch (e) {
+    console.error('获取排序设置失败:', e);
   }
 }
 
@@ -1553,7 +1566,7 @@ onMounted(async () => {
   loadBgSetting();
   
   // 初始化全局排序设置
-  initGlobalSort();
+  await initGlobalSort();
   
   // 检查 AI 配置状态
   checkAIConfig();
@@ -7499,28 +7512,30 @@ async function saveCardEdit() {
   top: 100%;
   right: 0;
   margin-top: 8px;
-  min-width: 160px;
+  min-width: 120px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-radius: 12px;
+  border-radius: 10px;
   box-shadow: 
     0 8px 32px rgba(0, 0, 0, 0.15),
     0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   z-index: 100;
   border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 4px;
 }
 
 .sort-option {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 7px 10px;
   cursor: pointer;
   transition: background 0.15s;
   color: #333;
   font-size: 13px;
+  border-radius: 6px;
 }
 
 .sort-option:hover {
@@ -7534,7 +7549,7 @@ async function saveCardEdit() {
 }
 
 .sort-option-icon {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .sort-check {
@@ -7545,11 +7560,11 @@ async function saveCardEdit() {
 
 @media (max-width: 768px) {
   .global-sort-dropdown {
-    min-width: 140px;
+    min-width: 110px;
   }
   
   .sort-option {
-    padding: 9px 12px;
+    padding: 6px 8px;
     font-size: 12px;
   }
 }
