@@ -62,7 +62,8 @@ const props = defineProps({
   cards: Array,
   selectedCards: Array,
   categoryId: Number,
-  subCategoryId: [Number, null]
+  subCategoryId: [Number, null],
+  selectionMode: Boolean
 });
 
 const emit = defineEmits([
@@ -133,9 +134,31 @@ function onContextOpen() {
 
 function onContextCopyUrl() {
   if (contextMenuCard.value) {
-    navigator.clipboard.writeText(contextMenuCard.value.url);
+    const url = contextMenuCard.value.url;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).catch(() => {
+        fallbackCopyText(url);
+      });
+    } else {
+      fallbackCopyText(url);
+    }
   }
   closeContextMenu();
+}
+
+function fallbackCopyText(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+  } catch (e) {
+    console.error('Copy failed:', e);
+  }
+  document.body.removeChild(textarea);
 }
 
 function handleClickOutside(event) {
@@ -145,7 +168,7 @@ function handleClickOutside(event) {
 }
 
 function handleCardClick(event, card) {
-  if (event.ctrlKey || event.metaKey) {
+  if (event.ctrlKey || event.metaKey || props.selectionMode) {
     event.preventDefault();
     event.stopPropagation();
     emit('toggleCardSelection', card);
@@ -153,7 +176,7 @@ function handleCardClick(event, card) {
 }
 
 function handleLinkClick(event, card) {
-  if (event.ctrlKey || event.metaKey) {
+  if (event.ctrlKey || event.metaKey || props.selectionMode) {
     event.preventDefault();
     event.stopPropagation();
   } else {
@@ -525,14 +548,16 @@ function isCardSelected(card) {
 
 .context-menu {
   position: fixed;
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  padding: 6px 0;
-  min-width: 160px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+  min-width: 150px;
   z-index: 9999;
   animation: contextMenuFadeIn 0.15s ease;
 }
@@ -551,15 +576,16 @@ function isCardSelected(card) {
 .context-menu-item {
   display: flex;
   align-items: center;
-  padding: 10px 16px;
+  padding: 8px 12px;
   cursor: pointer;
-  color: #fff;
-  font-size: 14px;
+  color: #333;
+  font-size: 13px;
+  border-radius: 8px;
   transition: background 0.15s ease;
 }
 
 .context-menu-item:hover {
-  background: rgba(99, 179, 237, 0.3);
+  background: rgba(24, 144, 255, 0.1);
 }
 
 .context-menu-icon {
@@ -569,7 +595,7 @@ function isCardSelected(card) {
 
 .context-menu-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.08);
   margin: 4px 0;
 }
 </style>

@@ -210,6 +210,34 @@
           </button>
         </div>
         <div class="selection-actions">
+          <div class="group-select-wrapper" @click.stop>
+            <button @click="toggleGroupSelectMenu" class="toolbar-btn select-btn" title="选择">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+              </svg>
+              <span>选择</span>
+            </button>
+            <transition name="dropdown">
+              <div v-if="showGroupSelectMenu" class="group-select-dropdown">
+                <div class="group-select-item" @click="selectAllCards">
+                  <span>全选</span>
+                </div>
+                <div class="group-select-item" @click="clearSelection">
+                  <span>全不选</span>
+                </div>
+                <div v-if="groupedCards.length > 0" class="group-select-divider"></div>
+                <template v-if="groupedCards.length > 0">
+                  <div v-for="group in groupedCards" :key="group.key" class="group-select-item" @click="selectGroupCards(group)">
+                    <span>{{ group.name || activeMenu?.name }}</span>
+                    <span class="group-select-count">{{ sortAndFilterCards(group.cards, group.subMenuId).length }}</span>
+                  </div>
+                </template>
+              </div>
+            </transition>
+          </div>
           <button @click="openMovePanel" class="toolbar-btn move-btn" title="移动到...">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -272,21 +300,22 @@
               <span class="group-count">{{ sortAndFilterCards(group.cards, group.subMenuId).length }}</span>
             </div>
           </div>
-          <transition name="group-collapse">
-            <CardGrid
-              v-if="!isGroupCollapsed(group.key)"
-              :cards="sortAndFilterCards(group.cards, group.subMenuId)" 
-              :selectedCards="selectedCards"
-              :categoryId="activeMenu?.id"
-              :subCategoryId="group.subMenuId"
-              @contextEdit="handleContextEdit"
-              @contextDelete="handleContextDelete"
-              @toggleCardSelection="handleToggleCardSelection"
-              @openMovePanel="openMovePanel"
-              @requireAuth="handleRequireAuth"
-              @click.stop
-            />
-          </transition>
+<transition name="group-collapse">
+              <CardGrid
+                v-if="!isGroupCollapsed(group.key)"
+                :cards="sortAndFilterCards(group.cards, group.subMenuId)" 
+                :selectedCards="selectedCards"
+                :selectionMode="selectedCards.length > 0"
+                :categoryId="activeMenu?.id"
+                :subCategoryId="group.subMenuId"
+                @contextEdit="handleContextEdit"
+                @contextDelete="handleContextDelete"
+                @toggleCardSelection="handleToggleCardSelection"
+                @openMovePanel="openMovePanel"
+                @requireAuth="handleRequireAuth"
+                @click.stop
+              />
+            </transition>
         </div>
       </template>
     </div>
@@ -298,18 +327,19 @@
           <span class="group-count">{{ sortedFilteredCards.length }}</span>
         </div>
       </div>
-      <CardGrid
-        :cards="sortedFilteredCards" 
-        :selectedCards="selectedCards"
-        :categoryId="activeMenu?.id"
-        :subCategoryId="activeSubMenu?.id"
-        @contextEdit="handleContextEdit"
-        @contextDelete="handleContextDelete"
-        @toggleCardSelection="handleToggleCardSelection"
-        @openMovePanel="openMovePanel"
-        @requireAuth="handleRequireAuth"
-        @click.stop
-      />
+<CardGrid
+          :cards="sortedFilteredCards" 
+          :selectedCards="selectedCards"
+          :selectionMode="selectedCards.length > 0"
+          :categoryId="activeMenu?.id"
+          :subCategoryId="activeSubMenu?.id"
+          @contextEdit="handleContextEdit"
+          @contextDelete="handleContextDelete"
+          @toggleCardSelection="handleToggleCardSelection"
+          @openMovePanel="openMovePanel"
+          @requireAuth="handleRequireAuth"
+          @click.stop
+        />
     </div>
     
     <!-- 背景选择面板 -->
@@ -1058,6 +1088,7 @@ const selectedCards = ref([]);
 const showMovePanel = ref(false);
 const targetMenuId = ref(null);
 const targetSubMenuId = ref(null);
+const showGroupSelectMenu = ref(false);
 
 // Toast 提示状态
 const toastMessage = ref('');
@@ -1072,6 +1103,7 @@ const progressStatus = ref('loading'); // loading, success, error
 // 卡片编辑模态框相关状态
 const showEditCardModal = ref(false);
 const editingCard = ref(null);
+const editError = ref('');
 const cardEditForm = ref({
   title: '',
   url: '',
@@ -3045,20 +3077,14 @@ async function batchDeleteSelected() {
         }
       }
       
-      clearAllCardsCache();
-      await loadCards(true);
-      selectedCards.value = [];
-      updateProgress(`成功删除 ${successCount} 个卡片`, 'success');
+        clearAllCardsCache();
+        await loadCards(true);
+        clearSelection();
+        updateProgress(`成功删除 ${successCount} 个卡片`, 'success');
     } catch (error) {
       updateProgress('删除失败：' + (error.message || '未知错误'), 'error');
     }
-  });
-}
-
-// 清除选择
-function clearSelection() {
-  selectedCards.value = [];
-  showMovePanel.value = false;
+    });
 }
 
 // ========== 菜单管理（带权限验证）==========
@@ -3305,6 +3331,49 @@ function toggleCardSelection(card) {
   }
 }
 
+// 清空选择
+function clearSelection() {
+  selectedCards.value = [];
+  showMovePanel.value = false;
+  showGroupSelectMenu.value = false;
+}
+
+// 切换分组选择菜单
+function toggleGroupSelectMenu() {
+  showGroupSelectMenu.value = !showGroupSelectMenu.value;
+}
+
+// 全选当前显示的所有卡片
+function selectAllCards() {
+  const allVisibleCards = [];
+  if (!activeSubMenu.value && activeMenu.value && groupedCards.value.length > 0) {
+    for (const group of groupedCards.value) {
+      const groupCards = sortAndFilterCards(group.cards, group.subMenuId);
+      allVisibleCards.push(...groupCards);
+    }
+  } else {
+    allVisibleCards.push(...sortedFilteredCards.value);
+  }
+  
+  for (const card of allVisibleCards) {
+    if (!selectedCards.value.some(c => c.id === card.id)) {
+      selectedCards.value.push(card);
+    }
+  }
+  showGroupSelectMenu.value = false;
+}
+
+// 选择某个分组的所有卡片
+function selectGroupCards(group) {
+  const groupCards = sortAndFilterCards(group.cards, group.subMenuId);
+  for (const card of groupCards) {
+    if (!selectedCards.value.some(c => c.id === card.id)) {
+      selectedCards.value.push(card);
+    }
+  }
+  showGroupSelectMenu.value = false;
+}
+
 
 // 显示 Toast 提示
 let toastTimer = null;
@@ -3445,13 +3514,12 @@ async function moveCardToCategory(menuId, subMenuId) {
     // 5. 显示结果
     if (failedCards.length > 0) {
       updateProgress(`成功移动 ${successfulMoves.length} 个卡片，${failedCards.length} 个失败`, 'success');
-    } else {
-      updateProgress(`成功移动 ${count} 个卡片！`, 'success');
-    }
-    
-    selectedCards.value = [];
-    showMovePanel.value = false;
-  } catch (error) {
+      } else {
+        updateProgress(`成功移动 ${count} 个卡片！`, 'success');
+      }
+      
+      clearSelection();
+    } catch (error) {
     console.error('移动卡片失败:', error);
     if (error.response?.status === 401) {
       closeProgressModal();
@@ -6927,6 +6995,66 @@ async function saveCardEdit() {
 .delete-btn:hover {
   background: rgba(245, 101, 101, 1);
   transform: translateY(-1px);
+}
+
+.select-btn {
+  background: rgba(147, 197, 253, 0.9);
+  color: #fff;
+}
+
+.select-btn:hover {
+  background: rgba(147, 197, 253, 1);
+  transform: translateY(-1px);
+}
+
+.group-select-wrapper {
+  position: relative;
+}
+
+.group-select-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  min-width: 140px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  z-index: 100;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 4px;
+}
+
+.group-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #333;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+.group-select-item:hover {
+  background: rgba(24, 144, 255, 0.1);
+}
+
+.group-select-count {
+  color: #999;
+  font-size: 12px;
+}
+
+.group-select-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 4px 0;
 }
 
 .selection-toolbar-enter-active,
