@@ -314,38 +314,19 @@
       </div>
     </transition>
     
-    <!-- 浮动操作按钮菜单 -->
-    <div class="fab-container" @click.stop>
-      <!-- 背景设置按钮 -->
-      <transition name="fab-item">
-        <button v-show="showFabMenu" @click="showBgPanel = true" class="bg-setting-btn" title="更换背景">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-            <path d="M21 15l-5-5L5 21"></path>
-          </svg>
-        </button>
-      </transition>
-      
-      <!-- 批量添加悬浮按钮 -->
-      <transition name="fab-item">
-        <button v-if="activeMenu" v-show="showFabMenu" @click="openBatchAddModal" class="batch-add-btn" title="批量添加网站">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-        </button>
-      </transition>
-      
-      <!-- 主切换按钮 -->
-      <button @click="toggleFabMenu" class="fab-toggle-btn" title="更多功能">
-        <transition name="fab-icon" mode="out-in">
-          <svg v-if="!showFabMenu" key="plus" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          <svg v-else key="close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="12"></line>
-          </svg>
-        </transition>
+    <!-- 顶部工具按钮组 -->
+    <div class="top-toolbar" @click.stop>
+      <button v-if="activeMenu" @click="openBatchAddModal" class="toolbar-icon-btn" title="批量添加网站">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+      </button>
+      <button @click="showBgPanel = true" class="toolbar-icon-btn" title="更换背景">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <path d="M21 15l-5-5L5 21"></path>
+        </svg>
       </button>
     </div>
     
@@ -985,20 +966,7 @@ const showQuickAddTag = ref(false);
 const quickTagName = ref('');
 const quickTagColor = ref('#1890ff');
 
-// FAB 菜单
-const showFabMenu = ref(false);
-
-function toggleFabMenu() {
-  showFabMenu.value = !showFabMenu.value;
-}
-
-function closeFabMenu() {
-  if (showFabMenu.value) {
-    showFabMenu.value = false;
-  }
-}
-
-// ========== 背景设置相关 ==========
+// 背景面板
 const showBgPanel = ref(false);
 const currentBgId = ref(1);
 
@@ -1800,7 +1768,6 @@ onMounted(async () => {
     }, 500);
   }
   
-  document.addEventListener('click', closeFabMenu);
   document.addEventListener('click', closeEngineDropdown);
 });
 
@@ -1937,7 +1904,6 @@ document.addEventListener('visibilitychange', handleVisibilityChange);
 connectSSE();
 
 onUnmounted(() => {
-  document.removeEventListener('click', closeFabMenu);
   document.removeEventListener('click', closeEngineDropdown);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   
@@ -4778,23 +4744,7 @@ async function saveCardEdit() {
     font-size: 11px;
   }
   
-  .fab-container {
-    right: 16px;
-    bottom: 16px;
-  }
-  
-  .fab-toggle-btn {
-    width: 44px;
-    height: 44px;
-  }
-  
-  .batch-add-btn,
-  .edit-mode-btn,
-  .exit-edit-btn {
-    width: 36px;
-    height: 36px;
-    margin-bottom: 10px;
-  }
+
   
   .mini-tag-bar {
     padding: 0.5rem 0.8rem;
@@ -4844,90 +4794,80 @@ async function saveCardEdit() {
     height: 18px;
   }
   
-  .fab-container {
-    right: 12px;
-    bottom: 12px;
-  }
-  
-  .fab-toggle-btn {
-    width: 42px;
-    height: 42px;
-  }
-  
-  .batch-add-btn,
-  .edit-mode-btn,
-  .exit-edit-btn {
-    width: 34px;
-    height: 34px;
-    margin-bottom: 8px;
-  }
+
 }
 
-/* 浮动操作按钮 */
-.fab-container {
+/* ========== 顶部工具按钮组 ========== */
+.top-toolbar {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  top: 16px;
+  right: 16px;
   z-index: 999;
   display: flex;
-  flex-direction: column-reverse;
   align-items: center;
+  gap: 10px;
 }
 
-.fab-toggle-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
-  border: none;
-  color: white;
-  cursor: pointer;
-  box-shadow: 
-    0 6px 20px rgba(24, 144, 255, 0.4),
-    0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-}
-
-.fab-toggle-btn:hover {
-  transform: scale(1.1) rotate(90deg);
-  box-shadow: 
-    0 8px 28px rgba(24, 144, 255, 0.5),
-    0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.batch-add-btn,
-.bg-setting-btn {
-  position: relative;
+.toolbar-icon-btn {
   width: 40px;
   height: 40px;
-  margin-bottom: 12px;
-  border-radius: 50%;
-  border: none;
-  color: white;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: #4a5568;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.batch-add-btn {
-  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+.toolbar-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  color: #1890ff;
 }
 
-.bg-setting-btn {
-  background: linear-gradient(135deg, #722ed1 0%, #9254de 100%);
+.toolbar-icon-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.batch-add-btn:hover,
-.bg-setting-btn:hover {
-  transform: scale(1.12) translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+@media (max-width: 768px) {
+  .top-toolbar {
+    top: 12px;
+    right: 12px;
+    gap: 8px;
+  }
+  
+  .toolbar-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+  
+  .toolbar-icon-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .top-toolbar {
+    top: 10px;
+    right: 10px;
+    gap: 6px;
+  }
+  
+  .toolbar-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+  }
 }
 
 /* 背景选择面板 */
@@ -5053,33 +4993,6 @@ async function saveCardEdit() {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-/* Transitions for FAB items */
-.fab-item-enter-active,
-.fab-item-leave-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.fab-item-enter-from,
-.fab-item-leave-to {
-  opacity: 0;
-  transform: translateY(30px) scale(0.9);
-}
-
-/* Transitions for the icon inside toggle button */
-.fab-icon-enter-active,
-.fab-icon-leave-active {
-  transition: all 0.2s ease-in-out;
-  position: absolute;
-}
-.fab-icon-enter-from {
-  transform: rotate(-135deg);
-  opacity: 0;
-}
-.fab-icon-leave-to {
-  transform: rotate(135deg);
-  opacity: 0;
 }
 
 /* 批量添加弹窗 */

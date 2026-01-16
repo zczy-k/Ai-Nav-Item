@@ -1,11 +1,11 @@
 <template>
   <div class="sort-dropdown" @click.stop>
     <button class="sort-trigger" @click="toggleDropdown" :title="currentSortLabel">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4"/>
       </svg>
-      <span class="sort-label">{{ currentSortLabel }}</span>
-      <svg class="chevron" :class="{ open: isOpen }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <span class="sort-label">{{ shortLabel }}</span>
+      <svg class="chevron" :class="{ open: isOpen }" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <polyline points="6 9 12 15 18 9"></polyline>
       </svg>
     </button>
@@ -13,17 +13,23 @@
     <transition name="dropdown">
       <div v-if="isOpen" class="sort-menu">
         <div 
-          v-for="option in sortOptions" 
-          :key="option.value"
-          class="sort-option"
-          :class="{ active: currentSort === option.value }"
-          @click="selectSort(option.value)"
+          v-for="group in sortGroups" 
+          :key="group.key"
+          class="sort-group"
         >
-          <span class="option-icon">{{ option.icon }}</span>
-          <span class="option-label">{{ option.label }}</span>
-          <svg v-if="currentSort === option.value" class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
+          <div class="group-label">{{ group.label }}</div>
+          <div class="group-options">
+            <button
+              v-for="option in group.options"
+              :key="option.value"
+              class="sort-btn"
+              :class="{ active: currentSort === option.value }"
+              @click="selectSort(option.value)"
+              :title="option.tip"
+            >
+              {{ option.text }}
+            </button>
+          </div>
         </div>
       </div>
     </transition>
@@ -48,20 +54,52 @@ const emit = defineEmits(['update:modelValue', 'change']);
 
 const isOpen = ref(false);
 
-const sortOptions = [
-  { value: 'time_desc', label: '时间 (最新)', icon: '🕐' },
-  { value: 'time_asc', label: '时间 (最旧)', icon: '🕰️' },
-  { value: 'freq_desc', label: '使用频率 (高)', icon: '🔥' },
-  { value: 'freq_asc', label: '使用频率 (低)', icon: '❄️' },
-  { value: 'name_asc', label: '名称 A-Z', icon: '🔤' },
-  { value: 'name_desc', label: '名称 Z-A', icon: '🔠' }
+const sortGroups = [
+  {
+    key: 'time',
+    label: '时间',
+    options: [
+      { value: 'time_desc', text: '最新', tip: '按创建时间从新到旧' },
+      { value: 'time_asc', text: '最早', tip: '按创建时间从旧到新' }
+    ]
+  },
+  {
+    key: 'freq',
+    label: '频率',
+    options: [
+      { value: 'freq_desc', text: '最多', tip: '按使用频率从高到低' },
+      { value: 'freq_asc', text: '最少', tip: '按使用频率从低到高' }
+    ]
+  },
+  {
+    key: 'name',
+    label: '名称',
+    options: [
+      { value: 'name_asc', text: 'A-Z', tip: '按名称升序' },
+      { value: 'name_desc', text: 'Z-A', tip: '按名称降序' }
+    ]
+  }
 ];
 
 const currentSort = computed(() => props.modelValue);
 
+const shortLabel = computed(() => {
+  const sortType = currentSort.value;
+  if (sortType.startsWith('time')) return sortType === 'time_desc' ? '最新' : '最早';
+  if (sortType.startsWith('freq')) return sortType === 'freq_desc' ? '频率↑' : '频率↓';
+  if (sortType.startsWith('name')) return sortType === 'name_asc' ? 'A-Z' : 'Z-A';
+  return '排序';
+});
+
 const currentSortLabel = computed(() => {
-  const option = sortOptions.find(o => o.value === currentSort.value);
-  return option ? option.label : '排序';
+  const sortType = currentSort.value;
+  if (sortType === 'time_desc') return '时间: 最新优先';
+  if (sortType === 'time_asc') return '时间: 最早优先';
+  if (sortType === 'freq_desc') return '频率: 最多优先';
+  if (sortType === 'freq_asc') return '频率: 最少优先';
+  if (sortType === 'name_asc') return '名称: A-Z';
+  if (sortType === 'name_desc') return '名称: Z-A';
+  return '排序';
 });
 
 function toggleDropdown() {
@@ -91,7 +129,7 @@ onMounted(() => {
   if (props.storageKey) {
     try {
       const saved = localStorage.getItem(props.storageKey);
-      if (saved && sortOptions.some(o => o.value === saved)) {
+      if (saved) {
         emit('update:modelValue', saved);
       }
     } catch (e) {}
@@ -112,37 +150,35 @@ onUnmounted(() => {
 .sort-trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.12);
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  color: #4a5568;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .sort-trigger:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .sort-label {
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 12px;
 }
 
 .chevron {
   transition: transform 0.2s ease;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .chevron.open {
@@ -151,54 +187,65 @@ onUnmounted(() => {
 
 .sort-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
-  min-width: 180px;
-  background: rgba(30, 30, 35, 0.95);
+  min-width: 200px;
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 6px;
-  box-shadow: 
-    0 10px 40px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
-  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.sort-option {
+.sort-group {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 10px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-left: 2px;
+}
+
+.group-options {
+  display: flex;
+  gap: 6px;
+}
+
+.sort-btn {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4a5568;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 13px;
   transition: all 0.15s ease;
 }
 
-.sort-option:hover {
-  background: rgba(255, 255, 255, 0.1);
+.sort-btn:hover {
+  background: rgba(66, 153, 225, 0.1);
+  border-color: rgba(66, 153, 225, 0.3);
+  color: #3182ce;
 }
 
-.sort-option.active {
-  background: linear-gradient(135deg, rgba(99, 179, 237, 0.25) 0%, rgba(99, 179, 237, 0.15) 100%);
-  color: #63b3ed;
-}
-
-.option-icon {
-  font-size: 14px;
-  width: 20px;
-  text-align: center;
-}
-
-.option-label {
-  flex: 1;
-}
-
-.check-icon {
-  color: #63b3ed;
+.sort-btn.active {
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.35);
 }
 
 .dropdown-enter-active,
@@ -209,22 +256,23 @@ onUnmounted(() => {
 .dropdown-enter-from,
 .dropdown-leave-to {
   opacity: 0;
-  transform: translateY(-8px) scale(0.95);
+  transform: translateY(-6px) scale(0.96);
 }
 
 @media (max-width: 768px) {
   .sort-trigger {
-    padding: 5px 10px;
-    font-size: 12px;
-  }
-  
-  .sort-label {
-    display: none;
+    padding: 4px 8px;
   }
   
   .sort-menu {
-    right: -20px;
-    min-width: 160px;
+    right: -10px;
+    min-width: 180px;
+    padding: 8px;
+  }
+  
+  .sort-btn {
+    padding: 5px 8px;
+    font-size: 11px;
   }
 }
 </style>
