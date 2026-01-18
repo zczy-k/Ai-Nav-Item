@@ -116,6 +116,14 @@
           <button class="btn primary" @click="saveConfig" :disabled="saving">
             {{ saving ? '⏳ 保存中...' : '💾 保存配置' }}
           </button>
+          <button 
+            v-if="config.hasApiKey" 
+            class="btn danger" 
+            @click="showClearConfirm = true" 
+            :disabled="clearing"
+          >
+            {{ clearing ? '⏳ 清除中...' : '🗑️ 清除配置' }}
+          </button>
         </div>
       </div>
     </div>
@@ -223,6 +231,30 @@
         @start="onWizardStart"
       />
 
+    <!-- 清除配置确认弹窗 -->
+    <div v-if="showClearConfirm" class="modal-overlay" @click="showClearConfirm = false">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>⚠️ 确认清除</h3>
+          <button @click="showClearConfirm = false" class="close-btn">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="warning-text">清除后，所有 AI 功能将不可用，包括：</p>
+          <ul class="warning-list">
+            <li>自动生成卡片名称、描述和标签</li>
+            <li>批量智能补全功能</li>
+            <li>手动 AI 生成功能</li>
+          </ul>
+          <p class="warning-text">确定要清除 API 配置吗？</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" @click="showClearConfirm = false">取消</button>
+          <button class="btn danger" @click="clearConfig" :disabled="clearing">
+            {{ clearing ? '清除中...' : '确认清除' }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Toast -->
     <div class="toast" :class="[toast.type, { show: toast.show }]">
@@ -235,6 +267,7 @@
 import { 
   aiGetConfig,
   aiUpdateConfig,
+  aiClearConfig,
   aiTestConnection,
   aiGetStats,
   aiStartBatchTask, 
@@ -322,6 +355,8 @@ export default {
       showApiKey: false,
       testing: false,
       saving: false,
+      clearing: false,
+      showClearConfirm: false,
       refreshing: false,
       starting: false,
       stopping: false,
@@ -476,6 +511,27 @@ export default {
           this.showToast('连接失败', 'error');
         }
         this.testing = false;
+      },
+      async clearConfig() {
+        this.clearing = true;
+        try {
+          const { data } = await aiClearConfig();
+          if (data.success) {
+            this.showToast('配置已清除', 'success');
+            this.config.hasApiKey = false;
+            this.config.apiKey = '';
+            this.config.baseUrl = '';
+            this.config.model = this.currentProvider.defaultModel;
+            this.connectionTested = false;
+            this.connectionOk = false;
+            this.showClearConfirm = false;
+          } else {
+            this.showToast(data.message || '清除失败', 'error');
+          }
+        } catch (e) {
+          this.showToast(e.response?.data?.message || '清除失败', 'error');
+        }
+        this.clearing = false;
       },
       async refreshStats() {
         this.refreshing = true;
@@ -845,4 +901,22 @@ export default {
 :root.dark .stat, :root.dark .action-card, :root.dark .switch-item { background: #374151; }
 :root.dark .connection-status { background: #374151; }
 :root.dark .task-panel { background: linear-gradient(135deg, #1e3a5f, #2d1f5f); }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1001; }
+.modal-content { background: #fff; border-radius: 12px; width: 90%; max-width: 400px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
+.modal-header h3 { margin: 0; font-size: 1.1rem; }
+.close-btn { border: none; background: none; font-size: 24px; color: #6b7280; cursor: pointer; padding: 0; line-height: 1; }
+.close-btn:hover { color: #374151; }
+.modal-body { padding: 20px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; }
+.warning-text { margin: 0 0 12px; color: #374151; }
+.warning-list { margin: 0 0 16px; padding-left: 20px; color: #6b7280; }
+.warning-list li { margin-bottom: 6px; }
+
+:root.dark .modal-content { background: #1f2937; border-color: #374151; }
+:root.dark .modal-header, :root.dark .modal-footer { border-color: #374151; background: #111827; }
+:root.dark .warning-text { color: #e5e7eb; }
+:root.dark .warning-list { color: #9ca3af; }
 </style>

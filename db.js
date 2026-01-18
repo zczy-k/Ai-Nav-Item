@@ -621,6 +621,17 @@ async function saveAIConfig(config) {
   }
 }
 
+// 清除 AI 配置
+async function clearAIConfig() {
+  const keys = ['ai_api_key', 'ai_base_url', 'ai_model', 'ai_last_tested_ok'];
+  for (const key of keys) {
+    await dbRun(
+      'REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+      [key, '']
+    );
+  }
+}
+
 // 获取需要 AI 处理的卡片
 async function getCardsNeedingAI(type) {
   let sql = 'SELECT c.id, c.title, c.url, c.desc FROM cards c';
@@ -810,6 +821,7 @@ const dbWrapper = {
   // AI 相关方法
   getAIConfig,
   saveAIConfig,
+  clearAIConfig,
   getCardsNeedingAI,
   getAllCards,
   getCardsByIds,

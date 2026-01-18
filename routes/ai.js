@@ -1441,6 +1441,22 @@ function parseTagsResponse(text, existingTags) {
 
 // ==================== API 路由 ====================
 
+// 公开接口：获取 AI 状态（无需认证，仅返回是否可用）
+router.get('/status', async (req, res) => {
+  try {
+    const config = await db.getAIConfig();
+    res.json({
+      success: true,
+      data: {
+        available: !!(config && config.apiKey),
+        provider: config?.provider || null
+      }
+    });
+  } catch (error) {
+    res.json({ success: false, data: { available: false } });
+  }
+});
+
 // 获取 AI 配置
 router.get('/config', authMiddleware, async (req, res) => {
   try {
@@ -1527,6 +1543,16 @@ router.post('/config', authMiddleware, async (req, res) => {
     res.json({ success: true, message: '配置保存成功' });
   } catch (error) {
     res.status(500).json({ success: false, message: '保存配置失败' });
+  }
+});
+
+// 清除 AI 配置
+router.delete('/config', authMiddleware, async (req, res) => {
+  try {
+    await db.clearAIConfig();
+    res.json({ success: true, message: 'AI 配置已清除' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '清除配置失败' });
   }
 });
 

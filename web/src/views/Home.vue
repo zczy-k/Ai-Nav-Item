@@ -3649,11 +3649,11 @@ async function handleEditCard(card) {
   checkAIConfig();
 }
 
-// 检查 AI 是否已配置
+// 检查 AI 是否已配置（使用公开接口，无需认证）
 async function checkAIConfig() {
   try {
-    const res = await api.get('/api/ai/config');
-    aiConfigured.value = res.data.success && res.data.config.hasApiKey;
+    const res = await axios.get('/api/ai/status');
+    aiConfigured.value = res.data.success && res.data.data.available;
   } catch (e) {
     aiConfigured.value = false;
   }
@@ -3764,8 +3764,15 @@ async function generateAIName() {
       showToastMessage(res.data.message || 'AI 生成失败', 'error');
     }
   } catch (err) {
-    const msg = err.response?.data?.message || 'AI 服务不可用，请先在后台配置';
-    showToastMessage(msg, 'error');
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
+      pendingAction.value = generateAIName;
+      showPasswordModal.value = true;
+      authError.value = '登录已过期，请重新输入密码';
+    } else {
+      const msg = err.response?.data?.message || 'AI 服务不可用，请先在后台配置';
+      showToastMessage(msg, 'error');
+    }
   } finally {
     aiGeneratingName.value = false;
   }
@@ -3795,8 +3802,15 @@ async function generateAIDescription() {
       showToastMessage(res.data.message || 'AI 生成失败', 'error');
     }
   } catch (err) {
-    const msg = err.response?.data?.message || 'AI 服务不可用，请先在后台配置';
-    showToastMessage(msg, 'error');
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
+      pendingAction.value = generateAIDescription;
+      showPasswordModal.value = true;
+      authError.value = '登录已过期，请重新输入密码';
+    } else {
+      const msg = err.response?.data?.message || 'AI 服务不可用，请先在后台配置';
+      showToastMessage(msg, 'error');
+    }
   } finally {
     aiGenerating.value = false;
   }
@@ -3862,8 +3876,15 @@ async function generateAITags() {
       showToastMessage(res.data.message || 'AI 推荐失败', 'error');
     }
   } catch (err) {
-    const msg = err.response?.data?.message || 'AI 服务不可用，请先在后台配置';
-    showToastMessage(msg, 'error');
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
+      pendingAction.value = generateAITags;
+      showPasswordModal.value = true;
+      authError.value = '登录已过期，请重新输入密码';
+    } else {
+      const msg = err.response?.data?.message || 'AI 服务不可用，请先在后台配置';
+      showToastMessage(msg, 'error');
+    }
   } finally {
     aiGeneratingTags.value = false;
   }

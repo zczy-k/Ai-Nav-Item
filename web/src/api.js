@@ -108,8 +108,10 @@ export const restoreBackup = (filename) => axios.post(`${BASE}/backup/restore/${
 export const getDataVersion = () => axios.get(`${BASE}/data-version`);
 
 // AI 批量生成 API
+export const aiGetStatus = () => axios.get(`${BASE}/ai/status`);
 export const aiGetConfig = () => axios.get(`${BASE}/ai/config`, { headers: authHeaders() });
 export const aiUpdateConfig = (data) => axios.post(`${BASE}/ai/config`, data, { headers: authHeaders() });
+export const aiClearConfig = () => axios.delete(`${BASE}/ai/config`, { headers: authHeaders() });
 export const aiTestConnection = () => axios.post(`${BASE}/ai/test`, {}, { headers: authHeaders() });
 export const aiGetStats = () => axios.get(`${BASE}/ai/stats`, { headers: authHeaders() });
 export const aiFilterCards = (filters) => axios.post(`${BASE}/ai/filter-cards`, filters, { headers: authHeaders() });
