@@ -8,17 +8,20 @@ const router = express.Router();
 
 // 获取所有卡片（按分类分组，用于首屏加载优化）
 router.get('/', (req, res) => {
-  // 不设置缓存，确保数据实时性
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   
-  db.all('SELECT * FROM cards ORDER BY menu_id, sub_menu_id, "order"', [], (err, cards) => {
+  db.all(`
+    SELECT c.*, sm.parent_id as parent_menu_id
+    FROM cards c
+    LEFT JOIN sub_menus sm ON c.sub_menu_id = sm.id
+    ORDER BY c.menu_id, c.sub_menu_id, c."order"
+  `, [], (err, cards) => {
     if (err) return res.status(500).json({ error: err.message });
     
     if (cards.length === 0) {
       return res.json({ cards: [], cardsByCategory: {} });
     }
     
-    // 获取所有标签关联
     const cardIds = cards.map(c => c.id);
     const placeholders = cardIds.map(() => '?').join(',');
     
@@ -32,7 +35,6 @@ router.get('/', (req, res) => {
       (err, tagRows) => {
         if (err) return res.status(500).json({ error: err.message });
         
-        // 将标签按 card_id 分组
         const tagsByCard = {};
         tagRows.forEach(tag => {
           if (!tagsByCard[tag.card_id]) {
@@ -45,15 +47,16 @@ router.get('/', (req, res) => {
           });
         });
         
-        // 按分类分组卡片
         const cardsByCategory = {};
         cards.forEach(card => {
-          const key = `${card.menu_id}_${card.sub_menu_id || 'null'}`;
+          const menuId = card.menu_id || card.parent_menu_id;
+          const key = `${menuId}_${card.sub_menu_id || 'null'}`;
           if (!cardsByCategory[key]) {
             cardsByCategory[key] = [];
           }
           cardsByCategory[key].push({
             ...card,
+            menu_id: menuId,
             tags: tagsByCard[card.id] || []
           });
         });
@@ -66,18 +69,24 @@ router.get('/', (req, res) => {
 
 // 获取指定菜单的卡片（包含标签）
 router.get('/:menuId', (req, res) => {
-  // 不设置缓存，确保数据实时性
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   
   const { subMenuId } = req.query;
+  const menuId = req.params.menuId;
   let query, params;
   
   if (subMenuId) {
-    query = 'SELECT * FROM cards WHERE sub_menu_id = ? ORDER BY "order"';
+    query = `
+      SELECT c.*, sm.parent_id as parent_menu_id
+      FROM cards c
+      LEFT JOIN sub_menus sm ON c.sub_menu_id = sm.id
+      WHERE c.sub_menu_id = ?
+      ORDER BY c."order"
+    `;
     params = [subMenuId];
   } else {
     query = 'SELECT * FROM cards WHERE menu_id = ? AND sub_menu_id IS NULL ORDER BY "order"';
-    params = [req.params.menuId];
+    params = [menuId];
   }
   
   db.all(query, params, (err, cards) => {
@@ -87,7 +96,6 @@ router.get('/:menuId', (req, res) => {
       return res.json([]);
     }
     
-    // 为每个卡片获取标签
     const cardIds = cards.map(c => c.id);
     const placeholders = cardIds.map(() => '?').join(',');
     
@@ -101,7 +109,6 @@ router.get('/:menuId', (req, res) => {
       (err, tagRows) => {
         if (err) return res.status(500).json({error: err.message});
         
-        // 将标签按 card_id 分组
         const tagsByCard = {};
         tagRows.forEach(tag => {
           if (!tagsByCard[tag.card_id]) {
@@ -114,9 +121,9 @@ router.get('/:menuId', (req, res) => {
           });
         });
         
-        // 将标签添加到卡片数据中
         const result = cards.map(card => ({
           ...card,
+          menu_id: card.menu_id || card.parent_menu_id || parseInt(menuId),
           tags: tagsByCard[card.id] || []
         }));
         
