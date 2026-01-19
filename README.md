@@ -1,10 +1,13 @@
-# Con-Nav-Item - 现代化个人导航站
+# Con-Nav-Item - 现代化个人导航站 v1.0.0
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)](https://github.com/zczy-k/Con-Nav-Item/releases)
 [![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue.js-3-brightgreen.svg)](https://vuejs.org/)
 
 现代化的个人导航站，提供美观的卡片式导航界面、强大的后台管理系统、AI 智能生成和功能丰富的浏览器扩展。
+
+**🎉 正式版本 1.0.0 发布！** 功能完整稳定，可用于生产环境。
 
 示例站：https://con-nav-item.zeabur.app/
 
@@ -131,6 +134,84 @@
 - **数据导入导出** - 支持备份文件的导入导出
 - **增量备份** - 智能检测变化，只备份有变动的数据
 - **防抖备份** - 数据变更后延迟备份，避免频繁写入（默认5分钟）
+
+## 📁 项目结构
+
+```
+Con-Nav-Item/
+├── app.js                    # 主应用入口
+├── package.json              # 项目配置和依赖
+├── config.js                 # 应用配置
+├── db.js                     # 数据库连接和初始化
+├── routes/                   # API 路由
+│   ├── auth.js              # 用户认证
+│   ├── menu.js              # 菜单管理
+│   ├── card.js              # 卡片管理
+│   ├── ai.js                # AI 智能生成
+│   ├── backup.js            # 备份管理
+│   └── ...                  # 其他路由
+├── middleware/               # 中间件
+│   ├── security.js          # 安全中间件
+│   └── errorHandler.js      # 错误处理
+├── utils/                    # 工具函数
+│   ├── aiProvider.js        # AI 提供商适配器
+│   ├── crypto.js            # 加密工具
+│   ├── autoBackup.js        # 自动备份
+│   └── ...                  # 其他工具
+├── web/                      # 前端代码 (Vue 3)
+│   ├── src/                 # 源代码
+│   ├── public/              # 静态资源
+│   └── dist/                # 构建输出
+├── browser-extension/        # 浏览器扩展
+│   ├── manifest.json        # 扩展配置
+│   ├── background.js        # 后台脚本
+│   ├── newtab.html          # 新标签页
+│   └── ...                  # 其他扩展文件
+├── scripts/                  # 部署脚本
+│   ├── install-linux.sh     # Linux 一键安装
+│   ├── install-serv00.sh    # Serv00 一键安装
+│   └── check-password.js    # 密码管理工具
+├── docs/                     # 文档
+│   ├── deployment/          # 部署相关文档
+│   └── features/            # 功能说明文档
+├── database/                 # 数据库文件
+├── backups/                  # 备份文件
+└── config/                   # 配置文件
+    ├── autoBackup.json      # 自动备份配置
+    ├── .jwt-secret          # JWT 密钥
+    └── .crypto-secret       # 加密密钥
+```
+
+## 🚀 快速开始
+
+### 开发环境
+
+```bash
+# 克隆项目
+git clone https://github.com/zczy-k/Con-Nav-Item.git
+cd Con-Nav-Item
+
+# 安装依赖
+npm run install:all
+
+# 启动开发服务器
+npm run dev
+```
+
+### 生产环境
+
+```bash
+# 安装依赖
+npm install
+
+# 构建前端
+npm run build
+
+# 启动应用
+npm start
+```
+
+访问 `http://localhost:3000`，默认账号：admin / 123456
 
 ## 🚀 快速部署
 
@@ -288,28 +369,28 @@ npm start
 
 ### Serv00 部署问题
 
-如果遇到 524 错误或前端无法显示，查看 [SERV00_FIX.md](SERV00_FIX.md)
+如果遇到 524 错误或前端无法显示，查看 [docs/deployment/serv00.md](docs/deployment/serv00.md)
 
 ### 密码管理
 
 ```bash
 # 检查密码
-node check-password.js check
+npm run check-password check
 
 # 重置密码
-node check-password.js reset 新密码
+npm run check-password reset 新密码
 ```
 
 Docker 环境：
 ```bash
-docker exec -it Con-Nav-Item node check-password.js reset 新密码
+docker exec -it Con-Nav-Item npm run check-password reset 新密码
 ```
 
 ### 自定义搜索引擎
 
 支持添加自定义搜索引擎，只需提供搜索URL，系统会自动解析图标和名称。
 
-详见 [自定义搜索引擎文档](docs/custom-search-engine.md)
+详见 [自定义搜索引擎文档](docs/features/custom-search-engine.md)
 
 ### 前端编辑模式
 
