@@ -2355,51 +2355,49 @@ async function loadCards(forceRefresh = false) {
     const subMenus = activeMenu.value.subMenus || [];
     const mainCacheKey = getCardsCacheKey(activeMenu.value.id, null);
     
-    // 检查是否所有分类都有缓存
-    if (!forceRefresh) {
-      const cachedCards = [];
-      let allCached = true;
-      
-      // 检查主菜单缓存
-      if (cardsCache.value[mainCacheKey]) {
-        cachedCards.push(...cardsCache.value[mainCacheKey]);
-      } else {
-        allCached = false;
-      }
-      
-      // 检查子菜单缓存
-      for (const subMenu of subMenus) {
-        const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
-        if (cardsCache.value[subCacheKey]) {
-          cachedCards.push(...cardsCache.value[subCacheKey]);
+      // 检查是否所有分类都有缓存
+      if (!forceRefresh) {
+        const cachedCards = [];
+        let allCached = true;
+        
+        // 检查主菜单缓存
+        if (cardsCache.value.hasOwnProperty(mainCacheKey)) {
+          cachedCards.push(...(cardsCache.value[mainCacheKey] || []));
         } else {
           allCached = false;
         }
+        
+        // 检查子菜单缓存
+        for (const subMenu of subMenus) {
+          const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
+          if (cardsCache.value.hasOwnProperty(subCacheKey)) {
+            cachedCards.push(...(cardsCache.value[subCacheKey] || []));
+          } else {
+            allCached = false;
+          }
+        }
+        
+        // 如果所有分类都有缓存，直接使用缓存（包括空数组）
+        if (allCached) {
+          cards.value = cachedCards;
+          return;
+        }
       }
       
-      // 如果所有分类都有缓存，直接使用缓存
-      if (allCached && cachedCards.length > 0) {
-        cards.value = cachedCards;
-        return;
-      }
-    }
-    
-    // 1. 先立即显示所有缓存的卡片
-    if (!forceRefresh) {
-      const cachedCards = [];
-      if (cardsCache.value[mainCacheKey]) {
-        cachedCards.push(...cardsCache.value[mainCacheKey]);
-      }
-      subMenus.forEach(subMenu => {
-        const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
-        if (cardsCache.value[subCacheKey]) {
-          cachedCards.push(...cardsCache.value[subCacheKey]);
+      // 1. 先立即显示所有缓存的卡片
+      if (!forceRefresh) {
+        const cachedCards = [];
+        if (cardsCache.value[mainCacheKey]) {
+          cachedCards.push(...cardsCache.value[mainCacheKey]);
         }
-      });
-      if (cachedCards.length > 0) {
+        subMenus.forEach(subMenu => {
+          const subCacheKey = getCardsCacheKey(activeMenu.value.id, subMenu.id);
+          if (cardsCache.value[subCacheKey]) {
+            cachedCards.push(...cardsCache.value[subCacheKey]);
+          }
+        });
         cards.value = cachedCards;
       }
-    }
     
       // 2. 后台并行加载所有数据，每个请求返回后立即更新显示
       const allPromises = [];
@@ -3287,11 +3285,15 @@ async function saveMenuModal() {
   
   menuModalLoading.value = true;
   try {
+    let newMenuId = null;
+    let newSubMenuId = null;
+    
     if (menuModalType.value === 'menu') {
       if (menuModalMode.value === 'add') {
         // 新菜单添加到末尾
         const maxOrder = menus.value.length > 0 ? Math.max(...menus.value.map(m => m.order || 0)) : 0;
-        await addMenu({ name: editingMenuData.value.name.trim(), order: maxOrder + 1 });
+        const res = await addMenu({ name: editingMenuData.value.name.trim(), order: maxOrder + 1 });
+        newMenuId = res.data?.id;
       } else {
         await updateMenu(editingMenuData.value.id, { name: editingMenuData.value.name.trim() });
       }
@@ -3301,7 +3303,8 @@ async function saveMenuModal() {
         const parentMenu = menus.value.find(m => m.id === editingMenuData.value.parentId);
         const subMenus = parentMenu?.subMenus || [];
         const maxOrder = subMenus.length > 0 ? Math.max(...subMenus.map(s => s.order || 0)) : 0;
-        await addSubMenu(editingMenuData.value.parentId, { name: editingMenuData.value.name.trim(), order: maxOrder + 1 });
+        const res = await addSubMenu(editingMenuData.value.parentId, { name: editingMenuData.value.name.trim(), order: maxOrder + 1 });
+        newSubMenuId = res.data?.id;
       } else {
         await updateSubMenu(editingMenuData.value.id, { name: editingMenuData.value.name.trim() });
       }
@@ -3310,6 +3313,21 @@ async function saveMenuModal() {
     // 刷新菜单数据
     const menusRes = await getMenus(true);
     menus.value = menusRes.data;
+    
+    // 如果是新建主菜单，为其初始化空的卡片缓存
+    if (newMenuId) {
+      const cacheKey = getCardsCacheKey(newMenuId, null);
+      cardsCache.value[cacheKey] = [];
+      saveCardsCache();
+    }
+    
+    // 如果是新建子菜单，为其初始化空的卡片缓存
+    if (newSubMenuId) {
+      const cacheKey = getCardsCacheKey(editingMenuData.value.parentId, newSubMenuId);
+      cardsCache.value[cacheKey] = [];
+      saveCardsCache();
+    }
+    
     showMenuModal.value = false;
   } catch (error) {
     if (error.response?.status === 401) {
@@ -3577,9 +3595,26 @@ async function moveCardToCategory(menuId, subMenuId) {
   if (isMovingCards.value) return;
   
   isMovingCards.value = true;
-  const movedCardIds = selectedCards.value.map(c => c.id);
-  const movedCards = [...selectedCards.value];
-  const count = selectedCards.value.length;
+  
+  // 过滤掉已经在目标分类中的卡片
+  const cardsToMove = selectedCards.value.filter(card => {
+    const cardMenuId = card.menu_id;
+    const cardSubMenuId = card.sub_menu_id || null;
+    const targetSubId = subMenuId || null;
+    return !(cardMenuId === menuId && cardSubMenuId === targetSubId);
+  });
+  
+  const skippedCount = selectedCards.value.length - cardsToMove.length;
+  
+  // 如果所有卡片都已在目标分类中
+  if (cardsToMove.length === 0) {
+    showToastMessage('所有选中的卡片已在该分类中', 'info');
+    showMovePanel.value = false;
+    isMovingCards.value = false;
+    return;
+  }
+  
+  const count = cardsToMove.length;
   
   // 显示进度弹窗
   showProgress('移动卡片', `正在移动 ${count} 个卡片...`);
@@ -3590,7 +3625,7 @@ async function moveCardToCategory(menuId, subMenuId) {
     const failedCards = [];
     let newDataVersion = null;
     
-    for (const card of movedCards) {
+    for (const card of cardsToMove) {
       const updateData = {
         menu_id: menuId,
         sub_menu_id: subMenuId,
@@ -3652,14 +3687,18 @@ async function moveCardToCategory(menuId, subMenuId) {
     await loadCards(true);
     
     // 5. 显示结果
+    let resultMsg = '';
     if (failedCards.length > 0) {
-      updateProgress(`成功移动 ${successfulMoves.length} 个卡片，${failedCards.length} 个失败`, 'success');
-      } else {
-        updateProgress(`成功移动 ${count} 个卡片！`, 'success');
-      }
+      resultMsg = `成功移动 ${successfulMoves.length} 个卡片，${failedCards.length} 个失败`;
+    } else if (skippedCount > 0) {
+      resultMsg = `成功移动 ${count} 个卡片，跳过 ${skippedCount} 个已在该分类中的卡片`;
+    } else {
+      resultMsg = `成功移动 ${count} 个卡片！`;
+    }
+    updateProgress(resultMsg, 'success');
       
-      clearSelection();
-    } catch (error) {
+    clearSelection();
+  } catch (error) {
     console.error('移动卡片失败:', error);
     if (error.response?.status === 401) {
       closeProgressModal();

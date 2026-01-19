@@ -1,5 +1,5 @@
 <template>
-  <div ref="cardGridRef" class="container card-grid">
+  <div ref="cardGridRef" class="container card-grid" :class="{ 'selection-mode': selectionMode }">
     <div v-for="(card, index) in cards" :key="card.id"
          class="link-item" 
          :class="{ 
@@ -8,8 +8,8 @@
          :data-card-id="card.id"
          @contextmenu.prevent="handleContextMenu($event, card)"
          @click="handleCardClick($event, card)">
-      <a :href="card.url" 
-         target="_blank" 
+      <a :href="selectionMode ? 'javascript:void(0)' : card.url" 
+         :target="selectionMode ? '' : '_blank'" 
          :title="getTooltip(card)" 
          @click="handleLinkClick($event, card)"
          class="card-link">
@@ -180,6 +180,7 @@ function handleLinkClick(event, card) {
   if (event.ctrlKey || event.metaKey || props.selectionMode) {
     event.preventDefault();
     event.stopPropagation();
+    emit('toggleCardSelection', card);
   } else {
     recordCardClick(card.id);
   }
@@ -484,6 +485,18 @@ function isCardSelected(card) {
   box-shadow: 
     0 0 0 4px rgba(99, 179, 237, 0.25), 
     0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.card-grid.selection-mode .link-item {
+  cursor: pointer;
+}
+
+.card-grid.selection-mode .link-item:hover {
+  border-color: rgba(99, 179, 237, 0.5);
+}
+
+.card-grid.selection-mode .link-item .card-link {
+  pointer-events: none;
 }
 
 .card-link {
