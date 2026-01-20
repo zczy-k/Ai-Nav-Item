@@ -3295,6 +3295,7 @@ async function saveMenuModal() {
   try {
     let newMenuId = null;
     let newSubMenuId = null;
+    const parentId = editingMenuData.value.parentId;
     
     if (menuModalType.value === 'menu') {
       if (menuModalMode.value === 'add') {
@@ -3308,10 +3309,10 @@ async function saveMenuModal() {
     } else {
       if (menuModalMode.value === 'add') {
         // 新子菜单添加到末尾
-        const parentMenu = menus.value.find(m => m.id === editingMenuData.value.parentId);
+        const parentMenu = menus.value.find(m => m.id === parentId);
         const subMenus = parentMenu?.subMenus || [];
         const maxOrder = subMenus.length > 0 ? Math.max(...subMenus.map(s => s.order || 0)) : 0;
-        const res = await addSubMenu(editingMenuData.value.parentId, { name: editingMenuData.value.name.trim(), order: maxOrder + 1 });
+        const res = await addSubMenu(parentId, { name: editingMenuData.value.name.trim(), order: maxOrder + 1 });
         newSubMenuId = res.data?.id;
       } else {
         await updateSubMenu(editingMenuData.value.id, { name: editingMenuData.value.name.trim() });
@@ -3322,6 +3323,20 @@ async function saveMenuModal() {
     const menusRes = await getMenus(true);
     menus.value = menusRes.data;
     
+    // 关键修复：更新 activeMenu 为新的菜单列表中的对应对象
+    // 这样可以确保 activeMenu.subMenus 等属性是最新的
+    if (activeMenu.value) {
+      const updatedActiveMenu = menus.value.find(m => m.id === activeMenu.value.id);
+      if (updatedActiveMenu) {
+        activeMenu.value = updatedActiveMenu;
+        // 如果有选中的子菜单，也需要更新引用
+        if (activeSubMenu.value) {
+          const updatedSubMenu = updatedActiveMenu.subMenus?.find(s => s.id === activeSubMenu.value.id);
+          activeSubMenu.value = updatedSubMenu || null;
+        }
+      }
+    }
+    
     // 如果是新建主菜单，为其初始化空的卡片缓存
     if (newMenuId) {
       const cacheKey = getCardsCacheKey(newMenuId, null);
@@ -3331,7 +3346,7 @@ async function saveMenuModal() {
     
     // 如果是新建子菜单，为其初始化空的卡片缓存
     if (newSubMenuId) {
-      const cacheKey = getCardsCacheKey(editingMenuData.value.parentId, newSubMenuId);
+      const cacheKey = getCardsCacheKey(parentId, newSubMenuId);
       cardsCache.value[cacheKey] = [];
       saveCardsCache();
     }
@@ -3384,6 +3399,12 @@ async function handleDeleteMenu(menu) {
       activeMenu.value = menus.value[0] || null;
       activeSubMenu.value = null;
       await loadCards(true);
+    } else if (activeMenu.value) {
+      // 即使删除的不是当前菜单，也需要更新 activeMenu 的引用
+      const updatedActiveMenu = menus.value.find(m => m.id === activeMenu.value.id);
+      if (updatedActiveMenu) {
+        activeMenu.value = updatedActiveMenu;
+      }
     }
   } catch (error) {
     if (error.response?.status === 401) {
@@ -3405,6 +3426,14 @@ async function handleDeleteSubMenu(subMenu, parentMenu) {
     
     // 通知浏览器扩展刷新右键菜单
     notifyExtensionRefreshMenus();
+    
+    // 更新 activeMenu 的引用，确保 subMenus 是最新的
+    if (activeMenu.value) {
+      const updatedActiveMenu = menus.value.find(m => m.id === activeMenu.value.id);
+      if (updatedActiveMenu) {
+        activeMenu.value = updatedActiveMenu;
+      }
+    }
     
     // 如果删除的是当前选中的子菜单，切换到父菜单
     if (activeSubMenu.value?.id === subMenu.id) {
@@ -3430,6 +3459,14 @@ async function handleMenusReordered(menuIds) {
     // 刷新菜单数据
     const menusRes = await getMenus(true);
     menus.value = menusRes.data;
+    
+    // 更新 activeMenu 的引用
+    if (activeMenu.value) {
+      const updatedActiveMenu = menus.value.find(m => m.id === activeMenu.value.id);
+      if (updatedActiveMenu) {
+        activeMenu.value = updatedActiveMenu;
+      }
+    }
   } catch (error) {
     if (error.response?.status === 401) {
       handleTokenInvalid();
@@ -3459,6 +3496,14 @@ async function handleMoveSubMenuUp(subMenu, parentMenu, index) {
     // 刷新菜单数据
     const menusRes = await getMenus(true);
     menus.value = menusRes.data;
+    
+    // 更新 activeMenu 的引用，确保 subMenus 是最新的
+    if (activeMenu.value) {
+      const updatedActiveMenu = menus.value.find(m => m.id === activeMenu.value.id);
+      if (updatedActiveMenu) {
+        activeMenu.value = updatedActiveMenu;
+      }
+    }
   } catch (error) {
     if (error.response?.status === 401) {
       handleTokenInvalid();
@@ -3485,6 +3530,14 @@ async function handleMoveSubMenuDown(subMenu, parentMenu, index) {
     // 刷新菜单数据
     const menusRes = await getMenus(true);
     menus.value = menusRes.data;
+    
+    // 更新 activeMenu 的引用，确保 subMenus 是最新的
+    if (activeMenu.value) {
+      const updatedActiveMenu = menus.value.find(m => m.id === activeMenu.value.id);
+      if (updatedActiveMenu) {
+        activeMenu.value = updatedActiveMenu;
+      }
+    }
   } catch (error) {
     if (error.response?.status === 401) {
       handleTokenInvalid();
