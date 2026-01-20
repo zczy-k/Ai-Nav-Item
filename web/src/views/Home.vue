@@ -7743,7 +7743,7 @@ async function saveCardEdit() {
   justify-content: space-between;
   padding: 10px 16px;
   margin: 0 0 10px 0;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 12px;
@@ -7754,7 +7754,7 @@ async function saveCardEdit() {
 }
 
 .card-group-header:hover {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .card-group-header.single-header {
@@ -7762,7 +7762,7 @@ async function saveCardEdit() {
 }
 
 .card-group-header.single-header:hover {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .group-header-left {
@@ -7775,14 +7775,15 @@ async function saveCardEdit() {
   width: 24px;
   height: 24px;
   border: none;
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 6px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
 }
 
 .collapse-btn svg {
@@ -7794,27 +7795,30 @@ async function saveCardEdit() {
 }
 
 .collapse-btn:hover {
-  background: rgba(0, 0, 0, 0.08);
-  color: #333;
+  background: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .group-name {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .main-category-name {
-  color: #666;
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 500;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .group-count {
   font-size: 12px;
-  color: #666;
-  background: rgba(0, 0, 0, 0.04);
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.15);
   padding: 2px 8px;
   border-radius: 10px;
+  backdrop-filter: blur(4px);
 }
 
 /* 分组折叠动画 */
