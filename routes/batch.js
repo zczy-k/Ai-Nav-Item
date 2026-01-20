@@ -200,6 +200,7 @@ router.post('/check-urls', auth, async (req, res) => {
 // 批量添加卡片
 router.post('/add', auth, (req, res) => {
   const { menu_id, sub_menu_id, cards } = req.body;
+  const clientId = req.headers['x-client-id'];
 
   if (!menu_id || !cards || !Array.isArray(cards) || cards.length === 0) {
     return res.status(400).json({ error: '请提供有效的菜单ID和卡片列表' });
@@ -311,9 +312,9 @@ router.post('/add', auth, (req, res) => {
                 if (tagErr) {
                   console.error('标签关联失败:', tagErr);
                 }
-                completed++;
-                if (completed === uniqueCards.length) {
-                  triggerDebouncedBackup(); // 触发数据变更通知和自动备份
+              completed++;
+                  if (completed === uniqueCards.length) {
+                    triggerDebouncedBackup(clientId, { type: 'cards_updated' });
                   
                   // 异步触发 AI 自动生成（不阻塞响应）
                   if (insertedIds.length > 0) {
@@ -329,10 +330,10 @@ router.post('/add', auth, (req, res) => {
                   });
                 }
               });
-            } else {
-              completed++;
-              if (completed === uniqueCards.length) {
-                triggerDebouncedBackup(); // 触发数据变更通知和自动备份
+              } else {
+                completed++;
+                if (completed === uniqueCards.length) {
+                  triggerDebouncedBackup(clientId, { type: 'cards_updated' });
                 
                 // 异步触发 AI 自动生成（不阻塞响应）
                 if (insertedIds.length > 0) {

@@ -897,12 +897,20 @@ router.post('/restore/:filename', authMiddleware, backupLimiter, async (req, res
       } catch (e) {
         // 忽略缓存清除失败
       }
-    } catch (e) {
-      console.error('恢复后初始化失败:', e.message);
-      // 即使初始化失败，也继续返回成功（数据已恢复，只是密钥可能需要重新配置）
-    }
+      } catch (e) {
+        console.error('恢复后初始化失败:', e.message);
+        // 即使初始化失败，也继续返回成功（数据已恢复，只是密钥可能需要重新配置）
+      }
 
-    let message = '备份恢复成功！';
+      // 恢复完成后，广播数据变更通知，让所有客户端刷新
+      try {
+        const { notifyDataChange } = require('../utils/autoBackup');
+        await notifyDataChange(null, { type: 'backup_restored' });
+      } catch (e) {
+        console.warn('广播恢复通知失败:', e.message);
+      }
+
+      let message = '备份恢复成功！';
     if (skippedFiles.length > 0) {
       message += ` 已跳过: ${skippedFiles.join(', ')}`;
     }
@@ -1576,16 +1584,24 @@ router.post('/webdav/restore', authMiddleware, async (req, res) => {
         console.error('数据库重连失败:', e);
       }
       
-      // 清除应用缓存
-      try {
-        const app = require('../app');
-        if (app.clearCache) {
-          app.clearCache();
+        // 清除应用缓存
+        try {
+          const app = require('../app');
+          if (app.clearCache) {
+            app.clearCache();
+          }
+        } catch (e) {
+          // 忽略缓存清除失败
         }
-      } catch (e) {
-        // 忽略缓存清除失败
-      }
-    });
+        
+        // 广播数据变更通知，让所有客户端刷新
+        try {
+          const { notifyDataChange } = require('../utils/autoBackup');
+          await notifyDataChange(null, { type: 'backup_restored' });
+        } catch (e) {
+          console.warn('广播恢复通知失败:', e.message);
+        }
+      });
     
   } catch (error) {
     console.error('从WebDAV恢复失败:', error);

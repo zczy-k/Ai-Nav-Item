@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const authMiddleware = require('./authMiddleware');
@@ -6,7 +6,6 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const { triggerDebouncedBackup } = require('../utils/autoBackup');
 
-// 从URL解析搜索引擎信息(不需要认证)
 router.post('/parse', async (req, res) => {
   const { url } = req.body;
   
@@ -15,7 +14,6 @@ router.post('/parse', async (req, res) => {
   }
 
   try {
-    // 获取网页内容
     const response = await axios.get(url, {
       timeout: 10000,
       headers: {
@@ -25,14 +23,11 @@ router.post('/parse', async (req, res) => {
 
     const $ = cheerio.load(response.data);
     
-    // 提取网站名称
     let name = $('title').text().trim();
     if (!name) {
       name = new URL(url).hostname;
     }
 
-
-    // 尝试检测搜索URL模式
     let searchUrl = '';
     const searchInputs = $('input[type="search"], input[name*="search"], input[name="q"], input[name="query"]');
     if (searchInputs.length > 0) {
@@ -48,7 +43,6 @@ router.post('/parse', async (req, res) => {
       }
     }
 
-    // 如果没有检测到搜索表单,使用默认模式
     if (!searchUrl) {
       searchUrl = `${url}${url.includes('?') ? '&' : '?'}q={searchTerms}`;
     }
@@ -67,7 +61,6 @@ router.post('/parse', async (req, res) => {
   }
 });
 
-// 获取所有自定义搜索引擎
 router.get('/', (req, res) => {
   db.all('SELECT * FROM custom_search_engines ORDER BY "order", id', (err, engines) => {
     if (err) {
@@ -77,9 +70,9 @@ router.get('/', (req, res) => {
   });
 });
 
-// 添加自定义搜索引擎
 router.post('/', authMiddleware, (req, res) => {
   const { name, search_url, keyword, order } = req.body;
+  const clientId = req.headers['x-client-id'];
 
   if (!name || !search_url) {
     return res.status(400).json({ error: '名称和搜索URL不能为空' });
@@ -92,7 +85,7 @@ router.post('/', authMiddleware, (req, res) => {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
-      triggerDebouncedBackup();
+      triggerDebouncedBackup(clientId, { type: 'search_engines_updated' });
       res.json({ 
         id: this.lastID,
         name,
@@ -104,10 +97,10 @@ router.post('/', authMiddleware, (req, res) => {
   );
 });
 
-// 更新自定义搜索引擎
 router.put('/:id', authMiddleware, (req, res) => {
   const { id } = req.params;
   const { name, search_url, keyword, order } = req.body;
+  const clientId = req.headers['x-client-id'];
 
   if (!name || !search_url) {
     return res.status(400).json({ error: '名称和搜索URL不能为空' });
@@ -123,7 +116,7 @@ router.put('/:id', authMiddleware, (req, res) => {
       if (this.changes === 0) {
         return res.status(404).json({ error: '搜索引擎不存在' });
       }
-      triggerDebouncedBackup();
+      triggerDebouncedBackup(clientId, { type: 'search_engines_updated' });
       res.json({ 
         id: parseInt(id),
         name,
@@ -135,9 +128,9 @@ router.put('/:id', authMiddleware, (req, res) => {
   );
 });
 
-// 删除自定义搜索引擎
 router.delete('/:id', authMiddleware, (req, res) => {
   const { id } = req.params;
+  const clientId = req.headers['x-client-id'];
 
   db.run('DELETE FROM custom_search_engines WHERE id = ?', [id], function (err) {
     if (err) {
@@ -146,14 +139,14 @@ router.delete('/:id', authMiddleware, (req, res) => {
     if (this.changes === 0) {
       return res.status(404).json({ error: '搜索引擎不存在' });
     }
-    triggerDebouncedBackup();
+    triggerDebouncedBackup(clientId, { type: 'search_engines_updated' });
     res.json({ message: '删除成功' });
   });
 });
 
-// 批量更新搜索引擎顺序
 router.post('/reorder', authMiddleware, (req, res) => {
   const { engines } = req.body;
+  const clientId = req.headers['x-client-id'];
 
   if (!Array.isArray(engines)) {
     return res.status(400).json({ error: '参数格式错误' });
@@ -169,7 +162,7 @@ router.post('/reorder', authMiddleware, (req, res) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    triggerDebouncedBackup();
+    triggerDebouncedBackup(clientId, { type: 'search_engines_updated' });
     res.json({ message: '排序更新成功' });
   });
 });

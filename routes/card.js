@@ -136,6 +136,7 @@ router.get('/:menuId', (req, res) => {
 // 批量更新卡片（用于拖拽排序和分类）- 必须放在/:id之前
 router.patch('/batch-update', auth, (req, res) => {
   const { cards } = req.body;
+  const clientId = req.headers['x-client-id'];
   
   if (!Array.isArray(cards) || cards.length === 0) {
     return res.status(400).json({ error: '无效的请求数据' });
@@ -180,7 +181,7 @@ router.patch('/batch-update', auth, (req, res) => {
                 if (err) {
                   return res.status(500).json({ error: err.message });
                 }
-                triggerDebouncedBackup(); // 触发自动备份和SSE广播
+                triggerDebouncedBackup(clientId, { type: 'cards_updated' }); // 触发自动备份和SSE广播
                 res.json({ success: true, updated: completed });
               });
             }
@@ -194,6 +195,7 @@ router.patch('/batch-update', auth, (req, res) => {
 // 新增卡片（含标签）
 router.post('/', auth, (req, res) => {
   const { menu_id, sub_menu_id, title, url, logo_url, desc, order, tagIds } = req.body;
+  const clientId = req.headers['x-client-id'];
   
   // 先检查是否重复
   db.all('SELECT * FROM cards', [], (err, existingCards) => {
@@ -225,7 +227,7 @@ router.post('/', auth, (req, res) => {
           db.run(`INSERT INTO card_tags (card_id, tag_id) VALUES ${values}`, (err) => {
             if (err) return res.status(500).json({error: err.message});
             
-            triggerDebouncedBackup();
+            triggerDebouncedBackup(clientId, { type: 'cards_updated' });
             
             // 异步触发 AI 自动生成（不阻塞响应）
             setImmediate(() => autoGenerateForCards([cardId]));
@@ -233,7 +235,7 @@ router.post('/', auth, (req, res) => {
             res.json({ id: cardId });
           });
         } else {
-          triggerDebouncedBackup();
+          triggerDebouncedBackup(clientId, { type: 'cards_updated' });
           
           // 异步触发 AI 自动生成（不阻塞响应）
           setImmediate(() => autoGenerateForCards([cardId]));
@@ -249,6 +251,7 @@ router.post('/', auth, (req, res) => {
 router.put('/:id', auth, (req, res) => {
   const { menu_id, sub_menu_id, title, url, logo_url, desc, order, tagIds } = req.body;
   const { id } = req.params;
+  const clientId = req.headers['x-client-id'];
   
   db.run(
     'UPDATE cards SET menu_id=?, sub_menu_id=?, title=?, url=?, logo_url=?, desc=?, "order"=? WHERE id=?', 
@@ -274,7 +277,7 @@ router.put('/:id', auth, (req, res) => {
             if (err) return res.status(500).json({error: err.message});
             if (!card) return res.status(404).json({error: '卡片不存在'});
             
-            triggerDebouncedBackup(); // 触发自动备份和SSE广播
+            triggerDebouncedBackup(clientId, { type: 'cards_updated' }); // 触发自动备份和SSE广播
             res.json({ 
               success: true,
               changed: changes,
@@ -300,6 +303,7 @@ router.put('/:id', auth, (req, res) => {
 
 router.delete('/:id', auth, (req, res) => {
   const cardId = req.params.id;
+  const clientId = req.headers['x-client-id'];
   
   // 使用事务确保数据一致性
   db.serialize(() => {
@@ -329,7 +333,7 @@ router.delete('/:id', auth, (req, res) => {
               return res.status(500).json({ error: '提交事务失败: ' + err.message });
             }
             
-            triggerDebouncedBackup(); // 触发自动备份和SSE广播
+            triggerDebouncedBackup(clientId, { type: 'cards_updated' }); // 触发自动备份和SSE广播
             res.json({ 
               success: true,
               deleted: deletedCount

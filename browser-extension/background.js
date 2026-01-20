@@ -9,11 +9,18 @@ let isLoadingMenus = false; // 防止并发请求
 let menuRetryTimer = null; // 菜单获取重试定时器
 const MENU_RETRY_INTERVAL = 30 * 1000; // 30秒重试间隔
 
+// SSE 同步相关
+let sseConnection = null;
+let sseReconnectTimer = null;
+let lastSseVersion = 0;
+
 // 扩展安装/更新时注册右键菜单
 chrome.runtime.onInstalled.addListener(async () => {
     await registerContextMenus();
     // 启动菜单获取重试机制
     startMenuRetryIfNeeded();
+    // 初始化 SSE 连接
+    initSseConnection();
 });
 
 // 扩展启动时注册右键菜单
@@ -21,7 +28,65 @@ chrome.runtime.onStartup.addListener(async () => {
     await registerContextMenus();
     // 启动菜单获取重试机制
     startMenuRetryIfNeeded();
+    // 初始化 SSE 连接
+    initSseConnection();
 });
+
+// 初始化 SSE 连接实现实时同步
+async function initSseConnection() {
+    if (sseConnection) {
+        sseConnection.close();
+        sseConnection = null;
+    }
+
+    try {
+        const config = await chrome.storage.sync.get(['navUrl']);
+        if (!config.navUrl) return;
+
+        const navServerUrl = config.navUrl.replace(/\/$/, '');
+        const sseUrl = `${navServerUrl}/api/sse/data-sync`;
+
+        console.log('[导航站扩展] 正在建立 SSE 连接:', sseUrl);
+        sseConnection = new EventSource(sseUrl);
+
+        sseConnection.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('[导航站扩展] 收到 SSE 消息:', data);
+
+                if (data.type === 'connected' || data.type === 'version_change') {
+                    const newVersion = data.version;
+                    
+                    // 如果版本号发生变化，且不是刚刚连接时的初始版本同步
+                    if (newVersion !== lastSseVersion) {
+                        console.log(`[导航站扩展] 数据版本变更: ${lastSseVersion} -> ${newVersion}，正在刷新菜单...`);
+                        lastSseVersion = newVersion;
+                        
+                        // 触发菜单刷新
+                        refreshCategoryMenus();
+                    }
+                }
+            } catch (e) {
+                // 忽略解析错误（可能是心跳）
+            }
+        };
+
+        sseConnection.onerror = () => {
+            console.warn('[导航站扩展] SSE 连接断开，准备重连...');
+            if (sseConnection) {
+                sseConnection.close();
+                sseConnection = null;
+            }
+            
+            // 5秒后尝试重连
+            if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
+            sseReconnectTimer = setTimeout(initSseConnection, 5000);
+        };
+
+    } catch (e) {
+        console.error('[导航站扩展] 初始化 SSE 失败:', e);
+    }
+}
 
 // 当缓存为空时，定期尝试获取菜单数据
 function startMenuRetryIfNeeded() {
@@ -1083,6 +1148,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'sync' && changes.navUrl) {
         console.log('[导航站扩展] 检测到导航站地址变化，正在刷新右键菜单...');
         refreshCategoryMenus();
+        // 重新初始化 SSE
+        initSseConnection();
     }
 });
 
@@ -1282,7 +1349,7 @@ function getWeekNumber(date) {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     const dayNum = d.getUTCDay() || 7;
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const yearStart = new Date(Date.UTC(d.get_UTC_Full_Year(), 0, 1));
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 

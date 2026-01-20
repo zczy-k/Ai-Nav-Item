@@ -3,18 +3,7 @@ const db = require('../db');
 const auth = require('./authMiddleware');
 const { triggerDebouncedBackup } = require('../utils/autoBackup');
 const { paginateQuery } = require('../utils/dbHelpers');
-const { broadcastVersionChange } = require('../utils/sseManager');
 const router = express.Router();
-
-// 辅助函数：递增版本号并广播
-async function notifyDataChange() {
-  try {
-    const newVersion = await db.incrementDataVersion();
-    broadcastVersionChange(newVersion);
-  } catch (e) {
-    console.error('通知数据变更失败:', e);
-  }
-}
 
 // 获取所有菜单（包含子菜单）- 优化：单次查询获取所有数据
 router.get('/', (req, res) => {
@@ -90,16 +79,17 @@ router.get('/:id/submenus', (req, res) => {
 // 新增、修改、删除菜单需认证
 router.post('/', auth, (req, res) => {
   const { name, order } = req.body;
-  db.run('INSERT INTO menus (name, "order") VALUES (?, ?)', [name, order || 0], async function(err) {
+  const clientId = req.headers['x-client-id'];
+  db.run('INSERT INTO menus (name, "order") VALUES (?, ?)', [name, order || 0], function(err) {
     if (err) return res.status(500).json({error: err.message});
-    triggerDebouncedBackup();
-    await notifyDataChange();
+    triggerDebouncedBackup(clientId, { type: 'menu_updated' }); // 触发自动备份
     res.json({ id: this.lastID });
   });
 });
 
 router.put('/:id', auth, (req, res) => {
   const { name, order } = req.body;
+  const clientId = req.headers['x-client-id'];
   
   // 支持部分更新：只更新提供的字段
   const updates = [];
@@ -121,16 +111,16 @@ router.put('/:id', auth, (req, res) => {
   params.push(req.params.id);
   const sql = `UPDATE menus SET ${updates.join(', ')} WHERE id=?`;
   
-  db.run(sql, params, async function(err) {
+  db.run(sql, params, function(err) {
     if (err) return res.status(500).json({error: err.message});
-    triggerDebouncedBackup();
-    await notifyDataChange();
+    triggerDebouncedBackup(clientId, { type: 'menu_updated' }); // 触发自动备份
     res.json({ changed: this.changes });
   });
 });
 
 router.delete('/:id', auth, (req, res) => {
   const menuId = req.params.id;
+  const clientId = req.headers['x-client-id'];
   
   // 使用事务确保数据一致性
   db.serialize(() => {
@@ -169,17 +159,16 @@ router.delete('/:id', auth, (req, res) => {
                 return res.status(500).json({ error: '删除菜单失败: ' + err.message });
               }
               
-              db.run('COMMIT', async (err) => {
-                  if (err) return res.status(500).json({ error: '提交事务失败: ' + err.message });
-                  
-                  triggerDebouncedBackup();
-                  await notifyDataChange();
-                  res.json({ 
-                    deleted: this.changes,
-                    deletedCards: deletedCards,
-                    deletedSubMenus: deletedSubMenus
-                  });
+              db.run('COMMIT', (err) => {
+                if (err) return res.status(500).json({ error: '提交事务失败: ' + err.message });
+                
+                triggerDebouncedBackup(clientId, { type: 'menu_updated' });
+                res.json({ 
+                  deleted: this.changes,
+                  deletedCards: deletedCards,
+                  deletedSubMenus: deletedSubMenus
                 });
+              });
             });
           });
         });
@@ -191,17 +180,18 @@ router.delete('/:id', auth, (req, res) => {
 // 子菜单相关API
 router.post('/:id/submenus', auth, (req, res) => {
   const { name, order } = req.body;
+  const clientId = req.headers['x-client-id'];
   db.run('INSERT INTO sub_menus (parent_id, name, "order") VALUES (?, ?, ?)', 
-    [req.params.id, name, order || 0], async function(err) {
+    [req.params.id, name, order || 0], function(err) {
     if (err) return res.status(500).json({error: err.message});
-    triggerDebouncedBackup();
-    await notifyDataChange();
+    triggerDebouncedBackup(clientId, { type: 'menu_updated' }); // 触发自动备份
     res.json({ id: this.lastID });
   });
 });
 
 router.put('/submenus/:id', auth, (req, res) => {
   const { name, order } = req.body;
+  const clientId = req.headers['x-client-id'];
   
   // 支持部分更新：只更新提供的字段
   const updates = [];
@@ -223,16 +213,16 @@ router.put('/submenus/:id', auth, (req, res) => {
   params.push(req.params.id);
   const sql = `UPDATE sub_menus SET ${updates.join(', ')} WHERE id=?`;
   
-  db.run(sql, params, async function(err) {
+  db.run(sql, params, function(err) {
     if (err) return res.status(500).json({error: err.message});
-    triggerDebouncedBackup();
-    await notifyDataChange();
+    triggerDebouncedBackup(clientId, { type: 'menu_updated' }); // 触发自动备份
     res.json({ changed: this.changes });
   });
 });
 
 router.delete('/submenus/:id', auth, (req, res) => {
   const subMenuId = req.params.id;
+  const clientId = req.headers['x-client-id'];
   
   // 使用事务确保数据一致性
   db.serialize(() => {
@@ -262,15 +252,13 @@ router.delete('/submenus/:id', auth, (req, res) => {
               return res.status(500).json({ error: '删除子菜单失败: ' + err.message });
             }
             
-            db.run('COMMIT', async (err) => {
-                if (err) return res.status(500).json({ error: '提交事务失败: ' + err.message });
-                
-                triggerDebouncedBackup();
-                await notifyDataChange();
-                res.json({ 
-                  deleted: this.changes,
-                  deletedCards: deletedCards
-                });
+            db.run('COMMIT', (err) => {
+              if (err) return res.status(500).json({ error: '提交事务失败: ' + err.message });
+              
+              triggerDebouncedBackup(clientId, { type: 'menu_updated' });
+              res.json({ 
+                deleted: this.changes,
+                deletedCards: deletedCards
               });
             });
           });

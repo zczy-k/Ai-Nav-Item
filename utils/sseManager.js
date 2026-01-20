@@ -20,9 +20,22 @@ function addClient(res) {
 
 /**
  * 向所有客户端广播数据版本变更
+ * @param {number} version 新数据版本号
+ * @param {string} clientId 发起变更的客户端ID (可选)
+ * @param {Object} payload 附加数据 (可选，例如 { type: 'menu_updated' })
  */
-function broadcastVersionChange(version) {
-  const message = JSON.stringify({ type: 'version_change', version });
+function broadcastVersionChange(version, clientId = null, payload = null) {
+  const messageData = { 
+    type: 'version_change', 
+    version,
+    senderId: clientId
+  };
+  
+  if (payload) {
+    Object.assign(messageData, payload);
+  }
+
+  const message = JSON.stringify(messageData);
   const data = `data: ${message}\n\n`;
   
   clients.forEach(client => {

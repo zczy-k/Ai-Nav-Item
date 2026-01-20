@@ -48,7 +48,7 @@ function loadConfig() {
       return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
     }
     
-    // 首次运行，保存默认配�?
+    // 首次运行，保存默认配?
     saveConfig(DEFAULT_CONFIG);
     return DEFAULT_CONFIG;
   } catch (error) {
@@ -144,13 +144,13 @@ async function createBackupFile(prefix = 'auto') {
       
       archive.pipe(output);
       
-      // 备份数据�?
+      // 备份数据?
       const databaseDir = path.join(__dirname, '..', 'database');
       if (fs.existsSync(databaseDir)) {
         archive.directory(databaseDir, 'database');
       }
       
-      // 备份 config 目录（自动备份配置等�?
+      // 备份 config 目录（自动备份配置等?
       const configDir = path.join(__dirname, '..', 'config');
       if (fs.existsSync(configDir)) {
         archive.directory(configDir, 'config');
@@ -296,7 +296,7 @@ function cleanOldBackups(prefix, keepCount) {
       }))
       .sort((a, b) => b.time - a.time);
     
-    // 删除超出保留数量的备�?
+    // 删除超出保留数量的备?
     let deletedCount = 0;
     for (let i = keepCount; i < files.length; i++) {
       fs.unlinkSync(files[i].path);
@@ -313,8 +313,10 @@ function cleanOldBackups(prefix, keepCount) {
 /**
  * 通知数据变更 - 立即递增版本号并广播给所有客户端
  * 用于让前端实时刷新数据
+ * @param {string} clientId 发起变更的客户端ID
+ * @param {Object} payload 附加数据
  */
-async function notifyDataChange() {
+async function notifyDataChange(clientId = null, payload = null) {
   const db = require('../db');
   const { broadcastVersionChange } = require('./sseManager');
   
@@ -322,22 +324,26 @@ async function notifyDataChange() {
     // 递增版本号并获取新版本号
     const newVersion = await db.incrementDataVersion();
     // 立即广播给所有客户端
-    broadcastVersionChange(newVersion);
+    broadcastVersionChange(newVersion, clientId, payload);
+    return newVersion;
   } catch (err) {
     // 版本号更新失败，忽略
+    return null;
   }
 }
 
 /**
  * 防抖备份 - 数据修改后触发
  * 注意：此函数会同时触发数据变更通知（立即）和自动备份（延迟）
+ * @param {string} clientId 发起变更的客户端ID
+ * @param {Object} payload 附加数据
  */
-async function triggerDebouncedBackup() {
+async function triggerDebouncedBackup(clientId = null, payload = null) {
   // 立即通知数据变更，让前端实时刷新（等待完成）
-  await notifyDataChange();
+  const newVersion = await notifyDataChange(clientId, payload);
   
   if (!config.debounce.enabled) {
-    return;
+    return newVersion;
   }
   
   // 清除之前的定时器
@@ -368,6 +374,8 @@ async function triggerDebouncedBackup() {
       // 防抖备份失败，忽略
     }
   }, config.debounce.delay * 60 * 1000);
+
+  return newVersion;
 }
 
 /**
@@ -378,7 +386,7 @@ function startScheduledBackup() {
     return;
   }
   
-  // 取消之前的任�?
+  // 取消之前的任?
   if (scheduledJob) {
     scheduledJob.cancel();
   }
