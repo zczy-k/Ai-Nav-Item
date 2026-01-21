@@ -4,6 +4,10 @@
 
 Con-Nav-Item 浏览器扩展 v1.0.0 正式发布，为您的个人导航站提供完整的浏览器集成体验。
 
+**发布日期**: 2026年1月21日  
+**版本**: 1.0.0  
+**兼容性**: Chrome 88+, Edge 88+, Firefox 127+, Brave 1.20+
+
 ## ✨ 核心功能
 
 ### 🏠 新标签页导航
@@ -123,6 +127,8 @@ Con-Nav-Item 浏览器扩展 v1.0.0 正式发布，为您的个人导航站提�
 
 ---
 
-**下载地址**: [nav-extension-v1.0.0.zip](https://github.com/zczy-k/Con-Nav-Item/releases/tag/v1.0.0)
+**📦 下载地址**: [nav-extension-v1.0.0.zip](https://github.com/zczy-k/Con-Nav-Item/releases/download/browser-extension-v1.0.0/nav-extension-v1.0.0.zip)
 
-**项目主页**: https://github.com/zczy-k/Con-Nav-Item
+**🏠 项目主页**: https://github.com/zczy-k/Con-Nav-Item
+
+**📖 完整文档**: https://github.com/zczy-k/Con-Nav-Item#-浏览器扩展安装
