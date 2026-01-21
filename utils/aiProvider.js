@@ -35,49 +35,99 @@ const AI_PROVIDERS = {
     needsBaseUrl: false
   },
   // 国内服务
-  deepseek: {
-    name: 'DeepSeek',
-    baseUrl: 'https://api.deepseek.com',
-    defaultModel: 'deepseek-chat',
+deepseek: {
+name: 'DeepSeek',
+baseUrl: 'https://api.deepseek.com',
+defaultModel: 'deepseek-chat',
+needsApiKey: true,
+needsBaseUrl: false
+},
+zhipu: {
+name: '智谱 GLM',
+baseUrl: 'https://open.bigmodel.cn/api/paas',
+defaultModel: 'glm-4-flash',
+needsApiKey: true,
+needsBaseUrl: false
+},
+qwen: {
+name: '通义千问',
+baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
+defaultModel: 'qwen-turbo',
+needsApiKey: true,
+needsBaseUrl: false
+},
+doubao: {
+name: '豆包',
+baseUrl: 'https://ark.cn-beijing.volces.com/api',
+defaultModel: 'doubao-lite-4k',
+needsApiKey: true,
+needsBaseUrl: false
+},
+moonshot: {
+name: 'Moonshot (Kimi)',
+baseUrl: 'https://api.moonshot.cn',
+defaultModel: 'moonshot-v1-8k',
+needsApiKey: true,
+needsBaseUrl: false
+},
+minimax: {
+name: 'MiniMax (海螺)',
+baseUrl: 'https://api.minimax.chat/v1',
+defaultModel: 'abab6.5s-chat',
+needsApiKey: true,
+needsBaseUrl: false
+},
+stepfun: {
+name: '阶跃星辰',
+baseUrl: 'https://api.stepfun.com',
+defaultModel: 'step-1-flash',
+needsApiKey: true,
+needsBaseUrl: false
+},
+  yi: {
+    name: '零一万物 (Yi)',
+    baseUrl: 'https://api.lingyiwanwu.com',
+    defaultModel: 'yi-lightning',
     needsApiKey: true,
     needsBaseUrl: false
   },
-  zhipu: {
-    name: '智谱 GLM',
-    baseUrl: 'https://open.bigmodel.cn/api/paas',
-    defaultModel: 'glm-4-flash',
+  baidu: {
+    name: '百度千帆 (OpenAI 兼容)',
+    baseUrl: 'https://qianfan.baidubce.com/v2',
+    defaultModel: 'ernie-4.0-8k-latest',
     needsApiKey: true,
     needsBaseUrl: false
   },
-  qwen: {
-    name: '通义千问',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
-    defaultModel: 'qwen-turbo',
+  siliconflow: {
+    name: 'SiliconFlow (硅基流动)',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    defaultModel: 'deepseek-ai/DeepSeek-V3',
     needsApiKey: true,
     needsBaseUrl: false
   },
-  doubao: {
-    name: '豆包',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api',
-    defaultModel: 'doubao-lite-4k',
+  spark: {
+    name: '讯飞星火',
+    baseUrl: 'https://spark-api-open.xfyun.cn/v1',
+    defaultModel: 'generalv3.5',
     needsApiKey: true,
     needsBaseUrl: false
   },
-  moonshot: {
-    name: 'Moonshot (Kimi)',
-    baseUrl: 'https://api.moonshot.cn',
-    defaultModel: 'moonshot-v1-8k',
+  perplexity: {
+    name: 'Perplexity',
+    baseUrl: 'https://api.perplexity.ai',
+    defaultModel: 'llama-3.1-sonar-small-128k-online',
     needsApiKey: true,
     needsBaseUrl: false
   },
   // 本地/自定义
   ollama: {
-    name: 'Ollama (本地)',
-    baseUrl: 'http://localhost:11434',
-    defaultModel: 'llama3.2',
-    needsApiKey: false,
-    needsBaseUrl: true
-  },
+
+name: 'Ollama (本地)',
+baseUrl: 'http://localhost:11434',
+defaultModel: 'llama3.2',
+needsApiKey: false,
+needsBaseUrl: true
+},
   custom: {
     name: '自定义 OpenAI 兼容',
     baseUrl: '',
@@ -117,9 +167,9 @@ async function callAI(config, messages) {
  */
 async function callOpenAICompatible(config, messages) {
   const { provider, apiKey, baseUrl, model } = config;
-  const providerConfig = AI_PROVIDERS[provider];
+  const providerConfig = AI_PROVIDERS[provider] || AI_PROVIDERS.custom;
   
-  const actualBaseUrl = baseUrl || providerConfig.baseUrl;
+  let actualBaseUrl = baseUrl || providerConfig.baseUrl;
   const actualModel = model || providerConfig.defaultModel;
   
   if (!actualBaseUrl) {
@@ -129,25 +179,57 @@ async function callOpenAICompatible(config, messages) {
   if (!actualModel) {
     throw new Error('请配置模型名称');
   }
+
+  // 智能 URL 处理：如果用户提供了完整路径则直接使用，否则拼接标准路径
+  let url = actualBaseUrl.trim();
+  if (!url.startsWith('http')) {
+    url = `https://${url}`;
+  }
   
-  const url = `${actualBaseUrl.replace(/\/+$/, '')}/v1/chat/completions`;
+  // 如果 baseUrl 不包含典型的 API 路径，则自动补充
+  const pathKeywords = ['/v1', '/chat', '/completions', '/generate', '/api'];
+  const hasPath = pathKeywords.some(keyword => url.toLowerCase().includes(keyword));
   
+  if (!hasPath) {
+    url = `${url.replace(/\/+$/, '')}/v1/chat/completions`;
+  } else if (url.endsWith('/v1') || url.endsWith('/v1/')) {
+    url = `${url.replace(/\/+$/, '')}/chat/completions`;
+  }
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 增加到 60s，针对慢速模型
 
   try {
+    const body = {
+      model: actualModel,
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 1000 // 增加输出长度限制
+    };
+
+    // 针对某些模型（如 o1, deepseek-reasoner）禁用不支持的参数
+    if (actualModel.startsWith('o1') || actualModel.includes('thinking') || actualModel.includes('reasoner')) {
+      delete body.temperature;
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+
+    // 支持不同的认证方式
+    if (apiKey) {
+      // 绝大多数使用 Bearer
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      // 某些提供商（如 Azure, Perplexity, 或特定代理）可能需要这个
+      headers['Api-Key'] = apiKey;
+      headers['X-API-Key'] = apiKey;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: actualModel,
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 500
-      }),
+      headers: headers,
+      body: JSON.stringify(body),
       signal: controller.signal
     });
 
@@ -158,9 +240,11 @@ async function callOpenAICompatible(config, messages) {
       let errorMessage = `API 请求失败 (${response.status})`;
       try {
         const errJson = JSON.parse(errText);
-        errorMessage += `: ${errJson.error?.message || errJson.message || errText}`;
+        // 兼容各种错误格式
+        const apiError = errJson.error?.message || errJson.error?.code || errJson.message || errText;
+        errorMessage += `: ${apiError}`;
       } catch {
-        errorMessage += `: ${errText}`;
+        errorMessage += `: ${errText.substring(0, 200)}`;
       }
       const error = new Error(errorMessage);
       error.status = response.status;
@@ -168,11 +252,40 @@ async function callOpenAICompatible(config, messages) {
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
+    
+    // 兼容多种返回格式 (OpenAI 标准 vs 某些代理转发)
+    let content = '';
+    const choice = data.choices?.[0];
+    
+    if (choice?.message?.content) {
+      content = choice.message.content;
+    } else if (choice?.message?.reasoning_content) {
+      // DeepSeek R1 风格的思维内容，如果没有 content 则回退到它
+      content = choice.message.reasoning_content;
+    } else if (choice?.text) {
+      content = choice.text;
+    } else if (data.content) {
+      content = data.content;
+    } else if (data.result) {
+      // 百度文心一言非兼容模式
+      content = data.result;
+    } else if (typeof data === 'string') {
+      content = data;
+    }
+
+    if (content === undefined || content === null || content === '') {
+      // 检查是否有拒绝原因 (Refusal)
+      if (choice?.message?.refusal) {
+        throw new Error(`AI 拒绝回答: ${choice.message.refusal}`);
+      }
+      throw new Error('API 返回内容为空，请检查模型名称或 API 状态');
+    }
+
+    return content;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
-      throw new Error('请求超时 (30s)，请检查网络或提供商状态');
+      throw new Error('请求超时 (60s)，请检查网络或提供商状态');
     }
     throw error;
   }
@@ -182,10 +295,12 @@ async function callOpenAICompatible(config, messages) {
  * Google Gemini API
  */
 async function callGemini(config, messages) {
-  const { apiKey, model } = config;
+  const { apiKey, model, baseUrl } = config;
   const actualModel = model || AI_PROVIDERS.gemini.defaultModel;
+  const actualBaseUrl = baseUrl || AI_PROVIDERS.gemini.baseUrl;
   
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${actualModel}:generateContent?key=${apiKey}`;
+  // 支持自定义 Base URL (代理)
+  const url = `${actualBaseUrl.replace(/\/+$/, '')}/v1beta/models/${actualModel}:generateContent?key=${apiKey}`;
   
   // 转换消息格式
   const contents = messages
@@ -198,7 +313,10 @@ async function callGemini(config, messages) {
   const systemMsg = messages.find(m => m.role === 'system');
   const payload = {
     contents: contents,
-    generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
+    generationConfig: { 
+      temperature: 0.7, 
+      maxOutputTokens: 2048 // 增加输出限制
+    }
   };
   
   if (systemMsg) {
@@ -206,12 +324,14 @@ async function callGemini(config, messages) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(payload),
       signal: controller.signal
     });
@@ -223,9 +343,11 @@ async function callGemini(config, messages) {
       let errorMessage = `Gemini API 错误 (${response.status})`;
       try {
         const errJson = JSON.parse(errText);
-        errorMessage += `: ${errJson.error?.message || errText}`;
+        // Gemini 的错误可能在数组中
+        const apiError = errJson.error?.message || errJson[0]?.error?.message || errText;
+        errorMessage += `: ${apiError}`;
       } catch {
-        errorMessage += `: ${errText}`;
+        errorMessage += `: ${errText.substring(0, 200)}`;
       }
       const error = new Error(errorMessage);
       error.status = response.status;
@@ -233,11 +355,21 @@ async function callGemini(config, messages) {
     }
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // 检查安全过滤
+    if (data.candidates?.[0]?.finishReason === 'SAFETY') {
+      throw new Error('Gemini 拒绝回答：触发安全过滤');
+    }
+
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (content === undefined || content === null || content === '') {
+      throw new Error('Gemini 返回内容为空，请检查模型名称或 API 状态');
+    }
+    return content;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
-      throw new Error('Gemini 请求超时 (30s)');
+      throw new Error('Gemini 请求超时 (60s)');
     }
     throw error;
   }
@@ -247,10 +379,11 @@ async function callGemini(config, messages) {
  * Anthropic Claude API
  */
 async function callAnthropic(config, messages) {
-  const { apiKey, model } = config;
+  const { apiKey, model, baseUrl } = config;
   const actualModel = model || AI_PROVIDERS.anthropic.defaultModel;
+  const actualBaseUrl = baseUrl || AI_PROVIDERS.anthropic.baseUrl;
   
-  const url = 'https://api.anthropic.com/v1/messages';
+  const url = `${actualBaseUrl.replace(/\/+$/, '')}/v1/messages`;
   
   // 提取 system 消息
   const systemMsg = messages.find(m => m.role === 'system');
@@ -258,7 +391,7 @@ async function callAnthropic(config, messages) {
   
   const payload = {
     model: actualModel,
-    max_tokens: 500,
+    max_tokens: 2048, // 增加输出限制
     messages: otherMessages
   };
   
@@ -267,7 +400,7 @@ async function callAnthropic(config, messages) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
     const response = await fetch(url, {
@@ -288,9 +421,9 @@ async function callAnthropic(config, messages) {
       let errorMessage = `Claude API 错误 (${response.status})`;
       try {
         const errJson = JSON.parse(errText);
-        errorMessage += `: ${errJson.error?.message || errText}`;
+        errorMessage += `: ${errJson.error?.message || errJson.message || errText}`;
       } catch {
-        errorMessage += `: ${errText}`;
+        errorMessage += `: ${errText.substring(0, 200)}`;
       }
       const error = new Error(errorMessage);
       error.status = response.status;
@@ -298,11 +431,15 @@ async function callAnthropic(config, messages) {
     }
 
     const data = await response.json();
-    return data.content?.[0]?.text || '';
+    const content = data.content?.[0]?.text;
+    if (content === undefined || content === null || content === '') {
+      throw new Error('Claude 返回内容为空，请检查模型名称或 API 状态');
+    }
+    return content;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
-      throw new Error('Claude 请求超时 (30s)');
+      throw new Error('Claude 请求超时 (60s)');
     }
     throw error;
   }
@@ -343,8 +480,12 @@ async function callOllama(config, messages) {
       throw error;
     }
 
-    const data = await response.json();
-    return data.message?.content || '';
+      const data = await response.json();
+      const content = data.message?.content;
+      if (content === undefined || content === null) {
+        throw new Error('Ollama 返回格式异常：未找到 message.content');
+      }
+      return content;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {

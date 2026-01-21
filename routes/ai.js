@@ -1657,9 +1657,9 @@ router.post('/test', authMiddleware, async (req, res) => {
     const aiResponse = await callAI(config, messages);
     const responseTime = Date.now() - startTime;
 
-    if (!aiResponse) {
-      throw new Error('AI 未返回任何内容');
-    }
+      if (!aiResponse && aiResponse !== '') {
+        throw new Error('AI 未返回任何内容，请检查 API Key 和模型配置是否正确');
+      }
 
     // 测试成功，持久化状态
     await db.saveAIConfig({ lastTestedOk: 'true' });
