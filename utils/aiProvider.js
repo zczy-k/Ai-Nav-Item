@@ -290,19 +290,47 @@ async function callOpenAICompatible(config, messages) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000); // 增加到 60s，针对慢速模型
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 增加到 60s，针对慢速模型
 
-    try {
-      const body = {
-        model: actualModel,
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 1000
-      };
+      try {
+        // 处理 messages：某些 API（如 Gemini 兼容）不支持 system 角色
+        let processedMessages = messages;
+        const isGeminiCompatible = actualModel.toLowerCase().includes('gemini') || 
+                                   actualBaseUrl.toLowerCase().includes('gemini');
+        
+        if (isGeminiCompatible && Array.isArray(messages) && messages.length > 0) {
+          const systemMessages = messages.filter(m => m.role === 'system');
+          const nonSystemMessages = messages.filter(m => m.role !== 'system');
+          
+          if (systemMessages.length > 0 && nonSystemMessages.length > 0) {
+            // 将 system 内容合并到第一个 user 消息前
+            const systemContent = systemMessages.map(m => m.content).join('\n\n');
+            const firstUserIndex = nonSystemMessages.findIndex(m => m.role === 'user');
+            
+            if (firstUserIndex !== -1) {
+              processedMessages = nonSystemMessages.map((m, i) => {
+                if (i === firstUserIndex) {
+                  return { ...m, content: `[System Instructions]\n${systemContent}\n\n[User Request]\n${m.content}` };
+                }
+                return m;
+              });
+            } else {
+              // 没有 user 消息，将 system 内容作为 user 消息
+              processedMessages = [{ role: 'user', content: systemContent }];
+            }
+          }
+        }
 
-      if (actualModel.startsWith('o1') || actualModel.includes('thinking') || actualModel.includes('reasoner')) {
-        delete body.temperature;
-      }
+        const body = {
+          model: actualModel,
+          messages: processedMessages,
+          temperature: 0.7,
+          max_tokens: 1000
+        };
+
+        if (actualModel.startsWith('o1') || actualModel.includes('thinking') || actualModel.includes('reasoner')) {
+          delete body.temperature;
+        }
 
       const headers = {
         'Content-Type': 'application/json',
