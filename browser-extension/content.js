@@ -1386,12 +1386,9 @@
                     return;
                 }
                 
-                const menuId = parseInt(item.dataset.menuId);
-                const subMenuId = item.dataset.submenuId ? parseInt(item.dataset.submenuId) : null;
-                const hasChildren = item.dataset.hasChildren === 'true';
-                
-                // 如果是父级且有子分类
-                if (hasChildren && !subMenuId) {
+                // 如果点击的是展开/折叠按钮，只展开不选中
+                if (e.target.classList.contains('category-toggle')) {
+                    const menuId = parseInt(item.dataset.menuId);
                     const toggle = item.querySelector('.category-toggle');
                     const subContainer = categoryList.querySelector(`[data-parent="${menuId}"]`);
                     
@@ -1401,18 +1398,37 @@
                         if (toggle) {
                             toggle.classList.toggle('expanded', !isExpanded);
                         }
-                        // 记住展开状态
                         if (isExpanded) {
                             expandedMenus.delete(menuId);
                         } else {
                             expandedMenus.add(menuId);
                         }
                     }
-                    // 父分类有子分类时，点击只展开不选中
                     return;
                 }
                 
-                // 选中分类（子分类或无子分类的父分类）
+                const menuId = parseInt(item.dataset.menuId);
+                const subMenuId = item.dataset.submenuId ? parseInt(item.dataset.submenuId) : null;
+                const hasChildren = item.dataset.hasChildren === 'true';
+                
+                // 如果是父级且有子分类，点击时展开并选中
+                if (hasChildren && !subMenuId) {
+                    const toggle = item.querySelector('.category-toggle');
+                    const subContainer = categoryList.querySelector(`[data-parent="${menuId}"]`);
+                    
+                    if (subContainer) {
+                        const isExpanded = subContainer.classList.contains('show');
+                        if (!isExpanded) {
+                            subContainer.classList.add('show');
+                            if (toggle) {
+                                toggle.classList.add('expanded');
+                            }
+                            expandedMenus.add(menuId);
+                        }
+                    }
+                }
+                
+                // 选中分类
                 selectCategory(menuId, subMenuId);
             });
         });
