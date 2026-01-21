@@ -341,18 +341,23 @@ async function callOpenAICompatible(config, messages) {
 
       const contentType = response.headers.get('content-type') || '';
       let content = '';
-      let rawDataForError = '无数据';
+      let responseData = null;
 
       if (contentType.includes('text/event-stream') || contentType.includes('stream')) {
         content = await parseStreamResponse(response);
       } else {
-        const data = await response.json();
-        rawDataForError = JSON.stringify(data).substring(0, 100);
-        content = extractContentFromResponse(data);
+        responseData = await response.json();
+        content = extractContentFromResponse(responseData);
       }
 
       if (content === undefined || content === null || content === '') {
-        throw new Error(`API 返回内容为空，请检查模型名称或 API 状态。返回预览: ${rawDataForError}`);
+        const debugInfo = responseData ? {
+          hasChoices: !!responseData.choices,
+          choicesLength: responseData.choices?.length,
+          firstChoice: responseData.choices?.[0] ? JSON.stringify(responseData.choices[0]).substring(0, 300) : null,
+          messageKeys: responseData.choices?.[0]?.message ? Object.keys(responseData.choices[0].message) : null
+        } : { isStream: true };
+        throw new Error(`API 返回内容为空。调试: ${JSON.stringify(debugInfo)}`);
       }
 
       return content;
