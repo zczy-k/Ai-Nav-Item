@@ -292,41 +292,17 @@ async function callOpenAICompatible(config, messages) {
   const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 增加到 60s，针对慢速模型
 
-      try {
-        // 处理 messages：某些 API（如 Gemini 兼容）不支持 system 角色
-        let processedMessages = messages;
-        const isGeminiCompatible = actualModel.toLowerCase().includes('gemini') || 
-                                   actualBaseUrl.toLowerCase().includes('gemini');
-        
-        if (isGeminiCompatible && Array.isArray(messages) && messages.length > 0) {
-          const systemMessages = messages.filter(m => m.role === 'system');
-          const nonSystemMessages = messages.filter(m => m.role !== 'system');
-          
-          if (systemMessages.length > 0 && nonSystemMessages.length > 0) {
-            // 将 system 内容合并到第一个 user 消息前
-            const systemContent = systemMessages.map(m => m.content).join('\n\n');
-            const firstUserIndex = nonSystemMessages.findIndex(m => m.role === 'user');
-            
-            if (firstUserIndex !== -1) {
-              processedMessages = nonSystemMessages.map((m, i) => {
-                if (i === firstUserIndex) {
-                  return { ...m, content: `[System Instructions]\n${systemContent}\n\n[User Request]\n${m.content}` };
-                }
-                return m;
-              });
-            } else {
-              // 没有 user 消息，将 system 内容作为 user 消息
-              processedMessages = [{ role: 'user', content: systemContent }];
-            }
-          }
-        }
+        try {
+          // 保持原始消息结构，不再针对 Gemini 强制合并 system 消息
+          // 现代 OpenAI 兼容代理通常能更好地处理 system 角色
+          let processedMessages = messages;
 
-        const body = {
-          model: actualModel,
-          messages: processedMessages,
-          temperature: 0.7,
-          max_tokens: 1000
-        };
+          const body = {
+            model: actualModel,
+            messages: processedMessages,
+            temperature: 0.7,
+            max_tokens: 1000
+          };
 
         if (actualModel.startsWith('o1') || actualModel.includes('thinking') || actualModel.includes('reasoner')) {
           delete body.temperature;
@@ -378,18 +354,23 @@ async function callOpenAICompatible(config, messages) {
         content = extractContentFromResponse(responseData);
       }
 
-      if (content === undefined || content === null || content === '') {
-        const debugInfo = responseData ? {
-          requestUrl: url,
-          requestModel: actualModel,
-          hasChoices: !!responseData.choices,
-          choicesLength: responseData.choices?.length,
-          firstChoice: responseData.choices?.[0] ? JSON.stringify(responseData.choices[0]).substring(0, 300) : null,
-          messageKeys: responseData.choices?.[0]?.message ? Object.keys(responseData.choices[0].message) : null,
-          reasoning: responseData.choices?.[0]?.message?.reasoning_content?.substring(0, 100) || null
-        } : { isStream: true, requestUrl: url, requestModel: actualModel };
-        throw new Error(`API 返回内容为空。调试: ${JSON.stringify(debugInfo)}`);
-      }
+        if (content === undefined || content === null || content === '') {
+          const debugInfo = responseData ? {
+            requestUrl: url,
+            requestModel: actualModel,
+            hasChoices: !!responseData.choices,
+            choicesLength: responseData.choices?.length,
+            firstChoice: responseData.choices?.[0] ? JSON.stringify(responseData.choices[0]).substring(0, 300) : null,
+            messageKeys: responseData.choices?.[0]?.message ? Object.keys(responseData.choices[0].message) : null,
+            reasoning: responseData.choices?.[0]?.message?.reasoning_content?.substring(0, 100) || null
+          } : { isStream: true, requestUrl: url, requestModel: actualModel };
+          
+          let errorMsg = `API 返回内容为空。调试: ${JSON.stringify(debugInfo)}`;
+          if (actualModel.toLowerCase().includes('gemini')) {
+            errorMsg += '\n排查建议：\n1. 检查模型名称是否正确（例如 gemini-1.5-flash）\n2. 该模型可能已下线或需要申请访问\n3. 尝试切换到其他模型';
+          }
+          throw new Error(errorMsg);
+        }
 
       return content;
   } catch (error) {
