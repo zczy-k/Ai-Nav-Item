@@ -1,12 +1,25 @@
 const CACHE_NAME = 'con-nav-item-v3';
 const RUNTIME_CACHE = 'con-nav-runtime-v3';
+const ICON_CACHE = 'con-nav-icons-v1';
 
-// 需要预缓存的核心资源
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/manifest.json'
 ];
+
+const ICON_PATTERNS = [
+  '/api/icon',
+  'api.xinac.net/icon',
+  'www.google.com/s2/favicons',
+  'icon.horse/icon',
+  'favicon.im',
+  'api.afmax.cn'
+];
+
+function isIconRequest(url) {
+  return ICON_PATTERNS.some(pattern => url.includes(pattern));
+}
 
 // 安装事件 - 预缓存核心资源
 self.addEventListener('install', (event) => {
@@ -25,7 +38,11 @@ self.addEventListener('activate', (event) => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames
-          .filter(cacheName => cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE)
+          .filter(cacheName => 
+            cacheName !== CACHE_NAME && 
+            cacheName !== RUNTIME_CACHE && 
+            cacheName !== ICON_CACHE
+          )
           .map(cacheName => {
             return caches.delete(cacheName);
           })
@@ -39,27 +56,43 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // 跳过非 GET 请求
   if (request.method !== 'GET') {
     return;
   }
 
-  // 跳过 Chrome 扩展请求
   if (url.protocol === 'chrome-extension:') {
     return;
   }
 
-  // API 请求：网络优先，不缓存
+  if (isIconRequest(request.url)) {
+    event.respondWith(
+      caches.open(ICON_CACHE).then(cache => {
+        return cache.match(request).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          
+          return fetch(request).then(networkResponse => {
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => {
+            return new Response('', { status: 404 });
+          });
+        });
+      })
+    );
+    return;
+  }
+
   if (url.pathname.startsWith('/api/')) {
-    // API 请求：网络优先
     event.respondWith(
       fetch(request)
         .then(response => {
-          // 成功则返回
           return response;
         })
         .catch(() => {
-          // 网络失败，返回离线提示
           return new Response(JSON.stringify({ error: '网络连接失败，请检查网络' }), {
             headers: { 'Content-Type': 'application/json' },
             status: 503
@@ -69,22 +102,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 静态资源：缓存优先，网络更新
   event.respondWith(
     caches.open(RUNTIME_CACHE).then(cache => {
       return cache.match(request).then(cachedResponse => {
         const fetchPromise = fetch(request).then(networkResponse => {
-          // 只缓存成功的响应
           if (networkResponse && networkResponse.status === 200) {
             cache.put(request, networkResponse.clone());
           }
           return networkResponse;
         }).catch(() => {
-          // 网络失败，返回缓存（如果有）
           return cachedResponse;
         });
 
-        // 有缓存则立即返回，同时后台更新
         return cachedResponse || fetchPromise;
       });
     })

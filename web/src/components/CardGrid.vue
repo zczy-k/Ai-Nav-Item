@@ -13,7 +13,13 @@
          :title="getTooltip(card)" 
          @click="handleLinkClick($event, card)"
          class="card-link">
-        <img class="link-icon" :src="getLogo(card)" alt="" @error="onImgError($event, card)" loading="lazy">
+        <img 
+          class="link-icon" 
+          :ref="(el) => el && setupIconLazyLoad(el, card)"
+          :src="placeholderIcon"
+          :data-url="card.url"
+          alt="" 
+          @error="onImgError($event, card)">
         <span class="link-text">{{ truncate(card.title) }}</span>
       </a>
       <div v-if="isCardSelected(card)" class="card-selected-badge">✓</div>
@@ -57,6 +63,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useIconLoader } from '../composables/useIconLoader';
 
 const props = defineProps({ 
   cards: Array,
@@ -76,6 +83,49 @@ const emit = defineEmits([
 ]);
 
 const cardGridRef = ref(null);
+const placeholderIcon = '/icons/common/default-favicon.png';
+
+const { setupLazyLoad, queueIcon } = useIconLoader();
+
+const iconCleanups = new Map();
+
+function getOriginUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.origin;
+  } catch {
+    return null;
+  }
+}
+
+function setupIconLazyLoad(el, card) {
+  if (!el || !card.url) return;
+  
+  if (iconCleanups.has(card.id)) {
+    iconCleanups.get(card.id)();
+  }
+  
+  if (card.logo_url) {
+    el.src = card.logo_url;
+    return;
+  }
+  
+  const originUrl = getOriginUrl(card.url);
+  if (!originUrl) {
+    el.src = placeholderIcon;
+    return;
+  }
+  
+  const cleanup = setupLazyLoad(el, originUrl, card.id);
+  if (cleanup) {
+    iconCleanups.set(card.id, cleanup);
+  }
+}
+
+onUnmounted(() => {
+  iconCleanups.forEach(cleanup => cleanup());
+  iconCleanups.clear();
+});
 
 const contextMenuVisible = ref(false);
 const contextMenuX = ref(0);
@@ -201,64 +251,20 @@ onUnmounted(() => {
   document.removeEventListener('scroll', closeContextMenu);
 });
 
-function getOriginUrl(url) {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.origin;
-  } catch {
-    return null;
-  }
-}
-
-function getLogo(card) {
-  if (card.logo_url) {
-    return card.logo_url;
-  }
-  
-  const originUrl = getOriginUrl(card.url);
-  if (originUrl) {
-    return `https://api.xinac.net/icon/?url=${originUrl}&sz=128`;
-  }
-  
-  return '/default-favicon.png';
-}
-
-const CDN_PROVIDERS = [
-  (url) => `https://api.xinac.net/icon/?url=${url}&sz=128`,
-  (url) => `https://api.afmax.cn/so/ico/index.php?r=${url}&sz=128`,
-  (url) => `https://icon.horse/icon/${url}`,
-  (url) => `https://www.google.com/s2/favicons?domain=${url}&sz=128`,
-  (url) => `https://favicon.im/${url}?larger=true`,
-];
-
 function onImgError(e, card) {
-  const currentSrc = e.target.src;
-  const originUrl = getOriginUrl(card.url);
-  
-  if (!originUrl) {
-    e.target.src = '/default-favicon.png';
+  if (e.target._retried) {
+    e.target.src = placeholderIcon;
     return;
   }
   
-  if (e.target._cdnIndex === undefined) e.target._cdnIndex = 0;
+  e.target._retried = true;
   
-  for (let i = 0; i < CDN_PROVIDERS.length; i++) {
-    const cdnUrl = CDN_PROVIDERS[i](originUrl);
-    if (currentSrc.includes('api.xinac.net') && i === 0 ||
-        currentSrc.includes('api.afmax.cn') && i === 1 ||
-        currentSrc.includes('icon.horse') && i === 2 ||
-        currentSrc.includes('www.google.com/s2/favicons') && i === 3 ||
-        currentSrc.includes('favicon.im') && i === 4) {
-      if (i + 1 < CDN_PROVIDERS.length) {
-        e.target._cdnIndex = i + 1;
-        e.target.src = CDN_PROVIDERS[i + 1](originUrl);
-        return;
-      }
-      break;
-    }
+  const originUrl = getOriginUrl(card.url);
+  if (originUrl) {
+    queueIcon(originUrl, e.target, card.id);
+  } else {
+    e.target.src = placeholderIcon;
   }
-  
-  e.target.src = '/default-favicon.png';
 }
 
 function getTooltip(card) {
@@ -296,7 +302,6 @@ function isCardSelected(card) {
   box-sizing: border-box;
 }
 
-/* 大屏桌面 1400px+ */
 @media (max-width: 1400px) {
   .container { 
     grid-template-columns: repeat(7, 1fr); 
@@ -305,7 +310,6 @@ function isCardSelected(card) {
   }
 }
 
-/* 桌面/笔记本 1024-1200px */
 @media (max-width: 1200px) {
   .container { 
     grid-template-columns: repeat(6, 1fr); 
@@ -314,7 +318,6 @@ function isCardSelected(card) {
   }
 }
 
-/* 小笔记本/平板横屏 900-1024px */
 @media (max-width: 1024px) {
   .container { 
     grid-template-columns: repeat(5, 1fr); 
@@ -324,7 +327,6 @@ function isCardSelected(card) {
   }
 }
 
-/* 平板竖屏 768-900px (iPad等) - 4列 */
 @media (max-width: 900px) {
   .container { 
     grid-template-columns: repeat(4, 1fr); 
@@ -345,7 +347,6 @@ function isCardSelected(card) {
   }
 }
 
-/* 移动端 ≤768px - 固定3列 */
 @media (max-width: 768px) {
   .container { 
     grid-template-columns: repeat(3, 1fr);
@@ -371,7 +372,6 @@ function isCardSelected(card) {
   }
 }
 
-/* 小手机 ≤480px - 固定3列，稍小间距 */
 @media (max-width: 480px) {
   .container { 
     grid-template-columns: repeat(3, 1fr);
@@ -396,7 +396,6 @@ function isCardSelected(card) {
   }
 }
 
-/* 超小手机 <380px - 仍保持3列 */
 @media (max-width: 380px) {
   .container { 
     grid-template-columns: repeat(3, 1fr);
@@ -519,8 +518,13 @@ function isCardSelected(card) {
   height: 34px;
   object-fit: contain;
   filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.25));
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
   margin-bottom: 8px;
+  opacity: 0.8;
+}
+
+.link-icon[src]:not([src=""]):not([src$="default-favicon.png"]) {
+  opacity: 1;
 }
 
 .link-item:hover .link-icon {
