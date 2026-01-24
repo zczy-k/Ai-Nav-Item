@@ -1106,12 +1106,12 @@ function buildNamePrompt(card) {
   const analysis = analyzePageType(card.url, card.title);
   const pageTypeDesc = getPageTypeDescription(analysis);
   
-  const commonRules = '\n注意：严禁输出任何思考过程或解释，直接输出名称文本。';
+  const commonRules = '\n\n## 强制要求\n- 严禁输出任何思考过程、解释或反问\n- 严禁输出"请提供"、"如果您能"、"我需要"等请求信息的内容\n- 必须直接输出名称文本，不要任何前缀或后缀\n- 即使信息有限，也必须基于 URL 和标题做出合理推断并输出结果';
   
   return [
     {
       role: 'system',
-      content: `你是一个精炼的网站命名专家。
+      content: `你是一个精炼的网站命名专家。你的任务是根据网站 URL 和标题提取或生成简洁的名称。
 
 ## 命名规则（按页面类型）
 
@@ -1153,6 +1153,8 @@ function buildNamePrompt(card) {
     { role: 'assistant', content: 'React 井字棋教程' },
     { role: 'user', content: '网站地址：https://www.taobao.com/\n当前抓取名：淘宝网 - 淘！我喜欢\n页面类型：电子商务\n品牌：淘宝\n输出名称：' },
     { role: 'assistant', content: '淘宝' },
+    { role: 'user', content: '网站地址：https://example.com/\n当前抓取名：无\n页面类型：网站首页\n品牌：Example\n输出名称：' },
+    { role: 'assistant', content: 'Example' },
     // 实际请求
     {
       role: 'user',
@@ -1169,12 +1171,12 @@ function buildDescriptionPrompt(card) {
   const analysis = analyzePageType(card.url, card.title);
   const pageTypeDesc = getPageTypeDescription(analysis);
   
-  const commonRules = '\n注意：严禁输出任何思考过程或解释，直接输出描述文本。';
+  const commonRules = '\n\n## 强制要求\n- 严禁输出任何思考过程、解释或反问\n- 严禁输出"请提供"、"如果您能"、"我需要"等请求信息的内容\n- 必须直接输出描述文本，不要任何前缀或后缀\n- 即使信息有限，也必须基于 URL 和标题做出合理推断并输出结果';
   
   return [
     {
       role: 'system',
-      content: `你是一个资深的导航站文案编辑。
+      content: `你是一个资深的导航站文案编辑。你的任务是根据网站 URL 和标题生成精炼的描述。
 
 ## 描述生成规则（按页面类型）
 
@@ -1226,6 +1228,8 @@ function buildDescriptionPrompt(card) {
     { role: 'assistant', content: '智能图片压缩工具，支持 PNG、JPEG、WebP 格式' },
     { role: 'user', content: '网站名称：知乎\n网站地址：https://www.zhihu.com/\n页面类型：问答社区\n品牌：知乎\n输出描述：' },
     { role: 'assistant', content: '中文互联网高质量问答社区与知识分享平台' },
+    { role: 'user', content: '网站名称：未知网站\n网站地址：https://example.com/\n页面类型：网站首页\n品牌：Example\n输出描述：' },
+    { role: 'assistant', content: '提供优质在线服务的综合性网站平台' },
     // 实际请求
     {
       role: 'user',
@@ -1247,12 +1251,12 @@ function buildTagsPrompt(card, existingTags) {
     ? existingTags.slice(0, 50).join('、')
     : '暂无';
   
-  const commonRules = '\n注意：严禁输出任何思考过程，严格按 JSON 格式输出。';
+  const commonRules = '\n\n## 强制要求\n- 严禁输出任何思考过程、解释或反问\n- 严禁输出"请提供"、"如果您能"、"我需要"等请求信息的内容\n- 必须直接输出 JSON 格式，不要任何前缀或后缀\n- 即使信息有限，也必须基于 URL 和标题做出合理推断并输出结果';
   
   return [
     {
       role: 'system',
-      content: `你是一个专业的互联网资源分类专家。
+      content: `你是一个专业的互联网资源分类专家。你的任务是根据网站 URL、标题和描述，分配合适的分类标签。
 
 ## 任务
 为网站分配 2-4 个最合适的分类标签。
@@ -1307,6 +1311,8 @@ function buildTagsPrompt(card, existingTags) {
     { role: 'assistant', content: '{"tags":["AI","设计"],"newTags":["图像生成"]}' },
     { role: 'user', content: '网站名称：淘宝\n网站描述：综合性电商平台\n页面类型：电子商务\n现有标签：购物、工具、AI\n输出JSON：' },
     { role: 'assistant', content: '{"tags":["购物"],"newTags":["电商"]}' },
+    { role: 'user', content: '网站名称：未知网站\n网站描述：暂无\n页面类型：网站首页\n现有标签：工具、资源、网站\n输出JSON：' },
+    { role: 'assistant', content: '{"tags":["网站","资源"],"newTags":[]}' },
     // 实际请求
     {
       role: 'user',
@@ -1369,13 +1375,18 @@ const AI_THINKING_PATTERNS = [
   /^(This|I need to|Let me|Since I|I will|I cannot|Okay,|Sure,).{0,30}/i,
   /无法(直接)?访问(该|这个|此)?(网站|链接|页面)/,
   /无法获取(网站|网页|页面)(内容|信息)/,
-  /请提供(更多|详细)(信息|内容)/,
-  /抱歉[，,]我无法/
+  /请提供(更多|详细|网站的)?(信息|内容|简介|功能说明)/,
+  /抱歉[，,]我无法/,
+  /如果您(能|可以)提供/,
+  /我可以为您生成/,
+  /符合规范的.*字/,
+  /请(您)?提供.*我(将|会|可以)/,
+  /需要(更多|额外)(的)?信息/,
+  /无法确定|无法判断|信息不足/
 ];
 
 function isAIThinkingText(text) {
-  if (!text || text.length < 10) return false;
-  if (text.length <= 50) return false;
+  if (!text || text.length < 5) return false;
   
   const clean = text.replace(/<[^>]+>/g, '').trim();
   
@@ -1415,35 +1426,91 @@ function cleanName(text) {
       .substring(0, 40); // 控制在合理范围
   }
   
-    function cleanDescription(text) {
-      if (!text) return '';
-      
-      let processed = stripThoughtTags(text);
-      
-      // 检测是否为 AI 思考过程文本
-      if (isAIThinkingText(processed)) {
-        // 尝试从思考文本中提取最后一句有用的内容
-        const sentences = processed.split(/[。！？\n]/).filter(s => s.trim().length > 10);
-        const lastSentence = sentences[sentences.length - 1]?.trim();
-        if (lastSentence && lastSentence.length >= 15 && lastSentence.length <= 100 && !isAIThinkingText(lastSentence)) {
-          processed = lastSentence;
-        } else {
-          console.warn('Detected AI thinking text in description, rejecting:', processed.substring(0, 50));
-          return '';
+function extractUsefulDescription(thinkingText) {
+  const lines = thinkingText.split(/[。！？\n]/).map(s => s.trim()).filter(s => s.length > 0);
+  
+  const descriptionPatterns = [
+    /^["'「」『』""''"](.{10,50})["'「」『』""''"]/,
+    /(?:描述|简介|建议|推荐|生成)[：:]\s*["'「」『』""''"]?(.{10,50})["'「」『』""''"]?$/,
+    /(?:可以(?:写成|使用|表述为|描述为))[：:]?\s*["'「」『』""''"]?(.{10,50})["'「」『』""''"]?/,
+    /(?:最终|综上|因此|所以)[，,]?\s*["'「」『』""''"]?(.{10,50})["'「」『』""''"]?$/,
+  ];
+  
+  for (const line of lines.reverse()) {
+    for (const pattern of descriptionPatterns) {
+      const match = line.match(pattern);
+      if (match && match[1]) {
+        const candidate = match[1].trim();
+        if (candidate.length >= 10 && candidate.length <= 60 && !isAIThinkingText(candidate)) {
+          return candidate;
         }
       }
+    }
+  }
+  
+  const validDescPatterns = [
+    /提供.{2,20}(?:服务|功能|工具|平台)/,
+    /(?:专注|专业|领先).{2,20}(?:领域|平台|服务)/,
+    /(?:一站式|综合性|智能).{2,20}(?:平台|工具|服务)/,
+    /.{2,10}(?:开发|设计|管理|协作).{2,20}(?:工具|平台)/,
+  ];
+  
+  for (const line of lines) {
+    if (line.length >= 12 && line.length <= 50 && !isAIThinkingText(line)) {
+      for (const pattern of validDescPatterns) {
+        if (pattern.test(line)) {
+          return line.replace(/^[，,、：:]\s*/, '').replace(/[，,、：:]$/, '');
+        }
+      }
+    }
+  }
+  
+  for (const line of lines) {
+    const cleanLine = line
+      .replace(/^["'「」『』""'']+|["'「」『』""'']+$/g, '')
+      .replace(/^[，,、：:]\s*/, '')
+      .trim();
+    
+    if (cleanLine.length >= 15 && cleanLine.length <= 45 && !isAIThinkingText(cleanLine)) {
+      const hasProductWord = /(?:平台|工具|服务|系统|助手|网站|应用|软件)/.test(cleanLine);
+      const hasActionWord = /(?:提供|支持|帮助|实现|打造|构建|管理|开发|设计)/.test(cleanLine);
+      const noQuestionMark = !/[？?]/.test(cleanLine);
       
-      let cleaned = processed
-        .replace(/```[\s\S]*?```/g, '')
-        .replace(/^["'「」『』""'']+|["'「」『』""'']+$/g, '')
-        .replace(/^(描述[：:]\s*|简介[：:]\s*|网站描述[：:]\s*|Description[：:]\s*)/i, '')
-        .replace(/[\r\n]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .replace(/[。.]+$/, '');
-      
-      return cleaned.length > 200 ? cleaned.substring(0, 200) + '...' : cleaned;
+      if (hasProductWord && hasActionWord && noQuestionMark) {
+        return cleanLine;
+      }
+    }
+  }
+  
+  return null;
+}
 
+function cleanDescription(text) {
+  if (!text) return '';
+  
+  let processed = stripThoughtTags(text);
+  
+  if (isAIThinkingText(processed)) {
+    const extracted = extractUsefulDescription(processed);
+    if (extracted) {
+      console.log('Extracted useful description from thinking text:', extracted);
+      processed = extracted;
+    } else {
+      console.warn('Detected AI thinking text, failed to extract useful content:', processed.substring(0, 80));
+      return '';
+    }
+  }
+  
+  let cleaned = processed
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/^["'「」『』""'']+|["'「」『』""'']+$/g, '')
+    .replace(/^(描述[：:]\s*|简介[：:]\s*|网站描述[：:]\s*|Description[：:]\s*)/i, '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[。.]+$/, '');
+  
+  return cleaned.length > 200 ? cleaned.substring(0, 200) + '...' : cleaned;
 }
 
 function parseTagsResponse(text, existingTags) {
