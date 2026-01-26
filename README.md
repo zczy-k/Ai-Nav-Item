@@ -4,90 +4,40 @@
 [![Version](https://img.shields.io/badge/Version-1.0.1-brightgreen.svg)](https://github.com/zczy-k/Con-Nav-Item/releases)
 [![Node](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 
-现代化的个人导航站，提供美观的卡片式导航界面、AI 智能生成。
+Con-Nav-Item 是一款专为数字化工作者打造的现代化个人导航系统。它不仅仅是一个链接收藏夹，更是一个集成了 AI 智能生成、多端同步、卡片化管理和浏览器深度集成的全能工作台。
 
-**🎉 正式版本 1.0.1 发布！使用服务器部署导航站后方可使用，可搭配扩展插件使用更加方便，插件可以到[Releases](https://github.com/zczy-k/Con-Nav-Item/releases) 下载最新版本的扩展包** 功能完整稳定。
+---
 
-示例站：https://con-nav-item.zeabur.app/
+## 🌟 亮点功能
 
-## 📸 界面预览
+*   **⚡ 极速体验**：基于 Vue 3 + Node.js，响应迅捷，支持 PWA。
+*   **🤖 AI 赋能**：内置多种主流 AI 适配，一键自动补全网站图标、描述、标签。
+*   **🧩 深度集成**：配套强大的浏览器插件，支持新标签页接管、快捷搜藏。
+*   **📂 数据安全**：内置 SQLite 数据库，支持本地备份与 WebDAV 云端备份。
+*   **🎨 颜值即正义**：现代化渐变卡片 UI，支持暗黑模式，极致的视觉体验。
 
-<div align="center">
-  <img width="1898" height="903" alt="image" src="https://github.com/user-attachments/assets/3b974405-312b-4cb1-9c16-5b87d45e79e5" />
-  <p><i>首页导航界面</i></p>
-  
- <img width="1907" height="905" alt="image" src="https://github.com/user-attachments/assets/b3a4bac2-f7b8-4742-8982-11a7381782cb" />
+---
 
-  <p><i>后台管理界面</i></p>
-  
-  <img width="1909" height="910" alt="image" src="https://github.com/user-attachments/assets/87e50b23-9844-42a0-aa12-cbf4b523db06" />
+## 🚀 安装部署流程 (全流程指导)
 
-  <p><i>备份管理功能</i></p>
-  
-  <img width="1895" height="899" alt="image" src="https://github.com/user-attachments/assets/e34ab03c-fe3a-43d2-835a-775b5ceb61ed" />
+无论你是拥有云服务器的大神，还是使用免费虚拟主机的学生党，都能轻松部署。
 
-  <p><i>后台AI配置界面</i></p>
-</div>
+### 1. 选择部署方式
+| 部署环境 | 推荐方案 | 特点 |
+| :--- | :--- | :--- |
+| **Linux 服务器** | 一键脚本 | 自动化配置 PM2 进程守护，最稳定 |
+| **NAS / Docker** | Docker Run | 环境隔离，升级最简单 |
+| **Serv00 / CT8** | Serv00 脚本 | 免费空间首选，自动配置域名与端口 |
 
-## 📝 更新日志
+### 2. 执行安装命令
 
-### v1.0.1 (2026-01-24)
-- **✨ 增强**：备份恢复逻辑优化，支持自动测试并激活备份中的 AI 配置。
-- **🤖 优化**：新增 AI 服务自动连通性校验，确保恢复后立即进入可用状态。
-- **🔧 修复**：增强了数据库在大数据量恢复时的重连稳定性。
-
-### v1.0.0
-- **🎉 初始版本发布**：支持多端同步、AI 智能生成卡片信息、浏览器扩展集成等核心功能。
-
-## ✨ 核心功能
-
-### 🏠 导航界面
-- **卡片式导航** - 美观的渐变卡片，支持拖拽排序
-- **多级菜单** - 主菜单和子菜单分类管理
-- **智能搜索** - 支持拼音搜索和多引擎聚合搜索
-- **响应式设计** - 完美适配桌面端和移动端
-- **PWA 支持** - 可安装为独立应用
-- **前端编辑** - 无需进入后台，直接在首页编辑卡片和菜单
-
-### 🤖 AI 智能生成
-支持多种 AI 服务，自动为卡片生成名称、描述和标签：
-- **支持服务**：OpenAI、Claude、Gemini、DeepSeek、智谱GLM、通义千问、Ollama等
-- **批量生成** - 筛选卡片，一键批量生成内容
-- **多种模式** - 补全模式/覆盖模式，多种生成风格
-- **安全存储** - API Key 加密存储
-
-### 🔧 后台管理
-- **用户管理** - 修改管理员账号密码
-- **内容管理** - 菜单、卡片、标签、友链、宣传位管理
-- **AI 配置** - 配置 AI 提供商和模型
-- **备份管理** - 本地备份 + WebDAV 云备份，支持自动备份
-
-### 🌐 浏览器扩展
-功能强大的浏览器扩展，支持 Chrome/Edge/Firefox 等：
-- **新标签页** - 新标签页直接显示导航站
-- **快速添加** - 右键菜单或浮动按钮快速添加网站
-- **书签管理** - 本地书签管理和云端同步
-- **智能标签** - 自动生成标签和分类
-
-## 🚀 快速部署
-
-### 一键管理脚本 (推荐)
-
-我们提供了综合管理脚本，支持一键 **安装、更新、卸载/重置**。
-
-**Serv00 / CT8 / Hostuno**：
+#### A. Linux 服务器 (Ubuntu/Debian/CentOS)
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/manage-serv00.sh)
-```
-
-**Linux 服务器 (Ubuntu/Debian/CentOS)**：
-```bash
+# 执行后根据提示选择 "Install" 即可
 bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/manage-linux.sh)
 ```
 
-### Docker 部署
-
-**首次部署**：
+#### B. Docker 部署 (最快上手)
 ```bash
 docker run -d \
   --name Con-Nav-Item \
@@ -100,105 +50,72 @@ docker run -d \
   ghcr.io/zczy-k/con-nav-item:latest
 ```
 
-**更新说明**：
-若要更新到最新版本，请依次执行：
-1. **拉取新镜像**：`docker pull ghcr.io/zczy-k/con-nav-item:latest`
-2. **停止并删除旧容器**：`docker stop Con-Nav-Item && docker rm Con-Nav-Item`
-3. **重新运行部署命令**：执行上方的 `docker run` 完整命令即可（挂载的目录会自动保留数据）。
-
-### 源码部署
-
+#### C. Serv00 / 免费虚拟主机
 ```bash
-git clone https://github.com/zczy-k/Con-Nav-Item.git
-cd Con-Nav-Item
-npm install
-cd web && npm install && npm run build && cd ..
-npm start
+# 脚本会自动识别域名并提示选择可用端口
+bash <(curl -Ls https://raw.githubusercontent.com/zczy-k/Con-Nav-Item/main/scripts/manage-serv00.sh)
 ```
 
-**访问地址**：
-- 首页：`http://localhost:3000`
-- 后台：`http://localhost:3000/admin`
-- 默认账号：admin / 123456
-
-⚠️ **首次登录后请立即修改密码！**
-
-## 📱 浏览器扩展
-
-从 [Releases](https://github.com/zczy-k/Con-Nav-Item/releases) 下载最新版本的扩展包。
-
-### 安装方法
-
-**Chrome / Edge / Brave**：
-1. 下载并解压扩展包
-2. 打开 `chrome://extensions/`
-3. 开启"开发者模式"
-4. 点击"加载已解压的扩展程序"
-
-**Firefox 127+**：
-1. 打开 `about:debugging#/runtime/this-firefox`
-2. 点击"临时载入附加组件"
-3. 选择扩展包文件
-
-### 配置使用
-
-1. 点击扩展图标进入设置
-2. 输入导航站地址和管理员密码
-3. 选择新标签页模式
-4. 开始使用：右键添加网站、新标签页导航、书签同步等
-
-## 🤖 AI 功能使用
-
-1. 进入后台管理 → AI 智能生成
-2. 选择 AI 提供商（推荐 DeepSeek）
-3. 填写 API Key 并测试连接
-4. 使用批量生成向导为卡片生成内容
-
-推荐配置：
-- **DeepSeek**：性价比高，中文效果好
-- **智谱 GLM**：国内服务，响应快
-- **Ollama**：本地部署，完全免费
-
-## 🔧 常见问题
-
-### 密码管理
-```bash
-# 检查当前密码
-npm run check-password check
-
-# 重置密码
-npm run check-password reset 新密码
-```
-
-### 脚本管理功能
-如果你需要卸载或重置环境，只需重新运行对应平台的一键脚本：
-- **Linux**: 选择 `Uninstall` 即可彻底卸载并清理进程。
-- **Serv00**: 选择 `Reset` 即可重置域名、端口及文件。
-
-### 前端编辑模式
-1. 点击首页右下角的"+"按钮
-2. 选择"编辑模式"并输入密码
-3. 现在可以拖拽排序、编辑删除卡片和菜单
-4. 点击空白区域退出编辑模式
-
-## 🛠️ 技术栈
-
-- **前端**：Vue 3 + Vite
-- **后端**：Node.js + Express + SQLite
-- **AI**：多提供商适配器
-- **认证**：JWT + bcrypt
-- **扩展**：Chrome Extension Manifest V3
-
-## 📄 许可证
-
-本项目采用 **Apache License 2.0** 开源许可证。基于 [nav-item](https://github.com/eooce/nav-item) 开发。
-
-## 🔗 相关链接
-
-- [GitHub 仓库](https://github.com/zczy-k/Con-Nav-Item)
-- [版本发布](https://github.com/zczy-k/Con-Nav-Item/releases)
-- [问题反馈](https://github.com/zczy-k/Con-Nav-Item/issues)
+### 3. 初始化配置 (安装后必看)
+1.  **访问后台**：打开 `http://你的IP:3000/admin` (Serv00 请使用脚本分配的域名)。
+2.  **默认账号**：用户名 `admin`，密码 `123456`。
+3.  **安全修改**：进入 **[用户管理]** 菜单，第一时间修改管理员用户名和密码。
+4.  **配置 AI**：进入 **[AI 智能生成]**，填入你的 API Key（推荐 DeepSeek），测试通过后即可享受一键生成功能。
 
 ---
 
-⭐ 如果这个项目对你有帮助，请给它一个星标！
+## 📦 进阶使用指南
+
+### 🌐 浏览器插件安装
+想要实现“右键一键保存网站”或“新标签页即导航”？
+1.  前往 [Releases](https://github.com/zczy-k/Con-Nav-Item/releases) 下载最新 `browser-extension.zip`。
+2.  解压后，在 Chrome/Edge 浏览器进入 `chrome://extensions/`。
+3.  开启 **开发者模式**，选择 **加载已解压的扩展程序**。
+4.  在插件设置中填入你的导航站地址和密码，完成绑定。
+
+### 🤖 如何让 AI 帮我干活？
+1.  在后台添加一个只写了“URL”的卡片。
+2.  勾选该卡片，点击 **批量 AI 生成**。
+3.  AI 会自动爬取标题、描述、图标并分类，点击“覆盖”或“补全”保存。
+
+### 🔄 维护与升级
+
+#### Docker 用户
+```bash
+# 1. 拉取镜像
+docker pull ghcr.io/zczy-k/con-nav-item:latest
+# 2. 删除容器 (数据不会丢)
+docker stop Con-Nav-Item && docker rm Con-Nav-Item
+# 3. 重新运行上面的 docker run 命令
+```
+
+#### 脚本用户 (Linux/Serv00)
+再次运行安装脚本，选择 **Update** 选项即可。
+
+---
+
+## 📸 界面预览
+
+<div align="center">
+  <img width="90%" alt="首页预览" src="https://github.com/user-attachments/assets/3b974405-312b-4cb1-9c16-5b87d45e79e5" />
+  <p><i>现代化渐变卡片首页</i></p>
+  
+  <img width="45%" alt="管理后台" src="https://github.com/user-attachments/assets/b3a4bac2-f7b8-4742-8982-11a7381782cb" />
+  <img width="45%" alt="AI 配置" src="https://github.com/user-attachments/assets/e34ab03c-fe3a-43d2-835a-775b5ceb61ed" />
+</div>
+
+---
+
+## 🛠️ 技术栈
+*   **前端**: Vue 3 + Vite + Tailwind CSS
+*   **后端**: Node.js + Express
+*   **数据库**: SQLite3 (简单、快速、易迁移)
+*   **AI 引擎**: 多模型适配器 (OpenAI, DeepSeek, Claude, GLM, etc.)
+
+## 📄 许可证
+本项目采用 **Apache License 2.0** 许可证。
+特别感谢 [nav-item](https://github.com/eooce/nav-item) 提供的灵感与基础。
+
+---
+
+⭐ 如果你喜欢这个项目，请点个 Star 鼓励一下！

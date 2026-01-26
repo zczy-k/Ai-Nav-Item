@@ -68,7 +68,7 @@ do_install() {
     
     # 下载
     yellow "  → 下载项目文件..."
-    curl -so "Con-Nav-Item.zip" "https://github.com/zczy-k/Con-Nav-Item/archive/refs/heads/main.zip"
+    curl -sLo "Con-Nav-Item.zip" "https://github.com/zczy-k/Con-Nav-Item/archive/refs/heads/main.zip"
     
     # 解压与更新
     yellow "  → 解压与数据恢复..."
